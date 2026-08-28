@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Supabase CLI local runtime cache (gitignored, not source):
+    "supabase/.temp/**",
   ]),
 ]);
 
