@@ -4,11 +4,12 @@ import { createServerActionClient } from "@/lib/supabase/server";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type PartUnion } from "@google/genai";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
 import { CHAPTER_NAMES } from "@/lib/chapters";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
+import { extractContent } from "@/lib/ai/extract-content";
 
 const DraftItemSchema = z.object({
   content: z.record(z.string(), z.string().nullable()),
@@ -93,14 +94,32 @@ async function generateDraftInternal(
   );
   const columnsDescription = columns.map((c) => `${c.column_key}（${c.label}）`).join(", ");
 
-  // 3. 資料抜粋を結合（テキスト系のみ。Step1同様の簡易実装）
-  const excerpts = await Promise.all(
-    documents.map(async (d) => {
+  // 3. 資料抜粋を結合（テキスト系はプロンプト本文へ埋め込み、画像はマルチモーダルパートとして
+  // 別途contentsに追加する。対応外の形式はエラーにせずファイル名のみのプレースホルダにする）
+  type ExcerptPart =
+    | { kind: "text"; content: string }
+    | { kind: "image"; base64: string; mimeType: string; fileName: string };
+
+  const excerptParts: ExcerptPart[] = await Promise.all(
+    documents.map(async (d): Promise<ExcerptPart> => {
       const { data: file } = await supabase.storage.from("project-documents").download(d.storage_path);
-      const text = file ? await file.text() : `[抽出不可: ${d.file_name}]`;
-      return `--- ${d.file_name} ---\n${text.slice(0, 3000)}`;
+      if (!file) return { kind: "text", content: `[取得不可: ${d.file_name}]` };
+
+      const extracted = await extractContent(file, d.file_name);
+      if (extracted.kind === "text") {
+        return { kind: "text", content: `--- ${d.file_name} ---\n${extracted.content.slice(0, 3000)}` };
+      }
+      if (extracted.kind === "image") {
+        return { kind: "image", base64: extracted.base64, mimeType: extracted.mimeType, fileName: d.file_name };
+      }
+      return { kind: "text", content: `[未対応の形式: ${d.file_name}]` };
     })
   );
+
+  const excerpts = excerptParts
+    .filter((p): p is Extract<ExcerptPart, { kind: "text" }> => p.kind === "text")
+    .map((p) => p.content);
+  const imageParts = excerptParts.filter((p): p is Extract<ExcerptPart, { kind: "image" }> => p.kind === "image");
 
   // 3.5 9章（機能要件）の場合のみ、Salesforce標準機能マッピングを参考情報として注入する
   let platformContext = "";
@@ -133,11 +152,17 @@ async function generateDraftInternal(
     .replace("{columns_description}", columnsDescription)
     .replace("{document_excerpts}", excerpts.join("\n\n") + platformContext);
 
+  const contents: PartUnion[] = [filledPrompt];
+  for (const img of imageParts) {
+    contents.push(`--- ${img.fileName}（画像） ---`);
+    contents.push({ inlineData: { mimeType: img.mimeType, data: img.base64 } });
+  }
+
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await callGeminiSafely(() =>
     ai.models.generateContent({
       model: "gemini-3.6-flash",
-      contents: filledPrompt,
+      contents,
       config: {
         responseMimeType: "application/json",
         responseJsonSchema: DRAFT_RESPONSE_SCHEMA,

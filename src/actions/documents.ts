@@ -19,8 +19,7 @@ async function uploadDocumentInternal(projectId: string, formData: FormData) {
     .upload(storagePath, file);
   if (uploadError) throw uploadError;
 
-  const excerpt = await extractExcerpt(file, file.name);
-  const classification = await classifyDocument(excerpt);
+  const classification = await classifyDocument(file, file.name);
 
   const { error: insertError } = await supabase.from("source_documents").insert({
     project_id: projectId,
@@ -66,8 +65,7 @@ async function reclassifyDocumentInternal(documentId: string, projectId: string)
     .download(doc.storage_path);
   if (downloadError || !file) throw downloadError ?? new UserFacingError("資料のダウンロードに失敗しました");
 
-  const excerpt = await extractExcerpt(file, doc.file_name);
-  const classification = await classifyDocument(excerpt);
+  const classification = await classifyDocument(file, doc.file_name);
 
   const { error: updateError } = await supabase
     .from("source_documents")
@@ -121,14 +119,4 @@ export async function getRecentDocuments(projectId: string, limit = 5): Promise<
     fileName: d.file_name,
     updatedAt: d.updated_at,
   }));
-}
-
-// テキスト系ファイルのみ簡易対応。PDF/画像等の本格対応はPhase1後半で拡張する
-// 拡張子で判定する（Storageからdownload()したBlobはfile.typeを持たない・name自体を持たないため、
-// アップロード時のFileと再分類時のBlobの両方から同じロジックで呼べるようにfileNameを別で受け取る）
-async function extractExcerpt(file: Blob, fileName: string): Promise<string> {
-  if (fileName.endsWith(".txt") || fileName.endsWith(".md")) {
-    return await file.text();
-  }
-  return `[ファイル名からの推測: ${fileName}]`;
 }

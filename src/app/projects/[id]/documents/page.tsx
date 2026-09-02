@@ -24,6 +24,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
         <input
           type="file"
           name="file"
+          accept=".txt,.md,.pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,image/*"
           required
           className="text-sm flex-1 border border-border rounded-md px-2 py-1.5 bg-page"
         />
