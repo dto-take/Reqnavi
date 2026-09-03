@@ -1,8 +1,9 @@
-import { listDocuments, uploadDocument, reclassifyDocument } from "@/actions/documents";
+import { listDocuments, reclassifyDocument } from "@/actions/documents";
 import { Card } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { InlineErrorForm } from "@/components/ui/inline-error-form";
+import { DocumentUploadZone } from "@/components/domain/document-upload-zone";
 
 type SourceDocument = {
   id: string;
@@ -14,22 +15,14 @@ type SourceDocument = {
 export default async function DocumentsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const documents = (await listDocuments(id)) as unknown as SourceDocument[] | null;
-  const uploadWithId = uploadDocument.bind(null, id);
 
   return (
     <Card className="max-w-2xl mx-auto mt-10">
       <PageHeader title="資料" />
 
-      <InlineErrorForm action={uploadWithId} className="flex items-center gap-2 mb-5 flex-wrap" successMessage="資料をアップロードしました">
-        <input
-          type="file"
-          name="file"
-          accept=".txt,.md,.pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,image/*"
-          required
-          className="text-sm flex-1 border border-border rounded-md px-2 py-1.5 bg-page"
-        />
-        <SubmitButton variant="primary" size="md" pendingText="分類中...">アップロード</SubmitButton>
-      </InlineErrorForm>
+      <div className="mb-5">
+        <DocumentUploadZone projectId={id} />
+      </div>
 
       <div className="flex flex-col">
         {documents?.map((d) => (

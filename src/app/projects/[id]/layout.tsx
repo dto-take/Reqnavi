@@ -92,6 +92,12 @@ export default async function ProjectLayout({
                 {n}. {CHAPTER_NAMES[n]}
               </Link>
             ))}
+            <Link
+              href={`/projects/${id}/bulk-generate`}
+              className="text-xs text-secondary hover:text-primary hover:bg-hover rounded px-2 py-1"
+            >
+              AI素案を一括生成
+            </Link>
           </div>
         </details>
 
