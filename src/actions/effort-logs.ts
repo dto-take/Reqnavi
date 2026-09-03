@@ -11,17 +11,31 @@ export type EffortLog = {
   hours_spent: number;
   note: string | null;
   recorded_by: string;
+  recordedByName: string | null;
+};
+
+type EffortLogRow = {
+  id: string;
+  work_start_date: string;
+  work_end_date: string;
+  hours_spent: number;
+  note: string | null;
+  recorded_by: string;
+  user_profiles: { display_name: string } | null;
 };
 
 export async function listEffortLogs(projectId: string): Promise<EffortLog[]> {
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
     .from("effort_logs")
-    .select("id, work_start_date, work_end_date, hours_spent, note, recorded_by")
+    .select("id, work_start_date, work_end_date, hours_spent, note, recorded_by, user_profiles(display_name)")
     .eq("project_id", projectId)
     .order("work_start_date", { ascending: false });
   if (error) throw error;
-  return data as unknown as EffortLog[];
+  return (data as unknown as EffortLogRow[]).map(({ user_profiles, ...log }) => ({
+    ...log,
+    recordedByName: user_profiles?.display_name ?? "(不明)",
+  }));
 }
 
 export async function createEffortLog(

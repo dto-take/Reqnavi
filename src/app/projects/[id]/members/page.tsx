@@ -3,7 +3,7 @@ import { addProjectMemberByEmail } from "@/actions/admin-users";
 import { RoleBadge, type Role } from "@/components/ui/role-badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button, buttonClasses } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 type ProjectDetail = {
   id: string;
@@ -28,14 +28,9 @@ export default async function ProjectMembersPage({ params }: { params: Promise<{
 
   return (
     <Card className="max-w-2xl mx-auto mt-10">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <p className="text-[11px] text-faint">{project.organizations?.name}</p>
-          <h1 className="text-base font-semibold text-primary">{project.name}</h1>
-        </div>
-        <a href={`/api/projects/${id}/export`} className={buttonClasses("secondary", "sm")}>
-          Wordで出力
-        </a>
+      <div className="mb-4">
+        <p className="text-[11px] text-faint">{project.organizations?.name}</p>
+        <h1 className="text-base font-semibold text-primary">{project.name}</h1>
       </div>
 
       <div className="flex justify-between items-center mb-2">

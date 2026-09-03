@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getReadinessSummary } from "@/actions/readiness";
 import { CHAPTER_NAMES } from "@/lib/chapters";
 import { readinessBarColor } from "@/lib/readiness-color";
@@ -23,7 +24,11 @@ export default async function ReadinessPage({ params }: { params: Promise<{ id: 
 
       <div className="flex flex-col gap-1.5">
         {summary.map((s) => (
-          <div key={s.chapterNo} className="grid grid-cols-4 items-center bg-sidebar rounded-md px-3 py-2 text-sm">
+          <Link
+            key={s.chapterNo}
+            href={`/projects/${id}/chapters/${s.chapterNo}`}
+            className="grid grid-cols-4 items-center bg-sidebar rounded-md px-3 py-2 text-sm hover:bg-hover"
+          >
             <span>{s.chapterNo}. {CHAPTER_NAMES[s.chapterNo]}</span>
             <div className="flex items-center gap-2">
               <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
@@ -36,7 +41,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ id: 
             </div>
             <span className={s.ambiguousCount > 3 ? "text-(--status-needhearing-text)" : "text-secondary"}>{s.ambiguousCount}件</span>
             <span className={s.needHearingCount > 0 ? "text-(--status-review-text)" : "text-secondary"}>{s.needHearingCount}件</span>
-          </div>
+          </Link>
         ))}
       </div>
 

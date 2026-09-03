@@ -259,9 +259,9 @@ export function RequirementTable({
                     : `[素案生成時] ${f.reason}`
                   )
                   .join(", ")}
-                className="text-xs text-(--status-review-text)"
+                className="text-xs text-(--status-review-text) cursor-help"
               >
-                ⚠ {item.ambiguous_flags.length}
+                ⚠ 曖昧表現 {item.ambiguous_flags.length}件
               </span>
             )}
           </div>

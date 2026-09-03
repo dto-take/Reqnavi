@@ -16,8 +16,15 @@ export default async function ProjectHomePage({ params }: { params: Promise<{ id
   return (
     <div className="max-w-4xl mx-auto mt-10 flex flex-col gap-4">
       <Card>
-        <p className="text-xs text-faint mb-1">{overview.project?.organizations?.name}</p>
-        <h1 className="text-lg font-semibold text-primary mb-3">{overview.project?.name}</h1>
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <p className="text-xs text-faint mb-1">{overview.project?.organizations?.name}</p>
+            <h1 className="text-lg font-semibold text-primary">{overview.project?.name}</h1>
+          </div>
+          <a href={`/api/projects/${id}/export`} className="text-xs text-secondary underline">
+            Wordで出力
+          </a>
+        </div>
         <div className="grid grid-cols-4 gap-4 text-center">
           <div>
             <div className="text-xl font-semibold text-primary">{overview.avgReadiness}%</div>

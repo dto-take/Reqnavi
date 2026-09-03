@@ -45,9 +45,10 @@ export default async function EffortPage({ params }: { params: Promise<{ id: str
 
       <div className="flex flex-col">
         {logs.map((log) => (
-          <div key={log.id} className="grid grid-cols-4 items-center py-2 border-t border-hover text-sm">
+          <div key={log.id} className="grid grid-cols-5 items-center py-2 border-t border-hover text-sm">
             <span>{log.work_start_date}</span>
             <span>{log.work_end_date}</span>
+            <span className="text-secondary text-xs">{log.recordedByName}</span>
             <span>{log.hours_spent}時間</span>
             <div className="flex justify-between items-center gap-2">
               <span className="text-secondary text-xs break-words min-w-0">{log.note}</span>

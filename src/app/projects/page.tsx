@@ -95,7 +95,7 @@ export default async function ProjectsPage({
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-secondary">
-                    <span>{p.selected_chapters?.length ?? 0}章 ／ 確定{stats.confirmed}件</span>
+                    <span>{p.selected_chapters?.length ?? 0}章 ／ 確定 {stats.confirmed}/{stats.total}件</span>
                     <span className="text-[11px] px-2 py-0.5 rounded bg-hover text-secondary">Salesforce</span>
                   </div>
                 </Card>

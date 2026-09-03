@@ -145,6 +145,17 @@ async function generateDraftInternal(
     }
   }
 
+  // 3.6 既存の未レビューAI素案を削除してから再生成する（再生成＝作り直しの意図）。
+  // se_reviewing・confirmed・exception_approved・rejectedの項目は対象外（人が触れたものは残す）。
+  // item_sourcesのFKはON DELETE CASCADEのため孤立レコードは残らない（案件削除機能のStepで対応済み）。
+  const { error: deleteDraftError } = await supabase
+    .from("requirement_items")
+    .delete()
+    .eq("project_id", projectId)
+    .eq("chapter_no", chapterNo)
+    .eq("status", "ai_draft");
+  if (deleteDraftError) throw deleteDraftError;
+
   // 4. プロンプトを組み立ててGeminiを呼び出す
   const { id: promptId, body: promptBody } = await getActivePrompt("extract_requirements");
   const filledPrompt = promptBody
@@ -166,6 +177,10 @@ async function generateDraftInternal(
       config: {
         responseMimeType: "application/json",
         responseJsonSchema: DRAFT_RESPONSE_SCHEMA,
+        // temperatureを下げて抽出結果を安定させる。複数資料に同一内容が重複記載されている場合、
+        // デフォルト温度だと0件・重複件数のいずれかにブレる不具合を実際に確認したため
+        // （3章・ロードマップで再現：同一スケジュールが2資料に記載されているケース）。
+        temperature: 0.1,
       },
     })
   );
