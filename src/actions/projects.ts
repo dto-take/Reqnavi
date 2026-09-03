@@ -2,6 +2,8 @@
 
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { UserFacingError } from "@/lib/user-error";
+import { errorMessage } from "@/lib/error-message";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -113,4 +115,43 @@ export async function listProjectMembers(projectId: string) {
     .eq("project_id", projectId);
   if (error) throw error;
   return data;
+}
+
+// 案件自体の削除（極めて破壊的な操作のためadmin限定）。DB側はON DELETE CASCADEで
+// 関連テーブルが連鎖削除されるが、Storage上のファイルはFKの対象外のため別途削除する。
+export async function deleteProject(projectId: string, formData: FormData) {
+  const supabase = await createServerActionClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (claims?.claims?.user_role !== "admin") {
+    throw new UserFacingError("この操作には管理者権限が必要です");
+  }
+
+  const { data: project, error: fetchError } = await supabase
+    .from("projects")
+    .select("name")
+    .eq("id", projectId)
+    .single();
+  if (fetchError || !project) throw new UserFacingError("案件が見つかりません");
+
+  const confirmName = formData.get("confirm_name") as string;
+  if (confirmName !== project.name) {
+    throw new UserFacingError("入力された案件名が一致しません");
+  }
+
+  // storage.list()は1回あたり最大100件までしか返さない。現状の運用規模（1案件あたりの
+  // 資料数）ではまず問題にならない想定だが、将来的に100件を超える案件が出てきた場合は
+  // offsetを使ったページネーションが必要になる。
+  const { data: files } = await supabase.storage
+    .from("project-documents")
+    .list(`${projectId}/uploads`, { limit: 1000 });
+  if (files && files.length > 0) {
+    const paths = files.map((f) => `${projectId}/uploads/${f.name}`);
+    await supabase.storage.from("project-documents").remove(paths);
+  }
+
+  const { error: deleteError } = await supabase.from("projects").delete().eq("id", projectId);
+  if (deleteError) throw new UserFacingError(errorMessage(deleteError));
+
+  revalidatePath("/projects");
+  redirect("/projects");
 }

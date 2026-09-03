@@ -90,6 +90,7 @@ SIerの要件定義工程を、資料からのAI素案生成 → SEによるリ�
 45. **【重要・リモートDB特有】`supabase db push`実行中にマイグレーションが原因不明で途中停止した場合、それより前のマイグレーションが実際には完全に適用されていないにもかかわらず、マイグレーション履歴（`supabase_migrations.schema_migrations`）には「適用済み」と記録されてしまうことがある。** この状態のまま`db push`を再実行すると、履歴上は完了しているはずの古いマイグレーションはスキップされ、後続のマイグレーション（例：後から作られたテーブルへのRLS設定）が「参照先テーブルが存在しない」という一見無関係なエラーで失敗する。原因調査は「エラーが出た箇所」ではなく「実際のスキーマ状態」を基準に行う（`grep`でテーブル作成元のマイグレーションを特定し、Studio等で該当テーブルが実在するか直接確認する）。**対象DBに保持すべき実データが無い場合に限り、`supabase db reset --linked`でスキーマを作り直し、全マイグレーションを最初から再適用することで解消できる。** 実データが存在する環境（特に本番）ではこの方法は使えないため、個別のマイグレーション履歴を手動で修復する必要がある（本番リリース時は特に注意すること）。
 46. **一部のnpmパッケージ（`officeparser`等）は、ファイル先頭での静的`import`がTurbopack（Next.jsのバンドラ）のSSRバンドルで正しく解決されず、実行時に`undefined`になることがある（Node単体のテストでは問題が再現しないため気づきにくい）。** サーバー専用のコード（Server Action、Route Handler内）で外部ライブラリを使う際、静的importで実行時エラー・`undefined`エラーが起きる場合は、関数内での動的import（`const lib = await import("パッケージ名")`）に切り替えることで解決できることが多い。
 47. **【重要】SupabaseのUPDATE/DELETE操作は、RLSポリシーによって対象行がフィルタされ実質0件しか更新・削除されなかった場合でも、デフォルトでは`error`を返さず「成功（0件更新）」として扱われる。** 実際に`source_documents`のUPDATEポリシーが無い状態で再分類処理を実行したところ、`{error: null}`が返るにもかかわらず実データは一切更新されていない不具合が発生した。書き込み系操作の実装時は、単に`if (error) throw error`で済ませず、意図した件数が実際に更新されたかを`.select()`で明示的に確認する（またはRLSポリシーの網羅性を規約16に従って事前に確認する）ことで、この種のサイレント失敗を防ぐ。
+48. **【重要】あるテーブル（例：`projects`）を起点にカスケード削除等の影響範囲を洗い出す場合、そのテーブルを`references projects(id)`のように直接参照するテーブルの`grep`だけでは不十分。** `project_id`列を持たず、`requirement_items`等の中間テーブル経由でのみ`projects`に連なるテーブル（例：`item_sources`・`item_history`・`baseline_item_snapshots`・`ai_reconciliation_suggestions`）が見落とされる。これらを見落とすと、削除処理の途中でFK違反が起き、処理全体が失敗する。正確に洗い出すには、`grep`ではなく`pg_constraint`を直接クエリして実際の外部キー依存グラフをたどる（`select conname, conrelid::regclass, confrelid::regclass from pg_constraint where contype = 'f'`等）。あわせて、`storage.objects`（Supabase Storage）にもテーブルと同様にDELETE用のRLSポリシーが必要な場合がある（DBの削除が成功してもStorage側のファイルだけが残る不整合を防ぐため）。
 37. **PostgRESTの埋め込みJOIN（`select("...,other_table(col)")`）は、参照元テーブルのRLSで行が見えても、それだけでは不十分。JOIN先のテーブル自体のRLSでもその行が見える必要がある。** 片方のテーブルだけ許可すると、結合結果のその部分が常に空欄になる（エラーにはならず、単に値が無いだけなので発見しづらい）。新しい埋め込みJOINを設計する際は、関係する全テーブルのSELECTポリシーが、同じ状況で両方満たされるかを確認する。
 38. **案件横断・組織横断の可視性を新しく設計する際は、必ずCLAUDE.mdの既存規約（特に規約6：パートナーへのコスト情報・組織横断機能の非表示）を読み返してから実装する。** 新機能の指示書を書く際、規約に反する設計を見落とすことがある（実例：案件横断参照機能の初回設計で、パートナー除外の考慮が指示書から漏れていた）。
 
@@ -124,11 +125,13 @@ reqnavi/
 
 日常の開発・コーディングでは、以下のいずれかのみを対象とする。**本番（Production）のSupabase/Vercelプロジェクトには、リリース承認プロセスを経ずに絶対に接続・操作しない。**
 
-| 環境 | Supabase | 用途 |
-|---|---|---|
-| ローカル | `supabase start`（Docker、都度リセット可） | 個人の開発作業 |
-| Preview/Staging | 開発用プロジェクト（例：`reqnavi-staging`） | 結合テスト・PRごとの確認。通常の開発作業はここまで |
-| Production | 本番用プロジェクト（例：`reqnavi-production`、リリース直前に別途作成） | 本番。承認フローを経てのみ接続 |
+| 環境 | Supabase | Vercel | 用途 |
+|---|---|---|---|
+| ローカル | `supabase start`（Docker、都度リセット可） | - | 個人の開発作業 |
+| Staging | `reqnavi-staging` | **Production環境として設定**（`main`ブランチ、`reqnavi.vercel.app`） | 結合テスト・実機検証。通常の開発作業はここまで |
+| 本番 | `reqnavi-production`（未作成、リリース直前に別途作成） | 未設定 | 本番。承認フローを経てのみ接続 |
+
+**重要な注意（実態とVercel上の表記のずれ）**：VercelのProduction/Preview区分を一本化する運用に変更したため、**Vercel上は「Production」と表示されるデプロイでも、接続先Supabaseは`reqnavi-staging`のまま**である。「Vercelの言うProduction」＝「本サービスの本番環境」ではない点を、開発・運用メンバー全員が混同しないよう常に意識すること。本当の本番リリース時は、`reqnavi-production`という別のSupabaseプロジェクトを新規作成し、承認フローを経て切り替える。
 
 ## 既知の未決事項（開発中に確認が必要）
 

@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { PageHeader } from "@/components/ui/page-header";
+import { ProjectDangerZone } from "@/components/domain/project-danger-zone";
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,10 +15,14 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
 
   const { data: projectData } = await supabase
     .from("projects")
-    .select("allow_cross_project_reference, selected_chapters")
+    .select("name, allow_cross_project_reference, selected_chapters")
     .eq("id", id)
     .single();
-  const project = projectData as unknown as { allow_cross_project_reference: boolean; selected_chapters: number[] } | null;
+  const project = projectData as unknown as {
+    name: string;
+    allow_cross_project_reference: boolean;
+    selected_chapters: number[];
+  } | null;
 
   return (
     <div className="max-w-md mx-auto mt-10">
@@ -66,6 +71,10 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
           <p className="text-xs text-faint">変更にはPM以上の権限が必要です</p>
         )}
       </Card>
+
+      {canEdit && claims?.claims?.user_role === "admin" && (
+        <ProjectDangerZone projectId={id} projectName={project?.name ?? ""} />
+      )}
     </div>
   );
 }
