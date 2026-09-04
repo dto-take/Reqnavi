@@ -120,7 +120,7 @@ export async function deleteFlowStep(stepId: string, projectId: string, flowType
 
 // order_indexの並び順に沿って、連続するステップ間のedgeを再生成する
 // （Step1では手動でのedge編集は行わず、リストの並び＝フローの順序とする）
-async function regenerateEdges(projectId: string, flowType: FlowType) {
+export async function regenerateEdges(projectId: string, flowType: FlowType) {
   const supabase = await createServerActionClient();
   const { data: nodesData } = await supabase
     .from("flow_nodes")

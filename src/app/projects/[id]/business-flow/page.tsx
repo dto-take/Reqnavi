@@ -1,9 +1,12 @@
 import { listFlowSteps, listFlowEdges, addFlowStep, deleteFlowStep, type FlowType } from "@/actions/business-flow";
+import { generateBusinessFlowDraft } from "@/actions/ai-draft-business-flow";
 import { SwimlaneDiagramEditor } from "@/components/domain/business-flow/SwimlaneDiagramEditor";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
+import { SubmitButton } from "@/components/ui/submit-button";
 
 export default async function BusinessFlowPage({
   params,
@@ -19,6 +22,7 @@ export default async function BusinessFlowPage({
   const steps = await listFlowSteps(id, flowType);
   const edges = await listFlowEdges(id, flowType);
   const addStep = addFlowStep.bind(null, id, flowType);
+  const draftFlow = generateBusinessFlowDraft.bind(null, id, flowType);
 
   return (
     <Card className="max-w-4xl mx-auto mt-10">
@@ -40,6 +44,12 @@ export default async function BusinessFlowPage({
       <a href={`/projects/${id}/business-flow/diff`} className="text-sm text-secondary underline mb-4 inline-block">
         As-Is/To-Be差分を確認
       </a>
+
+      {steps.length === 0 && (
+        <InlineErrorForm action={draftFlow} className="mb-4">
+          <SubmitButton variant="primary" size="md" pendingText="生成中...">AIでステップを生成</SubmitButton>
+        </InlineErrorForm>
+      )}
 
       <div className="overflow-x-auto mb-6">
         <SwimlaneDiagramEditor
