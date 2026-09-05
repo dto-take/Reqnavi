@@ -15,7 +15,7 @@ export function LoadingOverlayProvider({ children }: { children: React.ReactNode
     <LoadingContext.Provider value={{ increment, decrement }}>
       {children}
       {count > 0 && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-page/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-page/40 backdrop-blur-md">
           <BrandSpinner label="処理中..." />
         </div>
       )}

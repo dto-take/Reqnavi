@@ -34,9 +34,17 @@ body {
   font-family: var(--font-inter), sans-serif;
 }
 
-@keyframes spin-slow {
-  to { transform: rotate(360deg); }
+@keyframes brand-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.85; }
 }
-.animate-spin-slow {
-  animation: spin-slow 1.2s linear infinite;
+@keyframes brand-ripple {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(2); opacity: 0; }
+}
+.animate-brand-pulse {
+  animation: brand-pulse 1.8s ease-in-out infinite;
+}
+.animate-brand-ripple {
+  animation: brand-ripple 1.8s ease-out infinite;
 }
