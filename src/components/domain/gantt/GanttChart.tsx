@@ -2,14 +2,12 @@
 
 import { useTransition } from "react";
 import { updatePercentComplete } from "@/actions/progress-tasks";
-import { useGlobalPending } from "@/components/ui/loading-overlay";
 import { computeGanttLayout, GANTT_CONSTANTS, type ProgressTask } from "@/lib/gantt/layout";
 
 const { WEEK_WIDTH, ROW_HEIGHT, LABEL_WIDTH } = GANTT_CONSTANTS;
 
 export function GanttChart({ projectId, tasks }: { projectId: string; tasks: ProgressTask[] }) {
   const [isPending, startTransition] = useTransition();
-  useGlobalPending(isPending);
 
   if (tasks.length === 0) {
     return <div className="text-sm text-secondary py-6 text-center">まだタスクがありません</div>;

@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { moveFlowStep } from "@/actions/business-flow";
-import { useGlobalPending } from "@/components/ui/loading-overlay";
 import { computeSwimlaneLayout, LAYOUT_CONSTANTS } from "@/lib/business-flow/layout";
 import type { FlowStep, FlowEdge, FlowType } from "@/actions/business-flow";
 
@@ -22,7 +21,6 @@ export function SwimlaneDiagramEditor({
   const layout = computeSwimlaneLayout(steps);
   const [positions, setPositions] = useState(() => new Map(layout.positions));
   const [isPending, startTransition] = useTransition();
-  useGlobalPending(isPending);
 
   function handlePointerDown(e: React.PointerEvent<SVGGElement>, stepId: string) {
     e.currentTarget.setPointerCapture(e.pointerId);

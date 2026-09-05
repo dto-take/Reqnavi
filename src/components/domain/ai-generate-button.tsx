@@ -4,7 +4,6 @@ import { useFormStatus } from "react-dom";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { useGlobalPending } from "@/components/ui/loading-overlay";
 
 const MESSAGES = ["資料を読み込んでいます...", "AIが内容を分析中...", "項目を整理しています...", "もうすぐ完了します..."];
 
@@ -12,7 +11,6 @@ const MESSAGES = ["資料を読み込んでいます...", "AIが内容を分析�
 // ここでpending true→falseだけを見ると、失敗時にも「生成しました」と出てしまうため持たない。
 export function AiGenerateButton() {
   const { pending } = useFormStatus();
-  useGlobalPending(pending);
   const [messageIndex, setMessageIndex] = useState(0);
 
   useEffect(() => {

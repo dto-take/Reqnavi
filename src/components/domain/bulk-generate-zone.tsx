@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { generateDraft } from "@/actions/ai-draft";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { useGlobalPending } from "@/components/ui/loading-overlay";
 
 type ChapterOption = { chapterNo: number; chapterName: string; templateType: "A" | "B" | "C" };
 type QueueStatus = "unselected" | "pending" | "generating" | "done" | "error";
@@ -21,7 +20,6 @@ export function BulkGenerateZone({
   const [selected, setSelected] = useState<Set<number>>(new Set(chapters.map((c) => c.chapterNo)));
   const [statuses, setStatuses] = useState<Record<number, { status: QueueStatus; error?: string }>>({});
   const [isPending, startTransition] = useTransition();
-  useGlobalPending(isPending);
   const { show } = useToast();
 
   function toggle(chapterNo: number) {

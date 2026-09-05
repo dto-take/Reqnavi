@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { uploadDocument } from "@/actions/documents";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { useGlobalPending } from "@/components/ui/loading-overlay";
 
 type QueueItem = { file: File; status: "pending" | "uploading" | "done" | "error"; error?: string };
 
@@ -12,7 +11,6 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isPending, startTransition] = useTransition();
-  useGlobalPending(isPending);
   const { show } = useToast();
 
   function addFiles(files: FileList | File[]) {

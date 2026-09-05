@@ -9,13 +9,11 @@ import {
 } from "@/actions/nonfunctional-checklist";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useGlobalPending } from "@/components/ui/loading-overlay";
 
 const STATUS_CYCLE: ChecklistItem["status"][] = ["未", "済", "対象外"];
 
 export function ChecklistCard({ projectId, row }: { projectId: string; row: ChecklistCategoryRow }) {
   const [isPending, startTransition] = useTransition();
-  useGlobalPending(isPending);
   const { content } = row;
 
   function save(next: ChecklistContent) {
