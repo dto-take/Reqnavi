@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ToastProvider } from "@/components/ui/toast";
+import { LoadingOverlayProvider } from "@/components/ui/loading-overlay";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -18,7 +19,9 @@ export default function RootLayout({
   return (
     <html lang="ja" className={inter.variable}>
       <body>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <LoadingOverlayProvider>{children}</LoadingOverlayProvider>
+        </ToastProvider>
       </body>
     </html>
   );

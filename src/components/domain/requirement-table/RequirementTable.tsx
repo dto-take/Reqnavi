@@ -19,6 +19,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
 import { errorMessage } from "@/lib/error-message";
+import { useGlobalPending } from "@/components/ui/loading-overlay";
 
 // 表形式（テンプレートA/B/C）のセルは、内容が枠幅を超えた場合に横スクロールで隠れるのではなく
 // 折り返して見えるようにしたい。<input>は仕様上折り返せないため<textarea>を使い、
@@ -42,6 +43,7 @@ export function RequirementTable({
   showPlatformSuggestion?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
+  useGlobalPending(isPending);
   const [exceptionReasonDraft, setExceptionReasonDraft] = useState<Record<string, string>>({});
   const [openExceptionFor, setOpenExceptionFor] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);

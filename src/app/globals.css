@@ -33,3 +33,10 @@ body {
   color: var(--text-primary);
   font-family: var(--font-inter), sans-serif;
 }
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 1.2s linear infinite;
+}

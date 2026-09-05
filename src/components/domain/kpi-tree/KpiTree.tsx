@@ -10,6 +10,7 @@ import {
 import { KPI_LEVELS, KPI_LEVEL_DESCRIPTIONS, type KpiLevel } from "@/lib/kpi-levels";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useGlobalPending } from "@/components/ui/loading-overlay";
 
 function buildTree(nodes: KpiNode[], parentId: string | null): KpiNode[] {
   return nodes.filter((n) => n.parent_id === parentId);
@@ -30,6 +31,7 @@ export function KpiTree({
   nodes: KpiNode[];
 }) {
   const [isPending, startTransition] = useTransition();
+  useGlobalPending(isPending);
 
   function renderNode(node: KpiNode, depth: number) {
     const children = buildTree(nodes, node.id);
