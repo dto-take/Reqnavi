@@ -1,10 +1,13 @@
 "use server";
 
-import { createServerActionClient } from "@/lib/supabase/server";
+import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UserFacingError } from "@/lib/user-error";
+import { errorMessage } from "@/lib/error-message";
 import { revalidatePath } from "next/cache";
 
+// "use server"ファイルは非同期関数以外をexportできないため、この配列・型はここに閉じ、
+// 画面側（admin/users/page.tsx）は同じ6ロールをローカルに持つ（役割一覧程度の小さな重複は許容する）。
 const VALID_ROLES = ["admin", "exec", "pmo", "pm", "member", "partner"] as const;
 type ValidRole = (typeof VALID_ROLES)[number];
 
@@ -73,4 +76,76 @@ export async function updateUserRole(userId: string, formData: FormData) {
     .eq("user_id", userId);
   if (error) throw error;
   revalidatePath("/admin/users");
+}
+
+// admin-users.tsのcreatePartnerAccountを一般化したもの（これまでpartner限定だった
+// アカウント作成機能を全ロールに拡張する）。user_roleにadminを選べる点は意図的（規約39の
+// トリガーはUPDATE時のみの保護であり、この新規作成の唯一の防衛線はassertAdminである。
+// このガードは絶対に外さない）。
+// generateDraft等と同じuseActionState対応パターン（規約50）。createPartnerAccountと同様、
+// throw+error.tsxだと具体的なエラー文言が汎用文言に潰れるため、戻り値のerrorで判定する。
+export async function createUserAccount(
+  _prevState: { error: string | null },
+  formData: FormData
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createServerActionClient();
+    await assertAdmin(supabase);
+    const tenantId = await getTenantId(supabase);
+    if (!tenantId) throw new UserFacingError("認証が必要です");
+
+    const email = formData.get("email") as string;
+    const tempPassword = formData.get("temp_password") as string;
+    const userRole = formData.get("user_role") as string;
+    if (!VALID_ROLES.includes(userRole as ValidRole)) {
+      throw new UserFacingError(`不正なロールです: ${userRole}`);
+    }
+    const companyName = formData.get("company_name") as string;
+
+    const admin = createAdminClient();
+    const companyType = userRole === "partner" ? "partner" : "own";
+
+    // 会社名だけでなく種別（own/partner）も一致するものを探す。種別を見ずに名前だけで
+    // 検索すると、同名だが種別が異なる会社（例：自社と同名のパートナー会社）を誤って
+    // 引き当ててしまう可能性がある（companies.nameに一意制約は無い）。
+    const { data: existingCompany } = await admin
+      .from("companies")
+      .select("id")
+      .eq("name", companyName)
+      .eq("company_type", companyType)
+      .maybeSingle();
+
+    let companyId = existingCompany?.id;
+    if (!companyId) {
+      const { data: newCompany, error: companyError } = await admin
+        .from("companies")
+        .insert({ name: companyName, company_type: companyType })
+        .select("id")
+        .single();
+      if (companyError || !newCompany) throw companyError ?? new UserFacingError("会社の作成に失敗しました");
+      companyId = newCompany.id;
+    }
+
+    const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+    });
+    if (authError || !authUser.user) throw authError ?? new UserFacingError("アカウント作成に失敗しました");
+
+    const { error: profileError } = await admin.from("user_profiles").insert({
+      user_id: authUser.user.id,
+      tenant_id: tenantId,
+      user_role: userRole,
+      company_id: companyId,
+      auth_provider: "email",
+      force_password_reset: true,
+    });
+    if (profileError) throw profileError;
+
+    revalidatePath("/admin/users");
+    return { error: null };
+  } catch (e) {
+    return { error: errorMessage(e) };
+  }
 }
