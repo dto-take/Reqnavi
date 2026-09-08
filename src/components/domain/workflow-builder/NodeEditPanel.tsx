@@ -2,8 +2,8 @@
 
 import { useMemo, useTransition } from "react";
 import { computeWorkflowLayout } from "@/lib/workflow-layout";
-import { toWorkflowNode, branchSummary, NODE_META, RULE_OPS } from "@/lib/workflow-builder-shared";
-import { updateFlowNode, deleteWorkflowNode, type WorkflowNodeRow, type ConditionRule } from "@/actions/workflow-builder";
+import { toWorkflowNode, branchSummary, countDescendants, NODE_META, RULE_OPS } from "@/lib/workflow-builder-shared";
+import { updateFlowNode, deleteWorkflowNode, deleteConditionNode, type WorkflowNodeRow, type ConditionRule } from "@/actions/workflow-builder";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -91,6 +91,26 @@ export function NodeEditPanel({
   }
 
   function handleDelete() {
+    if (node!.node_type === "condition") {
+      const yesCount = countDescendants(allNodes, node!.id, "yes");
+      const noCount = countDescendants(allNodes, node!.id, "no");
+      // 規約：条件分岐ノードの削除は復元不可能なため、Yes/No配下の件数と、
+      // 削除するとどうなるか（Yesは本線に引き継がれる／Noは配下ごと削除される）を明示する
+      const msg =
+        `この条件分岐を削除します。\n\n` +
+        `・Yesルート配下の${yesCount}件のステップ → この位置に引き継がれます\n` +
+        `・Noルート配下の${noCount}件のステップ → まとめて削除されます\n\n` +
+        `この操作は取り消せません。削除しますか？`;
+      if (!confirm(msg)) return;
+      startTransition(() => {
+        deleteConditionNode(node!.id, projectId).then((res) => {
+          if (res.error) show(res.error, "error");
+          else onDeleted();
+        });
+      });
+      return;
+    }
+
     if (!confirm("この工程を削除しますか？この操作は取り消せません。")) return;
     startTransition(() => {
       deleteWorkflowNode(node!.id, projectId).then((res) => {

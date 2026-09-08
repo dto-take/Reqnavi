@@ -28,15 +28,34 @@ export function branchSummary(nodes: WorkflowNodeRow[], conditionId: string, bra
 // 装飾ではなく情報の分類を担う配色のため、ReqNaviの--brandには置き換えない
 // （docs/instructions/workflow_builder_phase_ab.md「重要な方針」節）。SwimlaneCanvas・
 // NodeEditPanelの両方から使うため、ここに一元化する（規約36の重複定義を避ける考え方と同じ）。
-export const NODE_META: Record<string, { label: string; color: string; tint: string; icon: string }> = {
-  start: { label: "開始", color: "#059669", tint: "#d1fae5", icon: "M5 3l14 9-14 9z" },
-  task: { label: "手動タスク", color: "#4f46e5", tint: "#e0e7ff", icon: "M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" },
-  approval: { label: "承認", color: "#7c3aed", tint: "#ede9fe", icon: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7zM9 12l2 2 4-4" },
-  condition: { label: "条件分岐", color: "#d97706", tint: "#fef3c7", icon: "M12 3l9 9-9 9-9-9z" },
-  notify: { label: "自動通知", color: "#0284c7", tint: "#e0f2fe", icon: "M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10.5 21a2 2 0 0 0 3 0" },
-  action: { label: "自動処理", color: "#0d9488", tint: "#ccfbf1", icon: "M13 2L3 14h7l-1 8 10-12h-7z" },
-  end: { label: "終了", color: "#64748b", tint: "#e2e8f0", icon: "M6 6h12v12H6z" },
+export const NODE_META: Record<string, { label: string; color: string; tint: string; icon: string; desc: string }> = {
+  start: { label: "開始", color: "#059669", tint: "#d1fae5", icon: "M5 3l14 9-14 9z", desc: "業務の起点イベント" },
+  task: { label: "手動タスク", color: "#4f46e5", tint: "#e0e7ff", icon: "M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9", desc: "人がシステムを操作" },
+  approval: { label: "承認", color: "#7c3aed", tint: "#ede9fe", icon: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7zM9 12l2 2 4-4", desc: "承認・却下の判断" },
+  condition: { label: "条件分岐", color: "#d97706", tint: "#fef3c7", icon: "M12 3l9 9-9 9-9-9z", desc: "Yes / No に分岐" },
+  notify: { label: "自動通知", color: "#0284c7", tint: "#e0f2fe", icon: "M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10.5 21a2 2 0 0 0 3 0", desc: "メール・Slack送信" },
+  action: { label: "自動処理", color: "#0d9488", tint: "#ccfbf1", icon: "M13 2L3 14h7l-1 8 10-12h-7z", desc: "バッチ・外部API連携" },
+  end: { label: "終了", color: "#64748b", tint: "#e2e8f0", icon: "M6 6h12v12H6z", desc: "業務の終端" },
 };
 
+// 左サイドバーのグループ分け（デザインハンドオフ「左サイドバー」節のグループ構成をそのまま移植）
+export const PALETTE_GROUPS: { label: string; types: string[] }[] = [
+  { label: "ベーシック", types: ["start", "end"] },
+  { label: "人が行う工程", types: ["task", "approval"] },
+  { label: "分岐・システム処理", types: ["condition", "notify", "action"] },
+];
+
 export const RULE_OPS = ["≧", "≦", "=", "≠", "含む"] as const;
+
+// 条件分岐削除の確認ダイアログ用：Yes/No配下の総ステップ数（ネストした条件分岐の配下も含む）
+export function countDescendants(nodes: WorkflowNodeRow[], parentId: string, branch: "yes" | "no"): number {
+  const direct = nodes.filter((n) => n.parent_condition_id === parentId && n.branch === branch);
+  let count = direct.length;
+  for (const d of direct) {
+    if (d.node_type === "condition") {
+      count += countDescendants(nodes, d.id, "yes") + countDescendants(nodes, d.id, "no");
+    }
+  }
+  return count;
+}
 

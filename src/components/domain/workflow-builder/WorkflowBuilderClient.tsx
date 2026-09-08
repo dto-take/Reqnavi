@@ -1,54 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { SwimlaneCanvas } from "@/components/domain/workflow-builder/SwimlaneCanvas";
 import { NodeEditPanel } from "@/components/domain/workflow-builder/NodeEditPanel";
+import { NodePalette } from "@/components/domain/workflow-builder/NodePalette";
 import { ProcedureTable } from "@/components/domain/workflow-builder/ProcedureTable";
 import { UseCaseNarrative } from "@/components/domain/workflow-builder/UseCaseNarrative";
-import { SubmitButton } from "@/components/ui/submit-button";
+import { useToast } from "@/components/ui/toast";
 import type { WorkflowNodeRow } from "@/actions/workflow-builder";
-
-// 選択ノードが条件分岐の場合、削除するとparent_condition_idのon delete cascadeで
-// DB側は配下（yes/no）ごとまとめて消える。ローカルstateも同じ範囲を除去して一致させる。
-function removeSubtree(nodes: WorkflowNodeRow[], id: string): WorkflowNodeRow[] {
-  const toRemove = new Set([id]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const n of nodes) {
-      if (n.parent_condition_id && toRemove.has(n.parent_condition_id) && !toRemove.has(n.id)) {
-        toRemove.add(n.id);
-        changed = true;
-      }
-    }
-  }
-  return nodes.filter((n) => !toRemove.has(n.id));
-}
 
 const VIEWS = ["canvas", "table", "narrative"] as const;
 type View = (typeof VIEWS)[number];
 const VIEW_LABEL: Record<View, string> = { canvas: "フロー図", table: "業務手順表", narrative: "ユースケース記述" };
 
+type InsertTarget = { conditionId: string; branch: "yes" | "no" } | null;
+
 export function WorkflowBuilderClient({
   projectId,
   initialNodes,
-  appendAction,
+  insertAction,
 }: {
   projectId: string;
   initialNodes: WorkflowNodeRow[];
-  appendAction: () => Promise<void>;
+  insertAction: (afterNodeId: string | null, nodeType: string) => Promise<{ id: string | null; error: string | null }>;
 }) {
+  const router = useRouter();
+  const { show } = useToast();
   const [nodes, setNodes] = useState(initialNodes);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [insertTarget, setInsertTarget] = useState<InsertTarget>(null);
   const [view, setView] = useState<View>("canvas");
+  const [isInserting, startInsertTransition] = useTransition();
 
-  // appendWorkflowNode（<form action>経由）はrevalidatePathでこのページのServer Componentを
-  // 再実行させるだけで、既にマウント済みのこのクライアントコンポーネントのuseStateは
-  // 自動では追従しない（Reactはpropsの変化だけでuseStateの初期値を再評価しない）ため、
-  // initialNodesが変わったらnodesを同期する。useEffectではなくレンダー中に直接setState
-  // するReact推奨パターン（https://react.dev/learn/you-might-not-need-an-effect）を使い、
-  // 余分な再レンダー・チラつきを避ける。編集中の未blurの入力がある状態で他ノードの
-  // 追加ボタンを押すと、その未保存分がこの同期で失われ得るが、暫定機能のため許容する。
+  // insertWorkflowNodeAfter・deleteConditionNode等は挿入位置に応じて既存の複数ノードの
+  // parent_condition_id/branch/order_indexを書き換え得る（不変条件の維持・Yesルートの展開等）。
+  // ローカルstateを部分的に手でパッチすると整合性が壊れやすいため、これらの操作後は
+  // router.refresh()でServer Componentから最新の全件を取り直す。initialNodesが変わったら
+  // nodesを同期する仕組みは既存のまま（レンダー中に直接setStateするReact推奨パターン）。
   const [prevInitialNodes, setPrevInitialNodes] = useState(initialNodes);
   if (initialNodes !== prevInitialNodes) {
     setPrevInitialNodes(initialNodes);
@@ -58,15 +47,48 @@ export function WorkflowBuilderClient({
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
   const actorOptions = Array.from(new Set(nodes.map((n) => n.role_lane).filter(Boolean)));
 
+  function handleSelect(id: string | null) {
+    setSelectedId(id);
+    setInsertTarget(null);
+  }
+
+  function handleSelectStub(conditionId: string, branch: "yes" | "no") {
+    setInsertTarget({ conditionId, branch });
+    setSelectedId(null);
+  }
+
   function handleLocalChange(nodeId: string, patch: Partial<WorkflowNodeRow>) {
     setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, ...patch } : n)));
   }
 
   function handleDeleted() {
-    if (!selectedId) return;
-    setNodes((prev) => removeSubtree(prev, selectedId));
     setSelectedId(null);
+    setInsertTarget(null);
+    router.refresh();
   }
+
+  function handleInsert(nodeType: string) {
+    const afterNodeId = insertTarget ? `stub:${insertTarget.conditionId}:${insertTarget.branch}` : selectedId;
+    startInsertTransition(() => {
+      insertAction(afterNodeId, nodeType).then((res) => {
+        if (res.error) {
+          show(res.error, "error");
+          return;
+        }
+        setSelectedId(res.id);
+        setInsertTarget(null);
+        setView("canvas");
+        router.refresh();
+      });
+    });
+  }
+
+  // デザインハンドオフ「挿入先ヒントの文言」節と同じ優先順位
+  const insertHint = insertTarget
+    ? `${insertTarget.branch === "yes" ? "Yes" : "No"} ルートの末尾に挿入します`
+    : selectedNode
+      ? `「${selectedNode.label}」の直後に挿入します`
+      : "フローの末尾に追加します";
 
   return (
     <div className="flex flex-col gap-3">
@@ -85,31 +107,29 @@ export function WorkflowBuilderClient({
       </div>
 
       {view === "canvas" && (
-        <>
-          <div className="flex gap-4" style={{ height: "calc(100vh - 280px)", minHeight: 420 }}>
-            <div className="flex-1 min-w-0">
-              <SwimlaneCanvas nodes={nodes} selectedId={selectedId} onSelect={setSelectedId} />
-            </div>
-            <div className="w-88 flex-none border border-border rounded-lg bg-page overflow-hidden">
-              <NodeEditPanel
-                node={selectedNode}
-                allNodes={nodes}
-                projectId={projectId}
-                actorOptions={actorOptions}
-                onLocalChange={handleLocalChange}
-                onDeleted={handleDeleted}
-                onDeselect={() => setSelectedId(null)}
-              />
-            </div>
+        <div className="flex gap-4" style={{ height: "calc(100vh - 260px)", minHeight: 440 }}>
+          <NodePalette insertHint={insertHint} disabled={isInserting} onInsert={handleInsert} />
+          <div className="flex-1 min-w-0">
+            <SwimlaneCanvas
+              nodes={nodes}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+              insertTarget={insertTarget}
+              onSelectStub={handleSelectStub}
+            />
           </div>
-
-          {/* フェーズDの本格的なパレットまでの暫定対応（本線末尾への単純追加のみ） */}
-          <form action={appendAction}>
-            <SubmitButton variant="secondary" size="sm" pendingText="追加中...">
-              + 本線の末尾に工程を追加
-            </SubmitButton>
-          </form>
-        </>
+          <div className="w-88 flex-none border border-border rounded-lg bg-page overflow-hidden">
+            <NodeEditPanel
+              node={selectedNode}
+              allNodes={nodes}
+              projectId={projectId}
+              actorOptions={actorOptions}
+              onLocalChange={handleLocalChange}
+              onDeleted={handleDeleted}
+              onDeselect={() => handleSelect(null)}
+            />
+          </div>
+        </div>
       )}
 
       {view === "table" && <ProcedureTable projectId={projectId} nodes={nodes} />}

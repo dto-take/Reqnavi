@@ -45,10 +45,14 @@ export function SwimlaneCanvas({
   nodes,
   selectedId,
   onSelect,
+  insertTarget,
+  onSelectStub,
 }: {
   nodes: WorkflowNodeRow[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  insertTarget: { conditionId: string; branch: "yes" | "no" } | null;
+  onSelectStub: (conditionId: string, branch: "yes" | "no") => void;
 }) {
   const layout = useMemo(() => computeWorkflowLayout(nodes.map(toWorkflowNode)), [nodes]);
   const cardW = LANE_WIDTH - 40;
@@ -152,6 +156,7 @@ export function SwimlaneCanvas({
             return (
               <div
                 key={n.id}
+                data-node-card={n.id}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelect(n.id);
@@ -200,11 +205,30 @@ export function SwimlaneCanvas({
             const left = laneX(pos.lane) - cardW / 2;
             const top = rowY(pos.row);
             const isYes = s.branch === "yes";
+            // 挿入先として選択中の見た目（デザインハンドオフ「空ブランチのスタブ」節の配色をそのまま移植）
+            const active = insertTarget?.conditionId === s.afterNodeId && insertTarget?.branch === s.branch;
+            const activeBg = isYes ? "#ecfdf5" : "#fff1f2";
+            const activeBorder = isYes ? "#10b981" : "#f43f5e";
+            const activeColor = isYes ? "#047857" : "#be123c";
             return (
               <div
                 key={i}
-                className="absolute box-border flex items-center justify-center gap-1.5 p-4 rounded-[11px] border-[1.5px] border-dashed border-[#cbd5e1] text-[12.5px] font-medium text-secondary bg-white"
-                style={{ left, top, width: cardW }}
+                data-node-stub={`${s.afterNodeId}:${s.branch}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectStub(s.afterNodeId, s.branch);
+                }}
+                className={`absolute box-border flex items-center justify-center gap-1.5 p-4 rounded-[11px] border-[1.5px] border-dashed text-[12.5px] font-medium bg-white cursor-pointer ${
+                  active ? "" : "text-secondary"
+                }`}
+                style={{
+                  left,
+                  top,
+                  width: cardW,
+                  background: active ? activeBg : "#ffffff",
+                  borderColor: active ? activeBorder : "#cbd5e1",
+                  color: active ? activeColor : undefined,
+                }}
               >
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
                   <path d="M12 5v14M5 12h14" />
