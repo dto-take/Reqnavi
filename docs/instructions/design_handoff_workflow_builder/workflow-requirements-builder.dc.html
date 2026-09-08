@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body { font-family: "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #4f46e5; text-decoration: none; }
+  a:hover { color: #4338ca; text-decoration: underline; }
+  input, select, textarea, button { font-family: inherit; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #6366f1; outline-offset: -1px; }
+  ::placeholder { color: #94a3b8; }
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;height:100vh;min-height:640px;background:#f8fafc;color:#0f172a;font-size:14px">
+
+  <header style="display:flex;align-items:center;gap:14px;padding:0 20px;height:56px;flex:none;background:#ffffff;border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;flex:none">
+      <div style="width:26px;height:26px;border-radius:7px;background:#4f46e5;display:flex;align-items:center;justify-content:center">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16M4 12h16M4 19h16M9 3v18"></path></svg>
+      </div>
+      <div style="font-weight:700;font-size:15px;letter-spacing:.02em">業務フロー要件定義ビルダー</div>
+    </div>
+    <div style="width:1px;height:22px;background:#e2e8f0;flex:none"></div>
+    <div style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1 1 auto;overflow:hidden">
+      <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis">商談管理＋見積提出 業務フロー</div>
+      <div style="font-size:11px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis">要件定義 Rev.0.3 ・ 最終更新 12:41</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;padding:3px;border-radius:8px;background:#f1f5f9;flex:none">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+        <button onClick="{{ t.onClick }}" style="padding:6px 14px;border-radius:6px;border:none;font-size:12.5px;font-weight:500;cursor:pointer;background:{{ t.bg }};color:{{ t.color }};box-shadow:{{ t.shadow }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex:none">
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;background:#f1f5f9;font-size:12px;color:#475569">
+        <span style="font-family:'IBM Plex Mono',monospace;font-weight:500;color:#0f172a">{{ nodeCount }}</span><span>工程</span>
+      </div>
+      <button onClick="{{ onClear }}" style="padding:7px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#334155;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#f8fafc;border-color:#94a3b8">整合性チェック</button>
+      <button onClick="{{ onClear }}" style="padding:7px 16px;border-radius:6px;border:1px solid #4f46e5;background:#4f46e5;color:#ffffff;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#4338ca">定義書に反映</button>
+    </div>
+  </header>
+
+  <div style="display:flex;flex:1;min-height:0">
+
+    <aside style="width:264px;flex:none;background:#ffffff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;min-height:0">
+      <div style="padding:16px 16px 10px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.04em">工程を追加</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px;line-height:1.5">{{ insertHint }}</div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:0 12px 16px;display:flex;flex-direction:column;gap:16px">
+        <sc-for list="{{ paletteGroups }}" as="g" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.08em;padding:0 4px">{{ g.label }}</div>
+            <sc-for list="{{ g.items }}" as="p" hint-placeholder-count="2">
+              <button onClick="{{ p.onAdd }}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:8px;border:1px solid #e2e8f0;background:#ffffff;cursor:pointer" style-hover="border-color:#a5b4fc;background:#f5f3ff">
+                <span style="width:30px;height:30px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;background:{{ p.tint }}">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="{{ p.color }}" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="{{ p.icon }}"></path></svg>
+                </span>
+                <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                  <span style="font-size:13px;font-weight:500">{{ p.label }}</span>
+                  <span style="font-size:11px;color:#94a3b8;line-height:1.3">{{ p.desc }}</span>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.08em;padding:0 4px">アクター（レーン）</div>
+          <sc-for list="{{ actorLegend }}" as="a" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;background:#f8fafc">
+              <span style="width:8px;height:8px;border-radius:3px;flex:none;background:{{ a.color }}"></span>
+              <span style="font-size:12px;color:#334155;flex:1;min-width:0">{{ a.name }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#94a3b8">{{ a.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </aside>
+
+    <main style="flex:1;min-width:0;position:relative;overflow:auto;background:#f8fafc">
+
+      <sc-if value="{{ isFlow }}" hint-placeholder-val="{{ true }}">
+        <div style="width:{{ canvasW }}px;min-width:100%">
+          <div style="position:sticky;top:0;z-index:6;display:flex;background:#ffffff;border-bottom:1px solid #cbd5e1;box-shadow:0 1px 3px rgba(15,23,42,.06)">
+            <sc-for list="{{ lanes }}" as="l" hint-placeholder-count="5">
+              <div style="width:{{ laneW }}px;flex:none;padding:11px 14px;border-right:1px solid #e2e8f0;display:flex;align-items:center;gap:8px">
+                <span style="width:6px;height:26px;border-radius:3px;flex:none;background:{{ l.color }}"></span>
+                <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                  <span style="font-size:12.5px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ l.name }}</span>
+                  <span style="font-size:10.5px;color:#94a3b8">{{ l.role }}</span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div onClick="{{ onClear }}" style="position:relative;height:{{ canvasH }}px">
+            <sc-for list="{{ lanes }}" as="l" hint-placeholder-count="5">
+              <div style="position:absolute;top:0;bottom:0;left:{{ l.left }}px;width:{{ laneW }}px;border-right:1px solid #e2e8f0;background:{{ l.bg }};pointer-events:none"></div>
+            </sc-for>
+
+            <svg style="position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none">
+              <sc-for list="{{ edges }}" as="e" hint-placeholder-count="6">
+                <path d="{{ e.d }}" fill="none" stroke="{{ e.color }}" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="{{ e.dash }}"></path>
+              </sc-for>
+              <sc-for list="{{ edges }}" as="e" hint-placeholder-count="6">
+                <circle cx="{{ e.tipX }}" cy="{{ e.tipY }}" r="3.5" fill="{{ e.color }}"></circle>
+              </sc-for>
+            </svg>
+
+            <sc-for list="{{ edgeLabels }}" as="l" hint-placeholder-count="2">
+              <div style="position:absolute;left:{{ l.x }}px;top:{{ l.y }}px;transform:translate(-50%,-50%);padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;background:{{ l.bg }};color:{{ l.color }};border:1px solid {{ l.border }};box-shadow:0 1px 2px rgba(15,23,42,.06)">{{ l.text }}</div>
+            </sc-for>
+
+            <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="8">
+              <div onClick="{{ n.onSelect }}" style="position:absolute;left:{{ n.left }}px;top:{{ n.top }}px;width:{{ cardW }}px;box-sizing:border-box;display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-radius:11px;background:#ffffff;cursor:pointer;border:1.5px solid {{ n.border }};box-shadow:{{ n.shadow }}">
+                <div style="display:flex;align-items:center;gap:7px">
+                  <span style="width:22px;height:22px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;background:{{ n.tint }}">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="{{ n.color }}" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="{{ n.icon }}"></path></svg>
+                  </span>
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.06em;color:{{ n.color }};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.typeLabel }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#94a3b8">{{ n.step }}</span>
+                  <span style="padding:1px 6px;border-radius:4px;font-size:9.5px;font-weight:700;background:{{ n.modeBg }};color:{{ n.modeColor }}">{{ n.mode }}</span>
+                </div>
+                <div style="font-size:13.5px;font-weight:500;line-height:1.4;color:#0f172a">{{ n.name }}</div>
+                <div style="display:flex;align-items:center;gap:6px;padding-top:7px;border-top:1px dashed #e2e8f0">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style="flex:none"><path d="M3 5h18v11H3zM8 20h8"></path></svg>
+                  <span style="font-size:11px;color:#475569;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.sys }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 5px;border-radius:4px">{{ n.screenId }}</span>
+                </div>
+              </div>
+            </sc-for>
+
+            <sc-for list="{{ stubs }}" as="s" hint-placeholder-count="0">
+              <button onClick="{{ s.onSelect }}" style="position:absolute;left:{{ s.left }}px;top:{{ s.top }}px;width:{{ cardW }}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:7px;padding:16px;border-radius:11px;background:{{ s.bg }};border:1.5px dashed {{ s.border }};color:{{ s.color }};font-size:12.5px;font-weight:500;cursor:pointer">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+                {{ s.text }}
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isTable }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:20px;min-width:1080px">
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px">
+            <div>
+              <div style="font-size:15px;font-weight:700">業務手順表（誰が / 何を / どの機能で）</div>
+              <div style="font-size:11.5px;color:#94a3b8;margin-top:4px">フロー図から自動生成 ・ 分岐ルートは Yes / No 列で区別されます</div>
+            </div>
+            <button onClick="{{ onClear }}" style="padding:7px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#334155;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#f1f5f9">CSVで書き出す</button>
+          </div>
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:52px 132px 60px 1.15fr 64px 1.1fr 92px 1fr 1fr;gap:0;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:10.5px;font-weight:700;color:#475569;letter-spacing:.04em">
+              <div style="padding:9px 10px">No</div>
+              <div style="padding:9px 10px;border-left:1px solid #e2e8f0">アクター（誰が）</div>
+              <div style="padding:9px 10px;border-left:1px solid #e2e8f0">ルート</div>
+              <div style="padding:9px 10px;border-left:1px solid #e2e8f0">作業内容（何を）</div>
+              <div style="padding:9px 10px;border-left:1px solid #e2e8f0">区分</div>
+              <div style="padding:9px 10px;border-left:1px solid #e2e8f0">利用システム・機能</div>
+              <div style="padding:9px 10px;border-left:1px solid #e2e8f0">画面ID</div>
+              <div style="padding:9px 10px;border-left:1px solid #e2e8f0">入力データ</div>
+              <div style="padding:9px 10px;border-left:1px solid #e2e8f0">出力データ</div>
+            </div>
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="8">
+              <div onClick="{{ s.onSelect }}" style="display:grid;grid-template-columns:52px 132px 60px 1.15fr 64px 1.1fr 92px 1fr 1fr;gap:0;border-bottom:1px solid #f1f5f9;font-size:12px;cursor:pointer;background:{{ s.rowBg }}" style-hover="background:#f5f3ff">
+                <div style="padding:10px;font-family:'IBM Plex Mono',monospace;color:#64748b">{{ s.step }}</div>
+                <div style="padding:10px;border-left:1px solid #f1f5f9;display:flex;align-items:center;gap:6px">
+                  <span style="width:6px;height:6px;border-radius:2px;flex:none;background:{{ s.actorColor }}"></span>
+                  <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.actor }}</span>
+                </div>
+                <div style="padding:10px;border-left:1px solid #f1f5f9">
+                  <span style="padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;background:{{ s.routeBg }};color:{{ s.routeColor }}">{{ s.route }}</span>
+                </div>
+                <div style="padding:10px;border-left:1px solid #f1f5f9;line-height:1.5">
+                  <span style="font-weight:500">{{ s.name }}</span>
+                  <span style="display:block;font-size:10.5px;color:#94a3b8;margin-top:2px">{{ s.typeLabel }}</span>
+                </div>
+                <div style="padding:10px;border-left:1px solid #f1f5f9">
+                  <span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:{{ s.modeBg }};color:{{ s.modeColor }}">{{ s.mode }}</span>
+                </div>
+                <div style="padding:10px;border-left:1px solid #f1f5f9;color:#334155;line-height:1.5">{{ s.sys }}</div>
+                <div style="padding:10px;border-left:1px solid #f1f5f9;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#64748b">{{ s.screenId }}</div>
+                <div style="padding:10px;border-left:1px solid #f1f5f9;color:#475569;line-height:1.5">{{ s.input }}</div>
+                <div style="padding:10px;border-left:1px solid #f1f5f9;color:#475569;line-height:1.5">{{ s.output }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+
+    <aside style="width:352px;flex:none;background:#ffffff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;min-height:0">
+      <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;min-height:0;height:100%">
+          <div style="flex:none;padding:16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:flex-start;gap:11px">
+            <span style="width:34px;height:34px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;background:{{ f.tint }}">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="{{ f.color }}" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="{{ f.icon }}"></path></svg>
+            </span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:{{ f.color }}">{{ f.typeLabel }}</div>
+              <div style="font-size:14px;font-weight:700;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#94a3b8;margin-top:3px">工程 {{ f.step }} ・ ID {{ f.id }}</div>
+            </div>
+          </div>
+
+          <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:18px">
+
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="font-size:11.5px;font-weight:700;color:#334155">作業内容（何を）</label>
+              <input value="{{ f.name }}" onChange="{{ f.setName }}" placeholder="例: 見積内容の承認" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;background:#ffffff">
+            </div>
+
+            <div style="display:flex;gap:12px">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:11.5px;font-weight:700;color:#334155">アクター（誰が）</label>
+                <select value="{{ f.actor }}" onChange="{{ f.setActor }}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;background:#ffffff">
+                  <sc-for list="{{ actorNames }}" as="a" hint-placeholder-count="4"><option value="{{ a }}">{{ a }}</option></sc-for>
+                </select>
+              </div>
+              <div style="width:104px;flex:none;display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:11.5px;font-weight:700;color:#334155">実行区分</label>
+                <select value="{{ f.mode }}" onChange="{{ f.setMode }}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;background:#ffffff">
+                  <option value="手動">手動</option>
+                  <option value="自動">自動</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0">
+              <div style="font-size:11.5px;font-weight:700;color:#334155">利用システム・機能（どの機能で）</div>
+              <input value="{{ f.sys }}" onChange="{{ f.setSys }}" placeholder="例: SFA / 見積作成機能" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;background:#ffffff">
+              <div style="display:flex;gap:10px">
+                <div style="width:132px;flex:none;display:flex;flex-direction:column;gap:5px">
+                  <label style="font-size:10.5px;font-weight:700;color:#64748b">画面 / API ID</label>
+                  <input value="{{ f.screenId }}" onChange="{{ f.setScreenId }}" placeholder="QUO-010" style="width:100%;box-sizing:border-box;padding:7px 9px;border-radius:6px;border:1px solid #cbd5e1;font-size:12px;background:#ffffff;font-family:'IBM Plex Mono',monospace">
+                </div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                  <label style="font-size:10.5px;font-weight:700;color:#64748b">システム区分</label>
+                  <select value="{{ f.sysKind }}" onChange="{{ f.setSysKind }}" style="width:100%;box-sizing:border-box;padding:7px 9px;border-radius:6px;border:1px solid #cbd5e1;font-size:12px;background:#ffffff">
+                    <option value="社内システム">社内システム</option>
+                    <option value="外部連携">外部連携</option>
+                    <option value="システム外（手作業）">システム外（手作業）</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:12px">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:11.5px;font-weight:700;color:#334155">入力データ</label>
+                <textarea value="{{ f.input }}" onChange="{{ f.setInput }}" rows="3" placeholder="例: 商談情報、価格マスタ" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:12.5px;line-height:1.6;background:#ffffff;resize:vertical"></textarea>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:11.5px;font-weight:700;color:#334155">出力データ</label>
+                <textarea value="{{ f.output }}" onChange="{{ f.setOutput }}" rows="3" placeholder="例: 見積ヘッダ・明細" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:12.5px;line-height:1.6;background:#ffffff;resize:vertical"></textarea>
+              </div>
+            </div>
+
+            <sc-if value="{{ f.isCondition }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <label style="font-size:11.5px;font-weight:700;color:#334155">分岐ルール</label>
+                  <select value="{{ f.logic }}" onChange="{{ f.setLogic }}" style="padding:4px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:11.5px;background:#ffffff">
+                    <option value="all">すべて満たす (AND)</option>
+                    <option value="any">いずれか満たす (OR)</option>
+                  </select>
+                </div>
+                <sc-for list="{{ f.rules }}" as="r" hint-placeholder-count="1">
+                  <div style="display:flex;flex-direction:column;gap:7px;padding:10px;border-radius:9px;background:#fffbeb;border:1px solid #fde68a">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <select value="{{ r.field }}" onChange="{{ r.setField }}" style="flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid #fcd34d;font-size:12px;background:#ffffff">
+                        <sc-for list="{{ ruleFields }}" as="rf" hint-placeholder-count="3"><option value="{{ rf }}">{{ rf }}</option></sc-for>
+                      </select>
+                      <select value="{{ r.op }}" onChange="{{ r.setOp }}" style="width:62px;flex:none;padding:6px 4px;border-radius:6px;border:1px solid #fcd34d;font-size:12px;background:#ffffff;text-align:center">
+                        <sc-for list="{{ ruleOps }}" as="ro" hint-placeholder-count="3"><option value="{{ ro }}">{{ ro }}</option></sc-for>
+                      </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <input value="{{ r.value }}" onChange="{{ r.setValue }}" placeholder="値を入力" style="flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid #fcd34d;font-size:12px;background:#ffffff;font-family:'IBM Plex Mono',monospace">
+                      <button onClick="{{ r.remove }}" style="flex:none;width:28px;height:28px;border-radius:6px;border:1px solid #fcd34d;background:#ffffff;color:#b45309;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#fef3c7">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </sc-for>
+                <button onClick="{{ f.addRule }}" style="padding:8px;border-radius:7px;border:1px dashed #cbd5e1;background:#ffffff;color:#475569;font-size:12px;font-weight:500;cursor:pointer" style-hover="border-color:#94a3b8;background:#f8fafc">＋ ルールを追加</button>
+                <div style="display:flex;gap:10px">
+                  <div style="flex:1;padding:10px;border-radius:9px;background:#ecfdf5;border:1px solid #a7f3d0">
+                    <div style="font-size:10px;font-weight:700;color:#047857;letter-spacing:.06em">YES ルート</div>
+                    <div style="font-size:11.5px;color:#065f46;margin-top:5px;line-height:1.5">{{ f.yesSummary }}</div>
+                  </div>
+                  <div style="flex:1;padding:10px;border-radius:9px;background:#fff1f2;border:1px solid #fecdd3">
+                    <div style="font-size:10px;font-weight:700;color:#be123c;letter-spacing:.06em">NO ルート</div>
+                    <div style="font-size:11.5px;color:#9f1239;margin-top:5px;line-height:1.5">{{ f.noSummary }}</div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="font-size:11.5px;font-weight:700;color:#334155">業務ルール・制約</label>
+              <textarea value="{{ f.rule }}" onChange="{{ f.setRule }}" rows="3" placeholder="例: 値引率20%超は部長承認が必須" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:12.5px;line-height:1.6;background:#ffffff;resize:vertical"></textarea>
+            </div>
+
+            <sc-if value="{{ showUseCase }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:10px;padding:13px;border-radius:10px;background:#f5f3ff;border:1px solid #ddd6fe">
+                <div style="display:flex;align-items:center;gap:7px">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#6d28d9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2M8 3h8v3H8zM8 12h8M8 16h5"></path></svg>
+                  <div style="font-size:11.5px;font-weight:700;color:#5b21b6;letter-spacing:.02em">ユースケース記述（自動生成）</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <div style="font-size:10px;font-weight:700;color:#7c3aed;letter-spacing:.06em">事前条件</div>
+                  <div style="font-size:12px;color:#3730a3;line-height:1.6">{{ f.pre }}</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="font-size:10px;font-weight:700;color:#7c3aed;letter-spacing:.06em">基本手順</div>
+                  <sc-for list="{{ f.ucSteps }}" as="u" hint-placeholder-count="3">
+                    <div style="display:flex;gap:7px;font-size:12px;color:#3730a3;line-height:1.6">
+                      <span style="font-family:'IBM Plex Mono',monospace;color:#7c3aed;flex:none">{{ u.no }}</span>
+                      <span style="min-width:0">{{ u.text }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <div style="font-size:10px;font-weight:700;color:#7c3aed;letter-spacing:.06em">事後条件</div>
+                  <div style="font-size:12px;color:#3730a3;line-height:1.6">{{ f.post }}</div>
+                </div>
+              </div>
+            </sc-if>
+
+          </div>
+
+          <div style="flex:none;padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;gap:8px;background:#f8fafc">
+            <button onClick="{{ f.remove }}" style="flex:1;padding:8px;border-radius:7px;border:1px solid #fecdd3;background:#ffffff;color:#be123c;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#fff1f2">工程を削除</button>
+            <button onClick="{{ onClear }}" style="flex:1;padding:8px;border-radius:7px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#f1f5f9">選択解除</button>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px;text-align:center">
+          <div style="width:44px;height:44px;border-radius:12px;background:#f1f5f9;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16M4 12h10M4 19h7"></path></svg>
+          </div>
+          <div style="font-size:13px;font-weight:500;color:#475569">工程が未選択です</div>
+          <div style="font-size:11.5px;color:#94a3b8;line-height:1.6">レーン上のカード、または手順表の行を<br>クリックすると詳細を編集できます。</div>
+        </div>
+      </sc-if>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;accent&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#4f46e5&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;options&quot;: [&quot;#4f46e5&quot;, &quot;#0f766e&quot;, &quot;#b91c1c&quot;, &quot;#334155&quot;], &quot;section&quot;: &quot;外観&quot; },
+  &quot;compact&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;レイアウト&quot; },
+  &quot;laneWidth&quot;: { &quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 268, &quot;min&quot;: 220, &quot;max&quot;: 340, &quot;step&quot;: 4, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;レイアウト&quot; },
+  &quot;showUseCase&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;要件定義&quot; }
+}">
+const META = {
+  start: { label: '開始', color: '#059669', tint: '#d1fae5', icon: 'M5 3l14 9-14 9z', desc: '業務の起点イベント' },
+  task: { label: '手動タスク', color: '#4f46e5', tint: '#e0e7ff', icon: 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9', desc: '人がシステムを操作' },
+  approval: { label: '承認', color: '#7c3aed', tint: '#ede9fe', icon: 'M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7zM9 12l2 2 4-4', desc: '承認・却下の判断' },
+  condition: { label: '条件分岐', color: '#d97706', tint: '#fef3c7', icon: 'M12 3l9 9-9 9-9-9z', desc: 'Yes / No に分岐' },
+  notify: { label: '自動通知', color: '#0284c7', tint: '#e0f2fe', icon: 'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10.5 21a2 2 0 0 0 3 0', desc: 'メール・Slack送信' },
+  action: { label: '自動処理', color: '#0d9488', tint: '#ccfbf1', icon: 'M13 2L3 14h7l-1 8 10-12h-7z', desc: 'バッチ・外部API連携' },
+  end: { label: '終了', color: '#64748b', tint: '#e2e8f0', icon: 'M6 6h12v12H6z', desc: '業務の終端' }
+};
+const GROUPS = [
+  { label: 'ベーシック', types: ['start', 'end'] },
+  { label: '人が行う工程', types: ['task', 'approval'] },
+  { label: '分岐・システム処理', types: ['condition', 'notify', 'action'] }
+];
+const ACTORS = [
+  { name: '顧客', role: '社外', color: '#0891b2' },
+  { name: '営業担当', role: '営業部', color: '#4f46e5' },
+  { name: '営業マネージャー', role: '承認者', color: '#7c3aed' },
+  { name: '見積・内勤', role: '営業事務', color: '#0d9488' },
+  { name: 'システム', role: '自動処理', color: '#64748b' }
+];
+const RULE_FIELDS = ['見積金額', '値引率', '商談ステージ', '取引区分', '与信結果', '納期'];
+const RULE_OPS = ['≧', '≦', '=', '≠', '含む'];
+
+class Component extends DCLogic {
+  state = {
+    seq: 30, tab: 'flow', selectedId: 'n5', insert: null,
+    flow: [
+      { id: 'n1', type: 'start', name: '引合の受領', actor: '顧客', mode: '手動', sys: 'Webフォーム / 問い合わせ受付', screenId: 'INQ-001', sysKind: '社内システム', input: '顧客の問い合わせ内容', output: '引合レコード', rule: '受付から24時間以内に一次対応' },
+      { id: 'n2', type: 'task', name: '商談情報の登録', actor: '営業担当', mode: '手動', sys: 'SFA / 商談登録機能', screenId: 'OPP-010', sysKind: '社内システム', input: '顧客情報、案件概要、想定金額', output: '商談レコード（ステージ=初回接触）', rule: '想定金額は税抜で入力' },
+      { id: 'n3', type: 'task', name: '見積明細の作成', actor: '見積・内勤', mode: '手動', sys: 'SFA / 見積作成機能', screenId: 'QUO-010', sysKind: '社内システム', input: '商談レコード、商品マスタ', output: '見積ヘッダ・見積明細（下書き）', rule: '型番は商品マスタからの選択のみ' },
+      { id: 'n4', type: 'action', name: '価格・値引率の自動計算', actor: 'システム', mode: '自動', sys: '価格計算エンジン / 単価API', screenId: 'PRC-API', sysKind: '外部連携', input: '見積明細、価格マスタ', output: '見積金額、値引率', rule: 'API応答3秒以内・失敗時は2回リトライ' },
+      {
+        id: 'n5', type: 'condition', name: '承認要否の判定', actor: 'システム', mode: '自動', sys: '承認ルールエンジン', screenId: 'APR-RULE', sysKind: '社内システム',
+        input: '見積金額、値引率', output: '承認要否フラグ', rule: '判定条件は承認ルールマスタで管理', logic: 'any',
+        rules: [{ field: '見積金額', op: '≧', value: '5000000' }, { field: '値引率', op: '≧', value: '20' }],
+        yes: [
+          { id: 'n6', type: 'approval', name: '見積内容の承認', actor: '営業マネージャー', mode: '手動', sys: 'SFA / 承認一覧機能', screenId: 'APR-020', sysKind: '社内システム', input: '見積ヘッダ・明細、値引理由', output: '承認履歴（承認/差戻）', rule: '依頼から2営業日以内に判断' },
+          { id: 'n7', type: 'notify', name: '承認結果の通知', actor: 'システム', mode: '自動', sys: '通知基盤 / メール送信', screenId: 'NTF-001', sysKind: '社内システム', input: '承認履歴', output: '通知ログ', rule: '差戻時は理由を必須で本文に含める', channel: 'メール' },
+          { id: 'n8', type: 'action', name: '見積書PDFの発行', actor: 'システム', mode: '自動', sys: '帳票基盤 / 見積書出力', screenId: 'RPT-030', sysKind: '社内システム', input: '承認済み見積', output: '見積書PDF（版数付き）', rule: '再発行時は版数を繰り上げ' },
+          { id: 'n9', type: 'task', name: '顧客への見積提出', actor: '営業担当', mode: '手動', sys: 'SFA / メール送信機能', screenId: 'MAIL-010', sysKind: '社内システム', input: '見積書PDF、送付先', output: '送付履歴、商談ステージ=見積提出', rule: '提出期限は引合から5営業日' },
+          { id: 'n10', type: 'end', name: '見積提出の完了', actor: '営業担当', mode: '手動', sys: 'SFA / 商談管理', screenId: 'OPP-010', sysKind: '社内システム', input: '送付履歴', output: '商談ステージ更新', rule: '' }
+        ],
+        no: [
+          { id: 'n11', type: 'action', name: '自動承認の記録', actor: 'システム', mode: '自動', sys: '承認ルールエンジン', screenId: 'APR-RULE', sysKind: '社内システム', input: '判定結果', output: '承認履歴（自動承認）', rule: '自動承認は監査ログに残す' },
+          { id: 'n12', type: 'action', name: '見積書PDFの発行', actor: 'システム', mode: '自動', sys: '帳票基盤 / 見積書出力', screenId: 'RPT-030', sysKind: '社内システム', input: '自動承認済み見積', output: '見積書PDF', rule: '' },
+          { id: 'n13', type: 'task', name: '顧客への見積提出', actor: '営業担当', mode: '手動', sys: 'SFA / メール送信機能', screenId: 'MAIL-010', sysKind: '社内システム', input: '見積書PDF、送付先', output: '送付履歴', rule: '' },
+          { id: 'n14', type: 'end', name: '見積提出の完了', actor: '営業担当', mode: '手動', sys: 'SFA / 商談管理', screenId: 'OPP-010', sysKind: '社内システム', input: '送付履歴', output: '商談ステージ更新', rule: '' }
+        ]
+      }
+    ]
+  };
+
+  /* ---------- tree helpers ---------- */
+  chains(chain, out) {
+    out.push(chain);
+    chain.forEach(n => { if (n.type === 'condition') { this.chains(n.yes || [], out); this.chains(n.no || [], out); } });
+    return out;
+  }
+  allChains() { return this.chains(this.state.flow, []); }
+  find(id) {
+    let hit = null;
+    this.allChains().forEach(c => c.forEach((n, i) => { if (n.id === id) hit = { node: n, chain: c, index: i }; }));
+    return hit;
+  }
+
+  update(id, patch) {
+    this.setState(s => {
+      const clone = JSON.parse(JSON.stringify(s.flow));
+      const walk = ch => ch.forEach(n => {
+        if (n.id === id) Object.assign(n, patch);
+        if (n.type === 'condition') { walk(n.yes || []); walk(n.no || []); }
+      });
+      walk(clone);
+      return { flow: clone };
+    });
+  }
+  updateRule(n, i, patch) {
+    this.update(n.id, { rules: (n.rules || []).map((r, j) => (j === i ? { ...r, ...patch } : r)) });
+  }
+
+  add = type => {
+    const id = 'n' + this.state.seq;
+    const auto = type === 'action' || type === 'notify' || type === 'condition';
+    const base = {
+      id, type, name: META[type].label, actor: auto ? 'システム' : '営業担当',
+      mode: auto ? '自動' : '手動', sys: '', screenId: '', sysKind: '社内システム',
+      input: '', output: '', rule: ''
+    };
+    if (type === 'notify') base.channel = 'メール';
+    if (type === 'condition') Object.assign(base, { logic: 'all', rules: [{ field: RULE_FIELDS[0], op: '≧', value: '' }], yes: [], no: [] });
+
+    const insertAt = (ch, index, node) => {
+      ch.splice(index, 0, node);
+      if (node.type === 'condition') { node.yes = ch.splice(index + 1).concat(node.yes || []); }
+    };
+
+    this.setState(s => {
+      const clone = JSON.parse(JSON.stringify(s.flow));
+      const ins = s.insert;
+      let done = false;
+      const walk = ch => {
+        for (let i = 0; i < ch.length && !done; i++) {
+          const n = ch[i];
+          if (ins && ins.kind === 'branch' && n.id === ins.id) {
+            n[ins.branch] = n[ins.branch] || [];
+            insertAt(n[ins.branch], n[ins.branch].length, base); done = true; return;
+          }
+          if (!ins && n.id === s.selectedId) {
+            if (n.type === 'condition') { n.yes = n.yes || []; insertAt(n.yes, 0, base); }
+            else insertAt(ch, i + 1, base);
+            done = true; return;
+          }
+          if (n.type === 'condition') { walk(n.yes || []); walk(n.no || []); }
+        }
+      };
+      walk(clone);
+      if (!done) {
+        let tail = clone;
+        while (tail.length && tail[tail.length - 1].type === 'condition') tail = (tail[tail.length - 1].yes = tail[tail.length - 1].yes || []);
+        insertAt(tail, tail.length, base);
+      }
+      return { flow: clone, seq: s.seq + 1, selectedId: id, insert: null, tab: 'flow' };
+    });
+  };
+
+  remove = id => {
+    this.setState(s => {
+      const clone = JSON.parse(JSON.stringify(s.flow));
+      const walk = ch => {
+        for (let i = 0; i < ch.length; i++) {
+          if (ch[i].id === id) {
+            const gone = ch[i];
+            ch.splice(i, 1, ...(gone.type === 'condition' ? (gone.yes || []) : []));
+            return true;
+          }
+          const n = ch[i];
+          if (n.type === 'condition' && (walk(n.yes || []) || walk(n.no || []))) return true;
+        }
+        return false;
+      };
+      walk(clone);
+      return { flow: clone, selectedId: null, insert: null };
+    });
+  };
+
+  /* ---------- swimlane layout ---------- */
+  actorIndex(name) {
+    const i = ACTORS.findIndex(a => a.name === name);
+    return i < 0 ? ACTORS.length - 1 : i;
+  }
+
+  layout() {
+    const compact = !!this.props.compact;
+    const LW = this.props.laneWidth || 268;
+    const CARD = LW - 40;
+    const NH = compact ? 84 : 100;
+    const VG = compact ? 34 : 52;
+    const PITCH = NH + VG;
+    const accent = this.props.accent || '#4f46e5';
+    const nodes = [], edges = [], edgeLabels = [], stubs = [], steps = [];
+    let stepNo = 0, maxRow = 0;
+
+    const laneX = name => this.actorIndex(name) * LW + LW / 2;
+    const rowY = row => 28 + row * PITCH;
+
+    const link = (from, to, color, text, dash) => {
+      const span = Math.abs(to.y - from.y);
+      let d;
+      if (from.elbow && span > PITCH * 1.4) {
+        // 長距離（Noルートなど）はレーン境界のガター（カードが無い帯）を通す
+        const lane = Math.max(Math.round((from.x - LW / 2) / LW), Math.round((to.x - LW / 2) / LW));
+        const gutter = (lane + 1) * LW - 12;
+        const y1 = from.y + 26, y2 = to.y - 26;
+        d = 'M' + from.x + ' ' + from.y + ' L' + from.x + ' ' + y1 + ' L' + gutter + ' ' + y1 +
+          ' L' + gutter + ' ' + y2 + ' L' + to.x + ' ' + y2 + ' L' + to.x + ' ' + to.y;
+      } else {
+        const dy = Math.max(30, span * 0.45);
+        d = 'M' + from.x + ' ' + from.y + ' C ' + from.x + ' ' + (from.y + dy) + ', ' + to.x + ' ' + (to.y - dy) + ', ' + to.x + ' ' + to.y;
+      }
+      edges.push({ d, color, tipX: to.x, tipY: to.y, dash: dash || '0' });
+      if (text) edgeLabels.push({
+        // 分岐ラベルは条件ノードの直下に固定（長い経路の中点に置くと他カードに重なる）
+        text, x: from.x + (text === 'Yes' ? -48 : 48), y: from.y + 20,
+        bg: text === 'Yes' ? '#ecfdf5' : '#fff1f2',
+        color: text === 'Yes' ? '#047857' : '#be123c',
+        border: text === 'Yes' ? '#a7f3d0' : '#fecdd3'
+      });
+    };
+
+    // chain を配置し、使い終わった次の row を返す
+    const place = (chain, row, parent, route) => {
+      let r = row, prev = parent;
+      for (let i = 0; i < chain.length; i++) {
+        const n = chain[i], m = META[n.type], sel = n.id === this.state.selectedId;
+        const cx = laneX(n.actor), top = rowY(r);
+        stepNo += 1;
+        const mode = n.mode || (n.type === 'action' || n.type === 'notify' ? '自動' : '手動');
+        const common = {
+          id: n.id, step: String(stepNo).padStart(2, '0'), name: n.name, typeLabel: m.label,
+          color: m.color, tint: m.tint, icon: m.icon, actor: n.actor,
+          actorColor: ACTORS[this.actorIndex(n.actor)].color,
+          sys: n.sys || '（システム未定義）', screenId: n.screenId || '—',
+          mode, modeBg: mode === '自動' ? '#f1f5f9' : '#eef2ff', modeColor: mode === '自動' ? '#475569' : '#4338ca',
+          input: n.input || '—', output: n.output || '—', route,
+          routeBg: route === 'Yes' ? '#ecfdf5' : route === 'No' ? '#fff1f2' : '#f1f5f9',
+          routeColor: route === 'Yes' ? '#047857' : route === 'No' ? '#be123c' : '#64748b',
+          onSelect: ev => { ev.stopPropagation(); this.setState({ selectedId: n.id, insert: null }); }
+        };
+        nodes.push({
+          ...common, left: Math.round(cx - CARD / 2), top: Math.round(top),
+          border: sel ? accent : '#e2e8f0',
+          shadow: sel ? '0 0 0 3px ' + accent + '26, 0 8px 18px -8px rgba(15,23,42,.3)' : '0 1px 2px rgba(15,23,42,.06)'
+        });
+        steps.push({ ...common, rowBg: sel ? '#eef2ff' : '#ffffff' });
+        if (prev) link(prev, { x: cx, y: top }, prev.color, prev.text, prev.dash);
+        maxRow = Math.max(maxRow, r);
+
+        if (n.type === 'condition') {
+          const anchor = { x: cx, y: top + NH };
+          const yesRow = r + 1;
+          const yesEnd = (n.yes || []).length
+            ? place(n.yes, yesRow, { x: cx, y: top + NH, color: '#10b981', text: 'Yes', elbow: true }, 'Yes')
+            : (() => {
+              link(anchor, { x: laneX(n.actor), y: rowY(yesRow) }, '#10b981', 'Yes', '5 4');
+              const st = this.state.insert, active = st && st.kind === 'branch' && st.id === n.id && st.branch === 'yes';
+              stubs.push({
+                left: Math.round(laneX(n.actor) - CARD / 2), top: Math.round(rowY(yesRow)),
+                text: 'Yes ルートに工程を追加', bg: active ? '#ecfdf5' : '#ffffff',
+                border: active ? '#10b981' : '#cbd5e1', color: active ? '#047857' : '#64748b',
+                onSelect: ev => { ev.stopPropagation(); this.setState({ insert: { kind: 'branch', id: n.id, branch: 'yes' }, selectedId: null }); }
+              });
+              maxRow = Math.max(maxRow, yesRow);
+              return yesRow + 1;
+            })();
+          if ((n.no || []).length) place(n.no, yesEnd, { x: cx, y: top + NH, color: '#f43f5e', text: 'No', elbow: true }, 'No');
+          else {
+            link(anchor, { x: laneX(n.actor), y: rowY(yesEnd) }, '#f43f5e', 'No', '5 4');
+            const st = this.state.insert, active = st && st.kind === 'branch' && st.id === n.id && st.branch === 'no';
+            stubs.push({
+              left: Math.round(laneX(n.actor) - CARD / 2), top: Math.round(rowY(yesEnd)),
+              text: 'No ルートに工程を追加', bg: active ? '#fff1f2' : '#ffffff',
+              border: active ? '#f43f5e' : '#cbd5e1', color: active ? '#be123c' : '#64748b',
+              onSelect: ev => { ev.stopPropagation(); this.setState({ insert: { kind: 'branch', id: n.id, branch: 'no' }, selectedId: null }); }
+            });
+            maxRow = Math.max(maxRow, yesEnd);
+          }
+          return maxRow + 1;
+        }
+        prev = { x: cx, y: top + NH, color: '#cbd5e1', text: '' };
+        r += 1;
+      }
+      return r;
+    };
+
+    place(this.state.flow, 0, null, '本線');
+
+    const counts = {};
+    steps.forEach(s => { counts[s.actor] = (counts[s.actor] || 0) + 1; });
+
+    return {
+      nodes, edges, edgeLabels, stubs, steps, cardW: CARD, laneW: LW,
+      canvasW: ACTORS.length * LW, canvasH: rowY(maxRow) + NH + 60,
+      nodeCount: steps.length,
+      lanes: ACTORS.map((a, i) => ({ ...a, left: i * LW, bg: i % 2 ? '#f8fafc' : '#ffffff' })),
+      actorLegend: ACTORS.map(a => ({ ...a, count: counts[a.name] || 0 }))
+    };
+  }
+
+  /* ---------- render values ---------- */
+  renderVals() {
+    const L = this.layout();
+    const hit = this.state.selectedId ? this.find(this.state.selectedId) : null;
+    const ins = this.state.insert;
+    const tab = this.state.tab;
+    let f = null;
+
+    if (hit) {
+      const n = hit.node, m = META[n.type];
+      const set = k => ev => this.update(n.id, { [k]: ev.target.value });
+      const row = L.steps.find(s => s.id === n.id) || {};
+      const prevName = hit.index > 0 ? hit.chain[hit.index - 1].name : null;
+      const nextName = hit.index < hit.chain.length - 1 ? hit.chain[hit.index + 1].name : null;
+      const sysLabel = n.sys || '対象システム';
+      const ucSteps = n.type === 'condition'
+        ? [
+          { no: '1.', text: sysLabel + ' が ' + (n.input || '判定対象データ') + ' を取得する' },
+          { no: '2.', text: '判定条件（' + (n.logic === 'any' ? 'いずれか満たす' : 'すべて満たす') + '）: ' + (n.rules || []).map(r => r.field + ' ' + r.op + ' ' + (r.value || '—')).join(n.logic === 'any' ? ' または ' : ' かつ ') },
+          { no: '3.', text: '成立時は Yes ルート、非成立時は No ルートへ分岐する' }
+        ]
+        : [
+          { no: '1.', text: n.actor + ' が ' + sysLabel + '（' + (n.screenId || 'ID未定') + '）を開く' },
+          { no: '2.', text: (n.input || '必要情報') + ' を入力・確認する' },
+          { no: '3.', text: n.name + ' を実行する' + (n.mode === '自動' ? '（システムが自動実行）' : '') }
+        ];
+      f = {
+        id: n.id, step: row.step || '—', name: n.name, typeLabel: m.label, color: m.color, tint: m.tint, icon: m.icon,
+        actor: n.actor, mode: n.mode || '手動', sys: n.sys || '', screenId: n.screenId || '',
+        sysKind: n.sysKind || '社内システム', input: n.input || '', output: n.output || '', rule: n.rule || '',
+        logic: n.logic || 'all', isCondition: n.type === 'condition',
+        setName: set('name'), setActor: set('actor'), setMode: set('mode'), setSys: set('sys'),
+        setScreenId: set('screenId'), setSysKind: set('sysKind'), setInput: set('input'),
+        setOutput: set('output'), setRule: set('rule'), setLogic: set('logic'),
+        rules: (n.rules || []).map((r, i) => ({
+          field: r.field, op: r.op, value: r.value,
+          setField: ev => this.updateRule(n, i, { field: ev.target.value }),
+          setOp: ev => this.updateRule(n, i, { op: ev.target.value }),
+          setValue: ev => this.updateRule(n, i, { value: ev.target.value }),
+          remove: () => this.update(n.id, { rules: (n.rules || []).filter((_, j) => j !== i) })
+        })),
+        addRule: () => this.update(n.id, { rules: (n.rules || []).concat([{ field: RULE_FIELDS[0], op: '≧', value: '' }]) }),
+        yesSummary: this.branchSummary(n.yes), noSummary: this.branchSummary(n.no),
+        pre: prevName ? '「' + prevName + '」が完了していること' + (n.rule ? '／' + n.rule : '') : 'フローの起点（事前条件なし）',
+        post: (n.output || '処理結果') + ' が確定し、' + (nextName ? '「' + nextName + '」へ引き継がれる' : n.type === 'condition' ? 'Yes / No いずれかのルートへ進む' : '業務が完了する'),
+        ucSteps,
+        remove: () => this.remove(n.id)
+      };
+    }
+
+    return {
+      ...L,
+      isFlow: tab === 'flow', isTable: tab === 'table',
+      tabs: [['flow', 'フロー図'], ['table', '業務手順表']].map(([k, label]) => ({
+        label, onClick: () => this.setState({ tab: k }),
+        bg: tab === k ? '#ffffff' : 'transparent',
+        color: tab === k ? '#0f172a' : '#64748b',
+        shadow: tab === k ? '0 1px 2px rgba(15,23,42,.12)' : 'none'
+      })),
+      actorNames: ACTORS.map(a => a.name), ruleFields: RULE_FIELDS, ruleOps: RULE_OPS,
+      paletteGroups: GROUPS.map(g => ({ label: g.label, items: g.types.map(t => ({ ...META[t], type: t, onAdd: () => this.add(t) })) })),
+      insertHint: ins ? (ins.branch === 'yes' ? 'Yes' : 'No') + ' ルートの末尾に挿入します'
+        : hit ? '「' + hit.node.name + '」の直後に挿入します' : 'フローの末尾に追加します',
+      showUseCase: this.props.showUseCase !== false,
+      hasSelection: !!f, noSelection: !f, f: f || {},
+      onClear: () => this.setState({ selectedId: null, insert: null })
+    };
+  }
+
+  branchSummary(branch) {
+    const b = branch || [];
+    if (!b.length) return 'ノード未設定';
+    return b.length + '工程 ・ ' + b.map(x => x.name).join(' → ');
+  }
+}
+</script>
+</body>
+</html>

@@ -4,7 +4,8 @@ import { getRecentDocuments } from "@/actions/documents";
 import { computeNextAction } from "@/lib/next-action";
 import { CHAPTER_GROUPS, CHAPTER_NAMES } from "@/lib/chapters";
 import { Card } from "@/components/ui/card";
-import { Button, buttonClasses } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { DownloadButton } from "@/components/ui/download-button";
 
 export default async function ProjectHomePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,12 +23,12 @@ export default async function ProjectHomePage({ params }: { params: Promise<{ id
             <h1 className="text-lg font-semibold text-primary">{overview.project?.name}</h1>
           </div>
           <div className="flex gap-2">
-            <a href={`/api/projects/${id}/export`} className={buttonClasses("secondary", "sm")}>
+            <DownloadButton href={`/api/projects/${id}/export`} fallbackFileName="export.docx" pendingText="Word生成中...">
               Wordで出力
-            </a>
-            <a href={`/api/projects/${id}/export-pptx`} className={buttonClasses("secondary", "sm")}>
+            </DownloadButton>
+            <DownloadButton href={`/api/projects/${id}/export-pptx`} fallbackFileName="export.pptx" pendingText="PowerPoint生成中...">
               PowerPointで出力（サマリー）
-            </a>
+            </DownloadButton>
           </div>
         </div>
         <div className="grid grid-cols-4 gap-4 text-center">

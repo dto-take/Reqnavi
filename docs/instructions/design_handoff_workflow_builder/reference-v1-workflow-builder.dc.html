@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body { font-family: "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #4f46e5; text-decoration: none; }
+  a:hover { color: #4338ca; text-decoration: underline; }
+  input, select, textarea, button { font-family: inherit; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #6366f1; outline-offset: -1px; }
+  ::placeholder { color: #94a3b8; }
+</style>
+</helmet>
+<div style="display:flex;flex-direction:column;height:100vh;min-height:640px;background:#f8fafc;color:#0f172a;font-size:14px">
+
+  <header style="display:flex;align-items:center;gap:16px;padding:0 20px;height:56px;flex:none;background:#ffffff;border-bottom:1px solid #e2e8f0">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:26px;height:26px;border-radius:7px;background:#4f46e5;display:flex;align-items:center;justify-content:center">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v5M5 21v-4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4M9 3h6v5H9z"></path></svg>
+      </div>
+      <div style="font-weight:700;font-size:15px;letter-spacing:.02em">ワークフロービルダー</div>
+    </div>
+    <div style="width:1px;height:22px;background:#e2e8f0"></div>
+    <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+      <div style="font-size:13px;font-weight:500;color:#0f172a">経費申請フロー v3</div>
+      <div style="font-size:11px;color:#94a3b8">最終保存 12:41 ・ 下書き</div>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;background:#f1f5f9;font-size:12px;color:#475569">
+        <span style="font-family:'IBM Plex Mono',monospace;font-weight:500;color:#0f172a">{{ nodeCount }}</span>
+        <span>ノード</span>
+      </div>
+      <button onClick="{{ onValidate }}" style="padding:7px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#334155;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#f8fafc;border-color:#94a3b8">検証</button>
+      <button onClick="{{ onValidate }}" style="padding:7px 16px;border-radius:6px;border:1px solid #4f46e5;background:#4f46e5;color:#ffffff;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#4338ca;border-color:#4338ca">公開する</button>
+    </div>
+  </header>
+
+  <div style="display:flex;flex:1;min-height:0">
+
+    <aside style="width:264px;flex:none;background:#ffffff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;min-height:0">
+      <div style="padding:16px 16px 10px">
+        <div style="font-size:12px;font-weight:700;color:#0f172a;letter-spacing:.04em">ノードを追加</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px;line-height:1.5">{{ insertHint }}</div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:0 12px 16px;display:flex;flex-direction:column;gap:16px">
+        <sc-for list="{{ paletteGroups }}" as="g" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.08em;padding:0 4px">{{ g.label }}</div>
+            <sc-for list="{{ g.items }}" as="p" hint-placeholder-count="2">
+              <button onClick="{{ p.onAdd }}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:8px;border:1px solid #e2e8f0;background:#ffffff;cursor:pointer" style-hover="border-color:#a5b4fc;background:#f5f3ff">
+                <span style="width:30px;height:30px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;background:{{ p.tint }}">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="{{ p.color }}" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="{{ p.icon }}"></path></svg>
+                </span>
+                <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                  <span style="font-size:13px;font-weight:500;color:#0f172a">{{ p.label }}</span>
+                  <span style="font-size:11px;color:#94a3b8;line-height:1.3">{{ p.desc }}</span>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex:none;padding:12px 16px;border-top:1px solid #e2e8f0;background:#f8fafc;font-size:11px;color:#94a3b8;line-height:1.6">
+        ノードを選択して追加すると、その直後に挿入されます。
+      </div>
+    </aside>
+
+    <main style="flex:1;min-width:0;position:relative;overflow:auto;background:#f8fafc">
+      <sc-if value="{{ showGrid }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;inset:0;background-image:radial-gradient(#cbd5e1 1px, transparent 1px);background-size:22px 22px;opacity:.7;pointer-events:none"></div>
+      </sc-if>
+      <div onClick="{{ onCanvasClick }}" style="position:relative;width:{{ canvasW }}px;height:{{ canvasH }}px;min-width:100%;min-height:100%">
+
+        <svg style="position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none">
+          <sc-for list="{{ edges }}" as="e" hint-placeholder-count="5">
+            <path d="{{ e.d }}" fill="none" stroke="{{ e.color }}" strokeWidth="2" strokeLinecap="round"></path>
+          </sc-for>
+          <sc-for list="{{ edges }}" as="e" hint-placeholder-count="5">
+            <circle cx="{{ e.tipX }}" cy="{{ e.tipY }}" r="3.5" fill="{{ e.color }}"></circle>
+          </sc-for>
+        </svg>
+
+        <sc-for list="{{ edgeLabels }}" as="l" hint-placeholder-count="2">
+          <div style="position:absolute;left:{{ l.x }}px;top:{{ l.y }}px;transform:translate(-50%,-50%);padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;background:{{ l.bg }};color:{{ l.color }};border:1px solid {{ l.border }}">{{ l.text }}</div>
+        </sc-for>
+
+        <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="6">
+          <div onClick="{{ n.onSelect }}" style="position:absolute;left:{{ n.left }}px;top:{{ n.top }}px;width:{{ nodeW }}px;box-sizing:border-box;display:flex;align-items:center;gap:11px;padding:12px 13px;border-radius:12px;background:#ffffff;cursor:pointer;border:1.5px solid {{ n.border }};box-shadow:{{ n.shadow }}">
+            <span style="width:34px;height:34px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;background:{{ n.tint }}">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="{{ n.color }}" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="{{ n.icon }}"></path></svg>
+            </span>
+            <span style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1">
+              <span style="font-size:10px;font-weight:700;letter-spacing:.06em;color:{{ n.color }}">{{ n.typeLabel }}</span>
+              <span style="font-size:13.5px;font-weight:500;color:#0f172a;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.name }}</span>
+              <span style="font-size:11px;color:#94a3b8;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.sub }}</span>
+            </span>
+          </div>
+        </sc-for>
+
+        <sc-for list="{{ stubs }}" as="s" hint-placeholder-count="0">
+          <button onClick="{{ s.onSelect }}" style="position:absolute;left:{{ s.left }}px;top:{{ s.top }}px;width:{{ nodeW }}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:7px;padding:14px;border-radius:12px;background:{{ s.bg }};border:1.5px dashed {{ s.border }};color:{{ s.color }};font-size:12.5px;font-weight:500;cursor:pointer">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            {{ s.text }}
+          </button>
+        </sc-for>
+      </div>
+    </main>
+
+    <aside style="width:336px;flex:none;background:#ffffff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;min-height:0">
+      <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;min-height:0;height:100%">
+          <div style="flex:none;padding:16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:flex-start;gap:11px">
+            <span style="width:34px;height:34px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;background:{{ f.tint }}">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="{{ f.color }}" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="{{ f.icon }}"></path></svg>
+            </span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:{{ f.color }}">{{ f.typeLabel }}</div>
+              <div style="font-size:14px;font-weight:700;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#94a3b8;margin-top:3px">ID: {{ f.id }}</div>
+            </div>
+          </div>
+
+          <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:18px">
+
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="font-size:11.5px;font-weight:700;color:#334155">ノード名</label>
+              <input value="{{ f.name }}" onChange="{{ f.setName }}" placeholder="例: 部長承認" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;color:#0f172a;background:#ffffff">
+            </div>
+
+            <sc-if value="{{ f.isTask }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:18px">
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <label style="font-size:11.5px;font-weight:700;color:#334155">担当者</label>
+                  <select value="{{ f.assignee }}" onChange="{{ f.setAssignee }}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;color:#0f172a;background:#ffffff">
+                    <sc-for list="{{ assignees }}" as="a" hint-placeholder-count="3"><option value="{{ a }}">{{ a }}</option></sc-for>
+                  </select>
+                </div>
+                <div style="display:flex;gap:12px">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                    <label style="font-size:11.5px;font-weight:700;color:#334155">期限（日）</label>
+                    <input value="{{ f.due }}" onChange="{{ f.setDue }}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;background:#ffffff;font-family:'IBM Plex Mono',monospace">
+                  </div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                    <label style="font-size:11.5px;font-weight:700;color:#334155">超過時</label>
+                    <select value="{{ f.escalate }}" onChange="{{ f.setEscalate }}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;background:#ffffff">
+                      <option value="催促通知">催促通知</option>
+                      <option value="上位者へ委譲">上位者へ委譲</option>
+                      <option value="何もしない">何もしない</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ f.isCondition }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <label style="font-size:11.5px;font-weight:700;color:#334155">分岐ルール</label>
+                  <select value="{{ f.logic }}" onChange="{{ f.setLogic }}" style="padding:4px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:11.5px;background:#ffffff">
+                    <option value="all">すべて満たす (AND)</option>
+                    <option value="any">いずれか満たす (OR)</option>
+                  </select>
+                </div>
+                <sc-for list="{{ f.rules }}" as="r" hint-placeholder-count="1">
+                  <div style="display:flex;flex-direction:column;gap:7px;padding:10px;border-radius:9px;background:#fffbeb;border:1px solid #fde68a">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <select value="{{ r.field }}" onChange="{{ r.setField }}" style="flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid #fcd34d;font-size:12px;background:#ffffff">
+                        <sc-for list="{{ ruleFields }}" as="rf" hint-placeholder-count="3"><option value="{{ rf }}">{{ rf }}</option></sc-for>
+                      </select>
+                      <select value="{{ r.op }}" onChange="{{ r.setOp }}" style="width:64px;flex:none;padding:6px 4px;border-radius:6px;border:1px solid #fcd34d;font-size:12px;background:#ffffff;text-align:center">
+                        <sc-for list="{{ ruleOps }}" as="ro" hint-placeholder-count="3"><option value="{{ ro }}">{{ ro }}</option></sc-for>
+                      </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <input value="{{ r.value }}" onChange="{{ r.setValue }}" placeholder="値を入力" style="flex:1;min-width:0;padding:6px 8px;border-radius:6px;border:1px solid #fcd34d;font-size:12px;background:#ffffff;font-family:'IBM Plex Mono',monospace">
+                      <button onClick="{{ r.remove }}" style="flex:none;width:28px;height:28px;border-radius:6px;border:1px solid #fcd34d;background:#ffffff;color:#b45309;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#fef3c7">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </sc-for>
+                <button onClick="{{ f.addRule }}" style="padding:8px;border-radius:7px;border:1px dashed #cbd5e1;background:#ffffff;color:#475569;font-size:12px;font-weight:500;cursor:pointer" style-hover="border-color:#94a3b8;background:#f8fafc">＋ ルールを追加</button>
+                <div style="display:flex;gap:10px;margin-top:2px">
+                  <div style="flex:1;padding:10px;border-radius:9px;background:#ecfdf5;border:1px solid #a7f3d0">
+                    <div style="font-size:10px;font-weight:700;color:#047857;letter-spacing:.06em">YES ルート</div>
+                    <div style="font-size:11.5px;color:#065f46;margin-top:5px;line-height:1.4">{{ f.yesSummary }}</div>
+                  </div>
+                  <div style="flex:1;padding:10px;border-radius:9px;background:#fff1f2;border:1px solid #fecdd3">
+                    <div style="font-size:10px;font-weight:700;color:#be123c;letter-spacing:.06em">NO ルート</div>
+                    <div style="font-size:11.5px;color:#9f1239;margin-top:5px;line-height:1.4">{{ f.noSummary }}</div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ f.isNotify }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:18px">
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <label style="font-size:11.5px;font-weight:700;color:#334155">通知チャネル</label>
+                  <select value="{{ f.channel }}" onChange="{{ f.setChannel }}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;background:#ffffff">
+                    <option value="メール">メール</option>
+                    <option value="Slack">Slack</option>
+                    <option value="Teams">Teams</option>
+                    <option value="社内通知">社内通知</option>
+                  </select>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <label style="font-size:11.5px;font-weight:700;color:#334155">宛先</label>
+                  <select value="{{ f.assignee }}" onChange="{{ f.setAssignee }}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:13px;background:#ffffff">
+                    <sc-for list="{{ assignees }}" as="a" hint-placeholder-count="3"><option value="{{ a }}">{{ a }}</option></sc-for>
+                  </select>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <label style="font-size:11.5px;font-weight:700;color:#334155">本文テンプレート</label>
+                  <textarea value="{{ f.note }}" onChange="{{ f.setNote }}" rows="4" placeholder="{{申請者}} 様、申請が承認されました。" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:12.5px;line-height:1.6;background:#ffffff;resize:vertical"></textarea>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ f.isPlain }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:11.5px;font-weight:700;color:#334155">メモ</label>
+                <textarea value="{{ f.note }}" onChange="{{ f.setNote }}" rows="4" placeholder="このノードの補足を記入" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;border:1px solid #cbd5e1;font-size:12.5px;line-height:1.6;background:#ffffff;resize:vertical"></textarea>
+              </div>
+            </sc-if>
+
+          </div>
+
+          <div style="flex:none;padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;gap:8px;background:#f8fafc">
+            <button onClick="{{ f.remove }}" style="flex:1;padding:8px;border-radius:7px;border:1px solid #fecdd3;background:#ffffff;color:#be123c;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#fff1f2">ノードを削除</button>
+            <button onClick="{{ onCanvasClick }}" style="flex:1;padding:8px;border-radius:7px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#f1f5f9">選択解除</button>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px;text-align:center">
+          <div style="width:44px;height:44px;border-radius:12px;background:#f1f5f9;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16M4 12h10M4 19h7"></path></svg>
+          </div>
+          <div style="font-size:13px;font-weight:500;color:#475569">ノードが未選択です</div>
+          <div style="font-size:11.5px;color:#94a3b8;line-height:1.6">キャンバス上のノードをクリックすると、<br>ここで詳細を編集できます。</div>
+        </div>
+      </sc-if>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;accent&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#4f46e5&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;options&quot;: [&quot;#4f46e5&quot;, &quot;#0f766e&quot;, &quot;#b91c1c&quot;, &quot;#334155&quot;], &quot;section&quot;: &quot;外観&quot; },
+  &quot;showGrid&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;外観&quot; },
+  &quot;compact&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;レイアウト&quot; },
+  &quot;nodeWidth&quot;: { &quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 236, &quot;min&quot;: 200, &quot;max&quot;: 300, &quot;step&quot;: 4, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;レイアウト&quot; }
+}">
+const META = {
+  start: { label: '開始', color: '#059669', tint: '#d1fae5', icon: 'M5 3l14 9-14 9z', desc: 'フローの起点' },
+  task: { label: '手動タスク', color: '#4f46e5', tint: '#e0e7ff', icon: 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9', desc: '担当者が処理' },
+  approval: { label: '承認', color: '#7c3aed', tint: '#ede9fe', icon: 'M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7zM9 12l2 2 4-4', desc: '承認・却下の判断' },
+  condition: { label: '条件分岐', color: '#d97706', tint: '#fef3c7', icon: 'M12 3l9 9-9 9-9-9z', desc: 'Yes / No に分岐' },
+  notify: { label: '自動通知', color: '#0284c7', tint: '#e0f2fe', icon: 'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10.5 21a2 2 0 0 0 3 0', desc: 'メール・Slack送信' },
+  action: { label: '自動処理', color: '#0d9488', tint: '#ccfbf1', icon: 'M13 2L3 14h7l-1 8 10-12h-7z', desc: '外部システム連携' },
+  end: { label: '終了', color: '#64748b', tint: '#e2e8f0', icon: 'M6 6h12v12H6z', desc: 'フローの終端' }
+};
+const GROUPS = [
+  { label: 'ベーシック', types: ['start', 'end'] },
+  { label: 'タスク', types: ['task', 'approval'] },
+  { label: '分岐・自動化', types: ['condition', 'notify', 'action'] }
+];
+const ASSIGNEES = ['申請者', '直属上長', '部長', '経理部', '人事部', '情報システム部'];
+const RULE_FIELDS = ['申請金額', '申請区分', '所属部署', '勤続年数', '添付ファイル'];
+const RULE_OPS = ['≧', '≦', '=', '≠', '含む'];
+
+class Component extends DCLogic {
+  state = {
+    seq: 20,
+    selectedId: 'n3',
+    insert: null,
+    flow: [
+      { id: 'n1', type: 'start', name: '経費申請の受付', note: 'Webフォームから起動' },
+      { id: 'n2', type: 'task', name: '申請内容の確認', assignee: '直属上長', due: '2', escalate: '催促通知' },
+      {
+        id: 'n3', type: 'condition', name: '金額チェック', logic: 'all',
+        rules: [{ field: '申請金額', op: '≧', value: '100000' }],
+        yes: [
+          { id: 'n4', type: 'approval', name: '部長承認', assignee: '部長', due: '3', escalate: '上位者へ委譲' },
+          { id: 'n5', type: 'action', name: '会計システムへ登録', note: 'ERP連携 API' },
+          { id: 'n6', type: 'end', name: '承認完了' }
+        ],
+        no: [
+          { id: 'n7', type: 'notify', name: '自動承認の通知', channel: 'Slack', assignee: '申請者', note: '10万円未満のため自動承認されました。' },
+          { id: 'n8', type: 'end', name: '自動承認で終了' }
+        ]
+      }
+    ]
+  };
+
+  /* ---------- tree helpers ---------- */
+  chains(chain, out) {
+    out.push(chain);
+    chain.forEach(n => { if (n.type === 'condition') { this.chains(n.yes || [], out); this.chains(n.no || [], out); } });
+    return out;
+  }
+  allChains() { return this.chains(this.state.flow, []); }
+  find(id) {
+    let hit = null;
+    this.allChains().forEach(c => c.forEach((n, i) => { if (n.id === id) hit = { node: n, chain: c, index: i }; }));
+    return hit;
+  }
+  count() { let c = 0; this.allChains().forEach(ch => { c += ch.length; }); return c; }
+
+  update(id, patch) {
+    this.setState(s => {
+      const clone = JSON.parse(JSON.stringify(s.flow));
+      const walk = ch => ch.forEach(n => {
+        if (n.id === id) Object.assign(n, patch);
+        if (n.type === 'condition') { walk(n.yes || []); walk(n.no || []); }
+      });
+      walk(clone);
+      return { flow: clone };
+    });
+  }
+
+  add = type => {
+    const id = 'n' + this.state.seq;
+    const base = { id, type, name: META[type].label };
+    if (type === 'task' || type === 'approval') Object.assign(base, { assignee: '直属上長', due: '3', escalate: '催促通知' });
+    if (type === 'notify') Object.assign(base, { channel: 'メール', assignee: '申請者', note: '' });
+    if (type === 'condition') Object.assign(base, { logic: 'all', rules: [{ field: '申請金額', op: '≧', value: '' }], yes: [], no: [] });
+    if (type === 'start' || type === 'end' || type === 'action') base.note = '';
+
+    // 条件分岐を挿入した場合、後続ノードは Yes ルートへ移動させる（後続が消えないように）
+    const insertAt = (ch, index, node) => {
+      ch.splice(index, 0, node);
+      if (node.type === 'condition') {
+        const rest = ch.splice(index + 1);
+        node.yes = rest.concat(node.yes || []);
+      }
+    };
+
+    this.setState(s => {
+      const clone = JSON.parse(JSON.stringify(s.flow));
+      const ins = s.insert;
+      let done = false;
+      const walk = ch => {
+        for (let i = 0; i < ch.length && !done; i++) {
+          const n = ch[i];
+          if (ins && ins.kind === 'branch' && n.id === ins.id) {
+            n[ins.branch] = n[ins.branch] || [];
+            insertAt(n[ins.branch], n[ins.branch].length, base); done = true; return;
+          }
+          if (!ins && n.id === s.selectedId) {
+            if (n.type === 'condition') { n.yes = n.yes || []; insertAt(n.yes, 0, base); }
+            else insertAt(ch, i + 1, base);
+            done = true; return;
+          }
+          if (n.type === 'condition') { walk(n.yes || []); walk(n.no || []); }
+        }
+      };
+      walk(clone);
+      if (!done) {
+        let tail = clone;
+        while (tail.length && tail[tail.length - 1].type === 'condition') tail = (tail[tail.length - 1].yes = tail[tail.length - 1].yes || []);
+        insertAt(tail, tail.length, base);
+      }
+      return { flow: clone, seq: s.seq + 1, selectedId: id, insert: null };
+    });
+  };
+
+  remove = id => {
+    this.setState(s => {
+      const clone = JSON.parse(JSON.stringify(s.flow));
+      const walk = ch => {
+        for (let i = 0; i < ch.length; i++) {
+          if (ch[i].id === id) {
+            const gone = ch[i];
+            // 条件分岐を削除したら Yes ルートを本線に戻す（No ルートは併せて削除）
+            ch.splice(i, 1, ...(gone.type === 'condition' ? (gone.yes || []) : []));
+            return true;
+          }
+          const n = ch[i];
+          if (n.type === 'condition' && (walk(n.yes || []) || walk(n.no || []))) return true;
+        }
+        return false;
+      };
+      walk(clone);
+      return { flow: clone, selectedId: null, insert: null };
+    });
+  };
+
+  /* ---------- layout ---------- */
+  measure(chain) {
+    let w = 1;
+    chain.forEach(n => {
+      if (n.type === 'condition') w = Math.max(w, this.measure(n.yes || []) + this.measure(n.no || []));
+    });
+    return w;
+  }
+
+  layout() {
+    const compact = !!this.props.compact;
+    const NW = this.props.nodeWidth || 236;
+    const NH = compact ? 60 : 74;
+    const VG = compact ? 46 : 66;
+    const COL = NW + 60;
+    const nodes = [], edges = [], labels = [], stubs = [];
+    const accent = this.props.accent || '#4f46e5';
+    let maxBottom = 0;
+
+    const link = (from, to, color, text) => {
+      const d = 'M' + from.x + ' ' + from.y + ' C ' + from.x + ' ' + (from.y + VG * 0.55) + ', ' + to.x + ' ' + (to.y - VG * 0.55) + ', ' + to.x + ' ' + to.y;
+      edges.push({ d, color, tipX: to.x, tipY: to.y });
+      if (text) labels.push({
+        text, x: (from.x + to.x) / 2, y: (from.y + to.y) / 2,
+        bg: text === 'Yes' ? '#ecfdf5' : '#fff1f2',
+        color: text === 'Yes' ? '#047857' : '#be123c',
+        border: text === 'Yes' ? '#a7f3d0' : '#fecdd3'
+      });
+    };
+
+    const place = (chain, cx, y0, parent) => {
+      let y = y0, prev = parent;
+      for (let i = 0; i < chain.length; i++) {
+        const n = chain[i], m = META[n.type], sel = n.id === this.state.selectedId;
+        nodes.push({
+          id: n.id, left: Math.round(cx - NW / 2), top: Math.round(y), name: n.name,
+          typeLabel: m.label, color: m.color, tint: m.tint, icon: m.icon,
+          sub: this.subtitle(n),
+          border: sel ? accent : '#e2e8f0',
+          shadow: sel ? '0 0 0 3px ' + accent + '26, 0 6px 16px -6px rgba(15,23,42,.25)' : '0 1px 2px rgba(15,23,42,.06)',
+          onSelect: ev => { ev.stopPropagation(); this.setState({ selectedId: n.id, insert: null }); }
+        });
+        if (prev) link(prev, { x: cx, y }, prev.color, prev.text);
+        maxBottom = Math.max(maxBottom, y + NH);
+
+        if (n.type === 'condition') {
+          const wy = this.measure(n.yes || []), wn = this.measure(n.no || []);
+          const total = wy + wn, startX = cx - (total * COL) / 2;
+          const yesX = startX + (wy * COL) / 2, noX = startX + wy * COL + (wn * COL) / 2;
+          const cy = y + NH + VG, anchor = { x: cx, y: y + NH };
+          [['yes', yesX, '#10b981', 'Yes'], ['no', noX, '#f43f5e', 'No']].forEach(([key, bx, col, text]) => {
+            const branch = n[key] || [];
+            if (branch.length) place(branch, bx, cy, { x: cx, y: y + NH, color: col, text });
+            else {
+              link(anchor, { x: bx, y: cy }, col, text);
+              const st = this.state.insert;
+              const active = st && st.kind === 'branch' && st.id === n.id && st.branch === key;
+              stubs.push({
+                left: Math.round(bx - NW / 2), top: Math.round(cy),
+                text: text + ' ルートにノードを追加',
+                bg: active ? (text === 'Yes' ? '#ecfdf5' : '#fff1f2') : '#ffffff',
+                border: active ? col : '#cbd5e1', color: active ? col : '#64748b',
+                onSelect: ev => { ev.stopPropagation(); this.setState({ insert: { kind: 'branch', id: n.id, branch: key }, selectedId: null }); }
+              });
+              maxBottom = Math.max(maxBottom, cy + 54);
+            }
+          });
+          break;
+        }
+        prev = { x: cx, y: y + NH, color: '#cbd5e1', text: '' };
+        y += NH + VG;
+      }
+    };
+
+    const W = this.measure(this.state.flow) * COL;
+    place(this.state.flow, W / 2 + 48, 40, null);
+    return { nodes, edges, edgeLabels: labels, stubs, nodeW: NW, canvasW: Math.round(W + 96), canvasH: Math.round(maxBottom + 80) };
+  }
+
+  subtitle(n) {
+    if (n.type === 'condition') {
+      const r = (n.rules || [])[0];
+      const extra = (n.rules || []).length > 1 ? ' 他' + ((n.rules.length) - 1) + '件' : '';
+      return r ? r.field + ' ' + r.op + ' ' + (r.value || '—') + extra : '条件が未設定';
+    }
+    if (n.type === 'notify') return n.channel + ' → ' + n.assignee;
+    if (n.type === 'task' || n.type === 'approval') return n.assignee + ' ・ ' + (n.due || '—') + '日以内';
+    if (n.note) return n.note;
+    if (n.type === 'end') return 'フロー終端';
+    if (n.type === 'start') return 'フローの起点';
+    return '';
+  }
+
+  /* ---------- render values ---------- */
+  renderVals() {
+    const L = this.layout();
+    const hit = this.state.selectedId ? this.find(this.state.selectedId) : null;
+    const ins = this.state.insert;
+    let f = null;
+
+    if (hit) {
+      const n = hit.node, m = META[n.type];
+      const set = k => ev => this.update(n.id, { [k]: ev.target.value });
+      f = {
+        id: n.id, name: n.name, typeLabel: m.label, color: m.color, tint: m.tint, icon: m.icon,
+        assignee: n.assignee || ASSIGNEES[0], due: n.due || '', escalate: n.escalate || '催促通知',
+        channel: n.channel || 'メール', note: n.note || '', logic: n.logic || 'all',
+        isTask: n.type === 'task' || n.type === 'approval',
+        isCondition: n.type === 'condition',
+        isNotify: n.type === 'notify',
+        isPlain: n.type === 'start' || n.type === 'end' || n.type === 'action',
+        setName: set('name'), setAssignee: set('assignee'), setDue: set('due'),
+        setEscalate: set('escalate'), setChannel: set('channel'), setNote: set('note'), setLogic: set('logic'),
+        rules: (n.rules || []).map((r, i) => ({
+          field: r.field, op: r.op, value: r.value,
+          setField: ev => this.updateRule(n, i, { field: ev.target.value }),
+          setOp: ev => this.updateRule(n, i, { op: ev.target.value }),
+          setValue: ev => this.updateRule(n, i, { value: ev.target.value }),
+          remove: () => this.update(n.id, { rules: (n.rules || []).filter((_, j) => j !== i) })
+        })),
+        addRule: () => this.update(n.id, { rules: (n.rules || []).concat([{ field: RULE_FIELDS[0], op: '≧', value: '' }]) }),
+        yesSummary: this.branchSummary(n.yes),
+        noSummary: this.branchSummary(n.no),
+        remove: () => this.remove(n.id)
+      };
+    }
+
+    return {
+      ...L,
+      nodeCount: this.count(),
+      showGrid: this.props.showGrid !== false,
+      assignees: ASSIGNEES, ruleFields: RULE_FIELDS, ruleOps: RULE_OPS,
+      paletteGroups: GROUPS.map(g => ({
+        label: g.label,
+        items: g.types.map(t => ({ ...META[t], type: t, onAdd: () => this.add(t) }))
+      })),
+      insertHint: ins ? (ins.branch === 'yes' ? 'Yes' : 'No') + ' ルートの先頭に挿入します'
+        : hit ? '「' + hit.node.name + '」の直後に挿入します'
+          : 'フローの末尾に追加します',
+      hasSelection: !!f, noSelection: !f, f: f || {},
+      onCanvasClick: () => this.setState({ selectedId: null, insert: null }),
+      onValidate: () => this.setState({ selectedId: null, insert: null })
+    };
+  }
+
+  updateRule(n, i, patch) {
+    const rules = (n.rules || []).map((r, j) => (j === i ? { ...r, ...patch } : r));
+    this.update(n.id, { rules });
+  }
+  branchSummary(branch) {
+    const b = branch || [];
+    if (!b.length) return 'ノード未設定';
+    return b.length + '件 ・ ' + b.map(x => x.name).join(' → ');
+  }
+}
+</script>
+</body>
+</html>

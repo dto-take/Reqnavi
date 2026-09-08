@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listRequirementItems } from "@/actions/requirement-items";
 import { ScreenWireframe } from "@/components/domain/screen-wireframe/ScreenWireframe";
+import { DownloadButton } from "@/components/ui/download-button";
 
 export default async function ScreenPreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,9 +21,11 @@ export default async function ScreenPreviewPage({ params }: { params: Promise<{ 
         バッチ処理・外部連携等、画面を持たない機能要件は対象外です。
       </p>
 
-      <a href={`/api/projects/${id}/export-screens-xlsx`} className="text-xs text-secondary underline mb-4 inline-block">
-        画面設計書をExcelでダウンロード
-      </a>
+      <div className="mb-4">
+        <DownloadButton href={`/api/projects/${id}/export-screens-xlsx`} fallbackFileName="export.xlsx" pendingText="Excel生成中...">
+          画面設計書をExcelでダウンロード
+        </DownloadButton>
+      </div>
 
       {screenItems.length === 0 ? (
         <p className="text-sm text-secondary">画面情報（表示項目）が入力された機能要件がありません</p>
