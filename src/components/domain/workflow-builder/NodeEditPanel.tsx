@@ -75,7 +75,7 @@ export function NodeEditPanel({
     };
   }
 
-  function selectFieldProps(key: "mode" | "sys_kind" | "condition_logic") {
+  function selectFieldProps(key: "node_type" | "mode" | "sys_kind" | "condition_logic") {
     return {
       value: node![key] ?? "",
       onChange: (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
@@ -122,6 +122,20 @@ export function NodeEditPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4.5">
+        {/* フェーズDのパレット実装までは追加時の種別を「手動タスク」固定にしているため
+            （src/actions/workflow-builder.tsのappendWorkflowNode）、種別変更はここで行う。
+            デザインハンドオフのフォーム項目一覧には無い暫定フィールド。 */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[11.5px] font-bold text-secondary">種別</label>
+          <Select {...selectFieldProps("node_type")}>
+            {Object.entries(NODE_META).map(([type, m]) => (
+              <option key={type} value={type}>
+                {m.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
         <div className="flex flex-col gap-1.5">
           <label className="text-[11.5px] font-bold text-secondary">作業内容（何を）</label>
           <Input placeholder="例: 見積内容の承認" {...textFieldProps("label")} />
