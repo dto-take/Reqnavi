@@ -41,9 +41,14 @@ export default async function BusinessFlowPage({
         </a>
       </div>
 
-      <a href={`/projects/${id}/business-flow/diff`} className="text-sm text-secondary underline mb-4 inline-block">
-        As-Is/To-Be差分を確認
-      </a>
+      <div className="flex gap-4 mb-4">
+        <a href={`/projects/${id}/business-flow/diff`} className="text-sm text-secondary underline inline-block">
+          As-Is/To-Be差分を確認
+        </a>
+        <a href={`/projects/${id}/business-flow/builder`} className="text-sm text-secondary underline inline-block">
+          業務フロービルダー（ベータ）を試す
+        </a>
+      </div>
 
       {steps.length === 0 && (
         <InlineErrorForm action={draftFlow} className="mb-4">

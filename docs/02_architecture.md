@@ -158,6 +158,8 @@ create table progress_tasks (
 
 **Phase2 Step7の実機検証で発覚**：当初のこの定義は`init_schema.sql`で作成されたのみで、RLSポリシー・GRANTが1件も無く、機能として完全に使用不可能な状態だった（規約12・23と同種だが、テーブル作成からRLS整備まで最も期間が空いた例）。RLS・GRANTは4章に記載の通り整備済み。
 
+**業務フロービルダー（条件分岐対応、`flow_type='business_builder'`）向け拡張**：`flow_nodes`に`node_type`（'start'|'task'|'approval'|'condition'|'notify'|'action'|'end'）・`mode`（手動/自動）・`screen_id`・`sys_kind`・`input_data`・`output_data`・`business_rule`・`channel`・`condition_logic`（'all'|'any'）・`condition_rules`（jsonb配列）・`branch`（'main'|'yes'|'no'）・`parent_condition_id`（自己参照, on delete cascade）を追加。既存の`label`/`role_lane`/`system_used`はそのまま流用（意味は変更していない）。ツリー構造は`parent_condition_id`＋`branch`＋`order_index`のみで表現し、`pos_x`/`pos_y`同様レイアウトは`src/lib/workflow-layout.ts`側で都度計算する。既存の`business_asis`/`business_tobe`（`order_index`のみに基づく直線チェーン＋`regenerateEdges()`）とはデータモデルが非互換のため、`business_builder`は完全に別の`flow_type`として分離している。
+
 ### 2.4 ベースライン・変更管理
 
 ```sql
