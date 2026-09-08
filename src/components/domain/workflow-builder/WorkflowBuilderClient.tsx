@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { SwimlaneCanvas } from "@/components/domain/workflow-builder/SwimlaneCanvas";
 import { NodeEditPanel } from "@/components/domain/workflow-builder/NodeEditPanel";
+import { ProcedureTable } from "@/components/domain/workflow-builder/ProcedureTable";
+import { UseCaseNarrative } from "@/components/domain/workflow-builder/UseCaseNarrative";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { WorkflowNodeRow } from "@/actions/workflow-builder";
 
@@ -23,6 +25,10 @@ function removeSubtree(nodes: WorkflowNodeRow[], id: string): WorkflowNodeRow[] 
   return nodes.filter((n) => !toRemove.has(n.id));
 }
 
+const VIEWS = ["canvas", "table", "narrative"] as const;
+type View = (typeof VIEWS)[number];
+const VIEW_LABEL: Record<View, string> = { canvas: "フロー図", table: "業務手順表", narrative: "ユースケース記述" };
+
 export function WorkflowBuilderClient({
   projectId,
   initialNodes,
@@ -34,6 +40,7 @@ export function WorkflowBuilderClient({
 }) {
   const [nodes, setNodes] = useState(initialNodes);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<View>("canvas");
 
   // appendWorkflowNode（<form action>経由）はrevalidatePathでこのページのServer Componentを
   // 再実行させるだけで、既にマウント済みのこのクライアントコンポーネントのuseStateは
@@ -63,29 +70,50 @@ export function WorkflowBuilderClient({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-4" style={{ height: "calc(100vh - 240px)", minHeight: 440 }}>
-        <div className="flex-1 min-w-0">
-          <SwimlaneCanvas nodes={nodes} selectedId={selectedId} onSelect={setSelectedId} />
-        </div>
-        <div className="w-88 flex-none border border-border rounded-lg bg-page overflow-hidden">
-          <NodeEditPanel
-            node={selectedNode}
-            allNodes={nodes}
-            projectId={projectId}
-            actorOptions={actorOptions}
-            onLocalChange={handleLocalChange}
-            onDeleted={handleDeleted}
-            onDeselect={() => setSelectedId(null)}
-          />
-        </div>
+      <div className="flex gap-1">
+        {VIEWS.map((v) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`text-xs px-3 py-1.5 rounded-md cursor-pointer ${
+              view === v ? "bg-brand text-white" : "text-secondary hover:bg-hover"
+            }`}
+          >
+            {VIEW_LABEL[v]}
+          </button>
+        ))}
       </div>
 
-      {/* フェーズDの本格的なパレットまでの暫定対応（本線末尾への単純追加のみ） */}
-      <form action={appendAction}>
-        <SubmitButton variant="secondary" size="sm" pendingText="追加中...">
-          + 本線の末尾に工程を追加
-        </SubmitButton>
-      </form>
+      {view === "canvas" && (
+        <>
+          <div className="flex gap-4" style={{ height: "calc(100vh - 280px)", minHeight: 420 }}>
+            <div className="flex-1 min-w-0">
+              <SwimlaneCanvas nodes={nodes} selectedId={selectedId} onSelect={setSelectedId} />
+            </div>
+            <div className="w-88 flex-none border border-border rounded-lg bg-page overflow-hidden">
+              <NodeEditPanel
+                node={selectedNode}
+                allNodes={nodes}
+                projectId={projectId}
+                actorOptions={actorOptions}
+                onLocalChange={handleLocalChange}
+                onDeleted={handleDeleted}
+                onDeselect={() => setSelectedId(null)}
+              />
+            </div>
+          </div>
+
+          {/* フェーズDの本格的なパレットまでの暫定対応（本線末尾への単純追加のみ） */}
+          <form action={appendAction}>
+            <SubmitButton variant="secondary" size="sm" pendingText="追加中...">
+              + 本線の末尾に工程を追加
+            </SubmitButton>
+          </form>
+        </>
+      )}
+
+      {view === "table" && <ProcedureTable projectId={projectId} nodes={nodes} />}
+      {view === "narrative" && <UseCaseNarrative nodes={nodes} />}
     </div>
   );
 }
