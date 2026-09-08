@@ -2,10 +2,9 @@
 
 import { NODE_META, PALETTE_GROUPS } from "@/lib/workflow-builder-shared";
 
-// デザインハンドオフはドラッグ&ドロップにも対応しているが、ドラッグ中のプレビュー・
-// ドロップ先ハイライト等の実装コストがこのアプリの利用シーン（PM/SEが少数の工程を
-// 組み立てる程度）に見合わないと判断し、クリック挿入のみを実装する
-// （docs/instructions/workflow_builder_phase_d.md Step2の「クリック挿入のみでも良い」の判断）。
+// クリック挿入（フェーズDで実装済み：選択中ノードの直後に挿入）に加え、
+// ドラッグ&ドロップにも対応する（キャンバス側のドロップ受け入れはSwimlaneCanvas.tsx）。
+// RequirementTableの並び替え機能と同じHTML5 Drag and Drop APIパターンを踏襲する。
 export function NodePalette({
   insertHint,
   disabled,
@@ -33,8 +32,13 @@ export function NodePalette({
                   type="button"
                   data-palette-type={type}
                   disabled={disabled}
+                  draggable={!disabled}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", type);
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
                   onClick={() => onInsert(type)}
-                  className="flex items-center gap-2.5 w-full text-left p-2.5 rounded-lg border border-border bg-white hover:border-(--brand) hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  className="flex items-center gap-2.5 w-full text-left p-2.5 rounded-lg border border-border bg-white hover:border-(--brand) hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed cursor-grab active:cursor-grabbing transition-colors"
                 >
                   <span className="w-7.5 h-7.5 flex-none rounded-lg flex items-center justify-center" style={{ background: meta.tint }}>
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={meta.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

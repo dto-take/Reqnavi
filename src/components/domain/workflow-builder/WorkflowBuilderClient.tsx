@@ -67,8 +67,9 @@ export function WorkflowBuilderClient({
     router.refresh();
   }
 
-  function handleInsert(nodeType: string) {
-    const afterNodeId = insertTarget ? `stub:${insertTarget.conditionId}:${insertTarget.branch}` : selectedId;
+  // クリック挿入・ドラッグ&ドロップ挿入の共通コア。afterNodeIdは実ノードID／
+  // スタブID（"stub:<conditionId>:<yes|no>"形式）のいずれも受け付ける（フェーズD参照）。
+  function performInsert(afterNodeId: string | null, nodeType: string) {
     startInsertTransition(() => {
       insertAction(afterNodeId, nodeType).then((res) => {
         if (res.error) {
@@ -81,6 +82,17 @@ export function WorkflowBuilderClient({
         router.refresh();
       });
     });
+  }
+
+  function handleInsert(nodeType: string) {
+    const afterNodeId = insertTarget ? `stub:${insertTarget.conditionId}:${insertTarget.branch}` : selectedId;
+    performInsert(afterNodeId, nodeType);
+  }
+
+  // ドラッグ&ドロップでは、選択中ノード/挿入先スタブの状態に関わらず、
+  // ドロップされた先（targetId）が明示的な挿入先になる
+  function handleDropInsert(targetId: string, nodeType: string) {
+    performInsert(targetId, nodeType);
   }
 
   // デザインハンドオフ「挿入先ヒントの文言」節と同じ優先順位
@@ -116,6 +128,7 @@ export function WorkflowBuilderClient({
               onSelect={handleSelect}
               insertTarget={insertTarget}
               onSelectStub={handleSelectStub}
+              onInsert={handleDropInsert}
             />
           </div>
           <div className="w-88 flex-none border border-border rounded-lg bg-page overflow-hidden">

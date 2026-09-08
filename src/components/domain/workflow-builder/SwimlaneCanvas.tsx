@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   computeWorkflowLayout,
   laneX,
@@ -47,15 +47,41 @@ export function SwimlaneCanvas({
   onSelect,
   insertTarget,
   onSelectStub,
+  onInsert,
 }: {
   nodes: WorkflowNodeRow[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   insertTarget: { conditionId: string; branch: "yes" | "no" } | null;
   onSelectStub: (conditionId: string, branch: "yes" | "no") => void;
+  onInsert: (targetId: string, nodeType: string) => void;
 }) {
   const layout = useMemo(() => computeWorkflowLayout(nodes.map(toWorkflowNode)), [nodes]);
   const cardW = LANE_WIDTH - 40;
+
+  // ノードパレットからのドラッグ&ドロップの受け入れ（RequirementTableの並び替え機能と
+  // 同じHTML5 Drag and Drop APIパターン）。targetIdは実ノードID・スタブID
+  // （"stub:<conditionId>:<yes|no>"形式）のいずれも取り得る（フェーズDのinsertWorkflowNodeAfter
+  // がそのまま受け付ける）。
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+
+  function handleDragOver(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDragOverTarget(targetId);
+  }
+
+  function handleDragLeave() {
+    setDragOverTarget(null);
+  }
+
+  function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    const nodeType = e.dataTransfer.getData("text/plain");
+    setDragOverTarget(null);
+    if (!nodeType) return;
+    onInsert(targetId, nodeType);
+  }
 
   if (nodes.length === 0) {
     return (
@@ -148,6 +174,7 @@ export function SwimlaneCanvas({
             const left = laneX(pos.lane) - cardW / 2;
             const top = rowY(pos.row);
             const sel = n.id === selectedId;
+            const isDragOver = dragOverTarget === n.id;
             const step = layout.stepNumbers.get(n.id) ?? 0;
             const mode = n.mode ?? "手動";
             const modeBg = mode === "自動" ? "#f1f5f9" : "#eef2ff";
@@ -161,12 +188,16 @@ export function SwimlaneCanvas({
                   e.stopPropagation();
                   onSelect(n.id);
                 }}
-                className="absolute box-border flex flex-col gap-1.5 p-3 rounded-[11px] bg-white cursor-pointer"
+                onDragOver={(e) => handleDragOver(e, n.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, n.id)}
+                className="absolute box-border flex flex-col gap-1.5 p-3 rounded-[11px] cursor-pointer"
                 style={{
                   left,
                   top,
                   width: cardW,
-                  border: `1.5px solid ${sel ? "var(--brand)" : "#e2e8f0"}`,
+                  border: isDragOver ? "2px dashed var(--brand)" : `1.5px solid ${sel ? "var(--brand)" : "#e2e8f0"}`,
+                  background: isDragOver ? "color-mix(in srgb, var(--brand) 6%, white)" : "#ffffff",
                   boxShadow: sel
                     ? "0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent), 0 8px 18px -8px rgba(15,23,42,.3)"
                     : "0 1px 2px rgba(15,23,42,.06)",
@@ -205,6 +236,8 @@ export function SwimlaneCanvas({
             const left = laneX(pos.lane) - cardW / 2;
             const top = rowY(pos.row);
             const isYes = s.branch === "yes";
+            const stubTargetId = `${s.afterNodeId}:${s.branch}`;
+            const isDragOver = dragOverTarget === stubTargetId;
             // 挿入先として選択中の見た目（デザインハンドオフ「空ブランチのスタブ」節の配色をそのまま移植）
             const active = insertTarget?.conditionId === s.afterNodeId && insertTarget?.branch === s.branch;
             const activeBg = isYes ? "#ecfdf5" : "#fff1f2";
@@ -213,21 +246,24 @@ export function SwimlaneCanvas({
             return (
               <div
                 key={i}
-                data-node-stub={`${s.afterNodeId}:${s.branch}`}
+                data-node-stub={stubTargetId}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelectStub(s.afterNodeId, s.branch);
                 }}
-                className={`absolute box-border flex items-center justify-center gap-1.5 p-4 rounded-[11px] border-[1.5px] border-dashed text-[12.5px] font-medium bg-white cursor-pointer ${
-                  active ? "" : "text-secondary"
+                onDragOver={(e) => handleDragOver(e, stubTargetId)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, sId)}
+                className={`absolute box-border flex items-center justify-center gap-1.5 p-4 rounded-[11px] border-[1.5px] border-dashed text-[12.5px] font-medium cursor-pointer ${
+                  active || isDragOver ? "" : "text-secondary"
                 }`}
                 style={{
                   left,
                   top,
                   width: cardW,
-                  background: active ? activeBg : "#ffffff",
-                  borderColor: active ? activeBorder : "#cbd5e1",
-                  color: active ? activeColor : undefined,
+                  background: isDragOver ? "color-mix(in srgb, var(--brand) 8%, white)" : active ? activeBg : "#ffffff",
+                  borderColor: isDragOver ? "var(--brand)" : active ? activeBorder : "#cbd5e1",
+                  color: isDragOver ? "var(--brand)" : active ? activeColor : undefined,
                 }}
               >
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
