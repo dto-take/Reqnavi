@@ -1,17 +1,21 @@
 import Link from "next/link";
 import { listScreenNodes, listScreenEdges, addScreenNode, addScreenTransition, deleteScreenNode } from "@/actions/screen-transition";
+import { generateScreenTransitionDraft } from "@/actions/ai-draft-screen-transitions";
 import { ScreenTransitionDiagram } from "@/components/domain/screen-transition/ScreenTransitionDiagram";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { PageHeader } from "@/components/ui/page-header";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
+import { SubmitButton } from "@/components/ui/submit-button";
 
 export default async function ScreenTransitionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [nodes, edges] = await Promise.all([listScreenNodes(id), listScreenEdges(id)]);
   const addNode = addScreenNode.bind(null, id);
   const addTransition = addScreenTransition.bind(null, id);
+  const draftTransitions = generateScreenTransitionDraft.bind(null, id);
 
   return (
     <Card className="max-w-3xl mx-auto mt-10">
@@ -19,6 +23,12 @@ export default async function ScreenTransitionsPage({ params }: { params: Promis
         ← 9. 機能要件に戻る
       </Link>
       <PageHeader title="画面遷移図" />
+
+      {nodes.length === 0 && (
+        <InlineErrorForm action={draftTransitions} className="mb-4">
+          <SubmitButton variant="primary" size="md" pendingText="生成中...">AIで画面遷移を生成</SubmitButton>
+        </InlineErrorForm>
+      )}
 
       <div className="overflow-x-auto mb-6">
         <ScreenTransitionDiagram nodes={nodes} edges={edges} />

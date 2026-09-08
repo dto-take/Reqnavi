@@ -13,7 +13,16 @@ export default async function ScreenPreviewPage({ params }: { params: Promise<{ 
       <Link href={`/projects/${id}/chapters/9`} className="text-xs text-secondary underline mb-3 inline-block">
         ← 9. 機能要件に戻る
       </Link>
-      <h1 className="text-base font-semibold text-primary mb-4">機能要件：画面イメージ</h1>
+      <h1 className="text-base font-semibold text-primary mb-2">機能要件：画面イメージ</h1>
+
+      <p className="text-xs text-secondary mb-4">
+        9章の機能要件（全{items.length}件）のうち、画面情報が入力されている{screenItems.length}件を画面イメージとして表示しています。
+        バッチ処理・外部連携等、画面を持たない機能要件は対象外です。
+      </p>
+
+      <a href={`/api/projects/${id}/export-screens-xlsx`} className="text-xs text-secondary underline mb-4 inline-block">
+        画面設計書をExcelでダウンロード
+      </a>
 
       {screenItems.length === 0 ? (
         <p className="text-sm text-secondary">画面情報（表示項目）が入力された機能要件がありません</p>
