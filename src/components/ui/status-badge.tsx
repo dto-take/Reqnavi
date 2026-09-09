@@ -1,6 +1,7 @@
-type Status = "ai_draft" | "se_reviewing" | "confirmed" | "exception_approved" | "need_hearing" | "rejected";
+export type Status = "ai_draft" | "se_reviewing" | "confirmed" | "exception_approved" | "need_hearing" | "rejected";
 
-const STATUS_MAP: Record<Status, { label: string; bg: string; text: string }> = {
+// RequirementCardの状態カラー（左端バー等）でも同じ対応関係を使うため公開する（規約36）。
+export const STATUS_MAP: Record<Status, { label: string; bg: string; text: string }> = {
   ai_draft:          { label: "AI素案",     bg: "var(--status-draft-bg)",      text: "var(--status-draft-text)" },
   se_reviewing:      { label: "SE確認中",   bg: "var(--status-review-bg)",     text: "var(--status-review-text)" },
   confirmed:         { label: "確定",       bg: "var(--status-confirmed-bg)",  text: "var(--status-confirmed-text)" },

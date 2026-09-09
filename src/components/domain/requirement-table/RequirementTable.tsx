@@ -1,32 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  updateRequirementItemContent,
-  updateRequirementItemStatus,
-  markAsExceptionApproved,
-  markAsRejected,
-  deleteRequirementItem,
-  reorderRequirementItems,
-  type ColumnDef,
-  type RequirementItem,
-} from "@/actions/requirement-items";
-import { suggestPlatformFeature } from "@/actions/platform-suggestion";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Input, Textarea } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { moveItemToGroup, reorderGroups, type ColumnDef, type RequirementItem } from "@/actions/requirement-items";
+import { groupByCategory } from "@/lib/requirement-grouping";
+import { RequirementCard } from "@/components/domain/requirement-table/RequirementCard";
+import { RequirementGroup } from "@/components/domain/requirement-table/RequirementGroup";
 import { useToast } from "@/components/ui/toast";
-import { isItemLocked } from "@/lib/item-lock";
 import { errorMessage } from "@/lib/error-message";
 
-// 表形式（テンプレートA/B/C）のセルは、内容が枠幅を超えた場合に横スクロールで隠れるのではなく
-// 折り返して見えるようにしたい。<input>は仕様上折り返せないため<textarea>を使い、
-// 内容量に応じて高さを自動調整する（複数行になった分だけ行が伸びる）
-function autoGrowTextarea(el: HTMLTextAreaElement) {
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
-}
+// ドラッグされているデータが「カード」なのか「グループ見出し」なのかをdataTransferの
+// text/plain値だけで区別できるようにするプレフィックス（区分名に偶然一致する文字列が
+// 来ても誤判定しないよう、値そのものではなく明示的なプレフィックスで判別する）。
+const ITEM_PREFIX = "item:";
+const GROUP_PREFIX = "group:";
 
 export function RequirementTable({
   projectId,
@@ -41,133 +27,129 @@ export function RequirementTable({
   items: RequirementItem[];
   showPlatformSuggestion?: boolean;
 }) {
-  const [isPending, startTransition] = useTransition();
-  const [exceptionReasonDraft, setExceptionReasonDraft] = useState<Record<string, string>>({});
-  const [openExceptionFor, setOpenExceptionFor] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
-  const [suggestingItemId, setSuggestingItemId] = useState<string | null>(null);
+  const [draggedCategory, setDraggedCategory] = useState<string | null>(null);
+  const [groupDropTarget, setGroupDropTarget] = useState<{ category: string; position: "before" | "after" } | null>(null);
   const { show } = useToast();
-  const actionsColumnWidth = showPlatformSuggestion ? "140px" : "80px";
-  // 「内容」等、文字数が多くなりやすい列（width_hint = 'wide'）は2fr、それ以外は1frで幅を配分する。
-  // 先頭の24pxはドラッグハンドル用の列（ヘッダー行・データ行で列数・幅を必ず一致させる）。
-  const gridTemplate = "24px " + columns.map((c) => (c.width_hint === "wide" ? "2fr" : "1fr")).join(" ") + ` 100px ${actionsColumnWidth}`;
 
-  function handleDragStart(e: React.DragEvent, itemId: string) {
-    e.dataTransfer.setData("text/plain", itemId);
+  const groups = groupByCategory(items);
+
+  // --- カードのドラッグ&ドロップ（同一グループ内の並び替え・別グループへの移動の両方） ---
+  function handleCardDragStart(e: React.DragEvent, itemId: string) {
+    e.dataTransfer.setData("text/plain", `${ITEM_PREFIX}${itemId}`);
     e.dataTransfer.effectAllowed = "move";
     setDraggedId(itemId);
   }
 
-  function handleDragOver(e: React.DragEvent, itemId: string) {
+  function handleCardDragOver(e: React.DragEvent, itemId: string) {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     const midpoint = rect.top + rect.height / 2;
     const position = e.clientY < midpoint ? "before" : "after";
     setDropTarget({ id: itemId, position });
+    setGroupDropTarget(null);
   }
 
-  function handleDragEnd() {
+  function handleCardDragEnd() {
     setDraggedId(null);
     setDropTarget(null);
   }
 
-  function handleDrop(e: React.DragEvent, targetItemId: string) {
+  function handleCardDrop(e: React.DragEvent, targetItemId: string, targetCategory: string) {
     e.preventDefault();
-    const sourceId = e.dataTransfer.getData("text/plain");
+    const raw = e.dataTransfer.getData("text/plain");
     const position = dropTarget?.position ?? "before";
     setDraggedId(null);
     setDropTarget(null);
+    if (!raw.startsWith(ITEM_PREFIX)) return; // グループ見出しのドロップはここでは扱わない
+    const sourceId = raw.slice(ITEM_PREFIX.length);
     if (!sourceId || sourceId === targetItemId) return;
 
-    const currentOrder = items.map((i) => i.id);
-    const sourceIndex = currentOrder.indexOf(sourceId);
-    if (sourceIndex === -1) return;
-
-    const withoutSource = currentOrder.filter((id) => id !== sourceId);
-    const targetIndex = withoutSource.indexOf(targetItemId);
+    // 章全体のフラットな並びの中で、ドロップ位置の直前に来るべき項目IDを求める
+    // （グループ境界は隣接する項目のcategoryによって自然に決まるため、フラット順で
+    // 挿入位置さえ正しく指定すれば、結果的に正しいグループへの所属になる）
+    const flatIds = items.map((i) => i.id);
+    const targetIndex = flatIds.indexOf(targetItemId);
     if (targetIndex === -1) return;
-
-    const insertIndex = position === "before" ? targetIndex : targetIndex + 1;
-    const reordered = [...withoutSource];
-    reordered.splice(insertIndex, 0, sourceId);
+    const insertBeforeItemId = position === "before" ? targetItemId : (flatIds[targetIndex + 1] ?? null);
+    if (insertBeforeItemId === sourceId) return;
 
     startTransition(async () => {
       try {
-        await reorderRequirementItems(projectId, chapterNo, reordered);
-        show("順序を更新しました");
-      } catch (e) {
-        show(errorMessage(e), "error");
+        await moveItemToGroup(projectId, chapterNo, sourceId, targetCategory, insertBeforeItemId);
+      } catch (err) {
+        show(errorMessage(err), "error");
       }
     });
   }
 
-  function handleContentChange(item: RequirementItem, key: string, value: string) {
-    const nextContent = { ...item.content, [key]: value };
-    startTransition(async () => {
-      try {
-        await updateRequirementItemContent(item.id, projectId, chapterNo, nextContent);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
-    });
+  // --- グループ見出し自体のドラッグ&ドロップ（並び替え）＋ カードをグループ見出しへドロップ ---
+  function handleGroupDragStart(e: React.DragEvent, category: string) {
+    e.dataTransfer.setData("text/plain", `${GROUP_PREFIX}${category}`);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedCategory(category);
   }
 
-  function handleConfirm(item: RequirementItem) {
-    startTransition(async () => {
-      try {
-        await updateRequirementItemStatus(item.id, projectId, chapterNo, "confirmed");
-        show("確定しました");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
-    });
+  function handleGroupDragOver(e: React.DragEvent, category: string) {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    const position = e.clientY < midpoint ? "before" : "after";
+    setGroupDropTarget({ category, position });
+    setDropTarget(null);
   }
 
-  function handleExceptionApprove(item: RequirementItem) {
-    const reason = exceptionReasonDraft[item.id]?.trim();
-    if (!reason) return;
-    startTransition(async () => {
-      try {
-        await markAsExceptionApproved(item.id, projectId, chapterNo, reason);
-        setOpenExceptionFor(null);
-        show("リスク許容で確定しました");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
-    });
+  function handleGroupDragEnd() {
+    setDraggedCategory(null);
+    setGroupDropTarget(null);
   }
 
-  function handleReject(item: RequirementItem) {
-    startTransition(async () => {
-      try {
-        await markAsRejected(item.id, projectId, chapterNo);
-        show("不採用にしました");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
-    });
-  }
+  function handleGroupDrop(e: React.DragEvent, targetCategory: string) {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData("text/plain");
+    const position = groupDropTarget?.position ?? "before";
+    setDraggedCategory(null);
+    setGroupDropTarget(null);
 
-  function handleDelete(item: RequirementItem) {
-    if (!confirm("この項目を削除しますか？この操作は取り消せません。")) return;
-    startTransition(async () => {
-      try {
-        await deleteRequirementItem(item.id, projectId, chapterNo);
-        show("削除しました");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
-    });
-  }
+    if (raw.startsWith(GROUP_PREFIX)) {
+      const sourceCategory = raw.slice(GROUP_PREFIX.length);
+      if (!sourceCategory || sourceCategory === targetCategory) return;
 
-  function handleSuggest(item: RequirementItem) {
-    setSuggestingItemId(item.id);
-    startTransition(async () => {
-      const result = await suggestPlatformFeature(item.id, projectId, chapterNo);
-      setSuggestingItemId(null);
-      show(result.error ?? "提案を反映しました", result.error ? "error" : "success");
-    });
+      const currentOrder = groups.map((g) => g.category);
+      const withoutSource = currentOrder.filter((c) => c !== sourceCategory);
+      const targetIndex = withoutSource.indexOf(targetCategory);
+      if (targetIndex === -1) return;
+      const insertIndex = position === "before" ? targetIndex : targetIndex + 1;
+      const reordered = [...withoutSource];
+      reordered.splice(insertIndex, 0, sourceCategory);
+
+      startTransition(async () => {
+        try {
+          await reorderGroups(projectId, chapterNo, reordered);
+        } catch (err) {
+          show(errorMessage(err), "error");
+        }
+      });
+      return;
+    }
+
+    if (raw.startsWith(ITEM_PREFIX)) {
+      // カードをグループ見出しへ直接ドロップした場合は、そのグループの先頭に挿入する
+      const sourceId = raw.slice(ITEM_PREFIX.length);
+      const targetGroup = groups.find((g) => g.category === targetCategory);
+      const insertBeforeItemId = targetGroup?.items[0]?.id ?? null;
+      if (!sourceId || insertBeforeItemId === sourceId) return;
+
+      startTransition(async () => {
+        try {
+          await moveItemToGroup(projectId, chapterNo, sourceId, targetCategory, insertBeforeItemId);
+        } catch (err) {
+          show(errorMessage(err), "error");
+        }
+      });
+    }
   }
 
   if (items.length === 0) {
@@ -180,156 +162,38 @@ export function RequirementTable({
   }
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <div
-        className="grid bg-sidebar text-xs text-secondary"
-        style={{ gridTemplateColumns: gridTemplate }}
-      >
-        <div className="px-3 py-2"></div>
-        {columns.map((c) => (
-          <div key={c.column_key} className="px-3 py-2">{c.label}</div>
-        ))}
-        <div className="px-3 py-2">ステータス</div>
-        <div className="px-3 py-2"></div>
-      </div>
-
-      {items.map((item) => (
-        <div
-          key={item.id}
-          onDragOver={(e) => handleDragOver(e, item.id)}
-          onDrop={(e) => handleDrop(e, item.id)}
-          className={`grid border-t border-hover relative ${draggedId === item.id ? "opacity-40" : ""}`}
-          style={{ gridTemplateColumns: gridTemplate }}
+    <div className="flex flex-col gap-5">
+      {groups.map((group) => (
+        <RequirementGroup
+          key={group.category}
+          projectId={projectId}
+          chapterNo={chapterNo}
+          category={group.category}
+          items={group.items}
+          isDraggingThisGroup={draggedCategory === group.category}
+          dropIndicator={groupDropTarget?.category === group.category ? groupDropTarget.position : null}
+          onHeaderDragStart={(e) => handleGroupDragStart(e, group.category)}
+          onHeaderDragOver={(e) => handleGroupDragOver(e, group.category)}
+          onHeaderDragEnd={handleGroupDragEnd}
+          onHeaderDrop={(e) => handleGroupDrop(e, group.category)}
         >
-          {dropTarget?.id === item.id && (
-            <div
-              className={`absolute left-0 right-0 h-0.5 bg-brand pointer-events-none ${
-                dropTarget.position === "before" ? "top-0" : "bottom-0"
-              }`}
-            />
-          )}
-          <div
-            draggable
-            onDragStart={(e) => handleDragStart(e, item.id)}
-            onDragEnd={handleDragEnd}
-            className="flex items-center justify-center cursor-grab text-faint"
-            title="ドラッグして並び替え"
-          >
-            ⠿
-          </div>
-          {columns.map((c) => (
-            <Textarea
-              key={c.column_key}
-              variant="bare"
-              rows={1}
-              ref={(el: HTMLTextAreaElement | null) => {
-                if (el) autoGrowTextarea(el);
-              }}
-              defaultValue={item.content[c.column_key] ?? ""}
-              onBlur={(e) => handleContentChange(item, c.column_key, e.target.value)}
-              onInput={(e) => autoGrowTextarea(e.currentTarget)}
-              disabled={isItemLocked(item.status)}
-              className="resize-none overflow-hidden"
+          {group.items.map((item) => (
+            <RequirementCard
+              key={item.id}
+              item={item}
+              columns={columns}
+              projectId={projectId}
+              chapterNo={chapterNo}
+              showPlatformSuggestion={showPlatformSuggestion}
+              isDragging={draggedId === item.id}
+              dropPosition={dropTarget?.id === item.id ? dropTarget.position : null}
+              onDragStart={(e) => handleCardDragStart(e, item.id)}
+              onDragOver={(e) => handleCardDragOver(e, item.id)}
+              onDragEnd={handleCardDragEnd}
+              onDrop={(e) => handleCardDrop(e, item.id, group.category)}
             />
           ))}
-          <div className="px-3 py-2 flex items-center gap-1.5 flex-wrap">
-            <StatusBadge status={item.status} />
-            {item.confidence === "inferred" && (
-              <span title="資料からの推測に基づく内容です" className="text-[10px] px-1.5 py-0.5 rounded bg-hover text-faint">
-                推測
-              </span>
-            )}
-            {item.sources.length > 0 && (
-              <span
-                title={item.sources.map((s) => `${s.fileName}${s.locationNote ? `（${s.locationNote}）` : ""}`).join(", ")}
-                className="text-[10px] px-1.5 py-0.5 rounded bg-hover text-faint cursor-help"
-              >
-                出典 {item.sources.length}件
-              </span>
-            )}
-            {item.status === "exception_approved" && item.exception_reason && (
-              <span title={item.exception_reason} className="text-xs text-faint cursor-help">ⓘ</span>
-            )}
-            {item.ambiguous_flags?.length > 0 && (
-              <span
-                title={item.ambiguous_flags
-                  .map((f) =>
-                    f.source === "dictionary" ? `[辞書] ${f.field}: 「${f.phrase}」`
-                    : f.source === "ai" ? `[AI] ${f.field}: ${f.reason}`
-                    : `[素案生成時] ${f.reason}`
-                  )
-                  .join(", ")}
-                className="text-xs text-(--status-review-text) cursor-help"
-              >
-                ⚠ 曖昧表現 {item.ambiguous_flags.length}件
-              </span>
-            )}
-          </div>
-          <div className="px-3 py-2 flex flex-col items-start gap-1">
-            {!isItemLocked(item.status) && (
-              <>
-                <Button variant="ghost" size="sm" disabled={isPending} onClick={() => handleConfirm(item)}>
-                  確定
-                </Button>
-                {openExceptionFor === item.id ? (
-                  <div className="flex items-center gap-1">
-                    <Input
-                      placeholder="リスク許容の理由"
-                      value={exceptionReasonDraft[item.id] ?? ""}
-                      onChange={(e) => setExceptionReasonDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                      className="w-32"
-                    />
-                    <Button
-                      variant="accent"
-                      size="sm"
-                      disabled={isPending || !exceptionReasonDraft[item.id]?.trim()}
-                      onClick={() => handleExceptionApprove(item)}
-                    >
-                      確定する
-                    </Button>
-                  </div>
-                ) : (
-                  <Button variant="ghost" size="sm" disabled={isPending} onClick={() => setOpenExceptionFor(item.id)}>
-                    リスク許容で確定
-                  </Button>
-                )}
-              </>
-            )}
-            {showPlatformSuggestion && !isItemLocked(item.status) && (
-              <Button variant="ghost" size="sm" disabled={isPending} onClick={() => handleSuggest(item)}>
-                {suggestingItemId === item.id ? (
-                  <span className="flex items-center gap-1">
-                    <Spinner className="w-3 h-3" /> 提案作成中...
-                  </span>
-                ) : (
-                  "Salesforce機能を提案"
-                )}
-              </Button>
-            )}
-            {!isItemLocked(item.status) && (
-              <button
-                disabled={isPending}
-                onClick={() => handleReject(item)}
-                className="text-xs text-faint underline"
-              >
-                不採用にする
-              </button>
-            )}
-            <button
-              disabled={isPending}
-              onClick={() => handleDelete(item)}
-              className="text-xs text-[#A23B2E] underline"
-            >
-              削除
-            </button>
-            <a
-              href={`/projects/${projectId}/chapters/${chapterNo}/consistency?item_id=${item.id}`}
-              className="text-xs text-faint underline"
-            >
-              この項目を確認
-            </a>
-          </div>
-        </div>
+        </RequirementGroup>
       ))}
     </div>
   );

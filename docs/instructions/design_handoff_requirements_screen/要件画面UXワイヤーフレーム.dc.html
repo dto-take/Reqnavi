@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet"><style>body{margin:0;background:#f0eee9;font-family:"Zen Kaku Gothic New",system-ui,sans-serif}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 "Zen Kaku Gothic New",system-ui,sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 "Zen Kaku Gothic New",system-ui,sans-serif;color:rgba(0,0,0,.55)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 "Zen Kaku Gothic New",system-ui,sans-serif;color:rgba(0,0,0,.5)}a{color:#2a5db0}a:hover{color:#17407e}</style></helmet>
+
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname"><a class="dv-oid" href="#2b">2b</a>（グループ＋グループ内手動順）を詰めた3案</span></div>
+<div class="dv-opts">
+
+<!-- ============ 3a ============ -->
+<div class="dv-opt" id="3a">
+<div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>2b ＋ 一括操作・フィルタを合流（<a class="dv-oid" href="#1a">1a</a>の良さを載せる）</div>
+<div class="dv-card" style="width:620px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+  <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:2px solid #2b2b2b">
+    <div style="font:700 18px/1.2 'Zen Kaku Gothic New',sans-serif">5. システム要件</div>
+    <div style="display:flex;align-items:center;gap:7px">
+      <div style="width:100px;height:8px;border:1.5px solid #2b2b2b;border-radius:5px;overflow:hidden"><div style="width:25%;height:100%;background:#2b2b2b"></div></div>
+      <span style="font:400 11.5px 'Yomogi',cursive;color:#4a4a4a;white-space:nowrap">確定 1 / 4</span>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:8px 11px;border:1.5px solid #2b2b2b;border-radius:7px;white-space:nowrap">グループ：要件区分 ▾</span>
+      <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:8px 12px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff;white-space:nowrap">AI素案を生成</span>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 18px;border-bottom:1.5px dashed #b9b4aa;background:#faf9f6">
+    <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:2px solid #2b2b2b;border-radius:20px;background:#2b2b2b;color:#fff">すべて 4</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">要対応 3</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">⚠ 曖昧 2</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">確定 1</span>
+    <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">絞り込み中でもグループの枠は残る</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;padding:9px 18px;background:#2b2b2b;color:#fff">
+    <div style="width:14px;height:14px;border:1.5px solid #fff;border-radius:3px;background:#fff"></div>
+    <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;white-space:nowrap">2件を選択中</span>
+    <div style="display:flex;gap:7px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end">
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 10px;border:1.5px solid #fff;border-radius:6px;white-space:nowrap">一括で確定</span>
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 10px;border:1.5px solid #fff;border-radius:6px;white-space:nowrap">グループを変更 ▾</span>
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 10px;border:1.5px solid #fff;border-radius:6px;white-space:nowrap">削除</span>
+    </div>
+  </div>
+
+  <div style="padding:12px 18px 16px;background:#f4f2ee;display:flex;flex-direction:column;gap:14px">
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▾</span>
+        <div style="width:13px;height:13px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+        <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif">連携・データ</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">2</span>
+        <span style="font:500 10.5px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #c8862a;border-radius:20px;color:#6b4611;background:#f7ecd8">未確定 2</span>
+        <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">⠿ 見出しごと移動</span>
+      </div>
+
+      <div style="display:flex;gap:10px;padding:12px 14px;border:1.5px solid #2b2b2b;border-left:6px solid #c8862a;border-radius:9px;background:#fff">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:none">
+          <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px;background:#2b2b2b"></div>
+          <span style="font:400 13px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;background:#f4e3c6;border:1.5px solid #c8862a;color:#6b4611">要レビュー</span>
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #a8402a;color:#7c2d1c">⚠ 曖昧 1</span>
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px dashed #7a7568;color:#4a4a4a">AI素案</span>
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a">出典 2</span>
+          </div>
+          <div style="font:500 14.5px/1.55 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">既存の基幹システム（会計システム）との間で、顧客情報を連携する必要がある。</div>
+          <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px">
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">ソリューション</span>
+              <div style="height:7px;background:#d8d5cf;border-radius:4px"></div>
+              <div style="height:7px;width:65%;background:#d8d5cf;border-radius:4px"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">KPI・メリデメ</span>
+              <span style="font:400 11.5px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b;padding:3px 8px;border:1.5px dashed #b9b4aa;border-radius:6px;align-self:flex-start">＋ 未入力 2</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 14px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff;white-space:nowrap">確定する</span>
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 12px;border:1.5px solid #2b2b2b;border-radius:7px;white-space:nowrap">開いて編集</span>
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 10px;border:1.5px solid #2b2b2b;border-radius:7px">⋯</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;padding:11px 14px;border:1.5px solid #2b2b2b;border-radius:9px;background:#fff">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:none">
+          <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px;background:#2b2b2b"></div>
+          <span style="font:400 13px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:7px;min-width:0">
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a;align-self:flex-start">下書き</span>
+          <div style="font:500 14px/1.5 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">監査ログの保持期間を定める必要がある。</div>
+        </div>
+      </div>
+      <div style="font:400 11.5px 'Yomogi',cursive;color:#4a4a4a;padding:8px 12px;border:1.5px dashed #b9b4aa;border-radius:8px;background:#fff">＋ このグループに追加</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▸</span>
+        <div style="width:13px;height:13px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+        <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif">利用環境・アクセス</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">2</span>
+        <span style="font:500 10.5px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #4a7c59;border-radius:20px;color:#2d4d37;background:#e2ede5">確定 1</span>
+        <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">折りたたみ中は件数サマリだけ</span>
+      </div>
+      <div style="height:34px;border:1.5px solid #b9b4aa;border-radius:9px;background:repeating-linear-gradient(135deg,#fbfaf7 0 8px,#f2efe9 8px 16px)"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;padding:12px 18px;border-top:1.5px solid #2b2b2b;font:500 12.5px 'Zen Kaku Gothic New',sans-serif">
+    <span>← 4. KPI</span><span>6. 開発スコープ →</span>
+  </div>
+</div>
+<div style="width:620px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 見出しのチェックでグループ丸ごと選択 → 一括確定</span>
+  <span>◎ グループ見出しに「未確定 / 確定」件数 → 折りたたんでも進捗が見える</span>
+  <span>◎ フィルタしてもグループの枠は保持（構成が崩れて見えない）</span>
+</div>
+</div>
+
+<!-- ============ 3b ============ -->
+<div class="dv-opt" id="3b">
+<div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>高密度版：1行1件＋クリックで展開（件数が増えても俯瞰できる）</div>
+<div class="dv-card" style="width:560px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+  <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:2px solid #2b2b2b">
+    <div style="font:700 18px/1.2 'Zen Kaku Gothic New',sans-serif">5. システム要件</div>
+    <span style="font:400 11.5px 'Yomogi',cursive;color:#4a4a4a;white-space:nowrap">8件 / 確定 2</span>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:7px 11px;border:1.5px solid #2b2b2b;border-radius:7px;white-space:nowrap">すべて畳む</span>
+      <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 12px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff;white-space:nowrap">AI素案を生成</span>
+    </div>
+  </div>
+
+  <div style="background:#f4f2ee;padding:10px 16px 16px;display:flex;flex-direction:column;gap:12px">
+
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 2px">
+        <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▾</span>
+        <span style="font:700 12.5px 'Zen Kaku Gothic New',sans-serif">連携・データ</span>
+        <div style="flex:1;height:6px;border:1.5px solid #b9b4aa;border-radius:4px;overflow:hidden;background:#fff"><div style="width:33%;height:100%;background:#2b2b2b"></div></div>
+        <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">1/3 確定</span>
+      </div>
+
+      <div style="border:1.5px solid #2b2b2b;border-radius:9px;background:#fff;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1.5px solid #e2ded6">
+          <span style="font:400 12px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+          <span style="width:9px;height:9px;border-radius:50%;background:#c8862a;flex:none"></span>
+          <span style="flex:1;min-width:0;font:500 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">既存の基幹システムとの間で、顧客情報を連携する必要がある</span>
+          <span style="font:500 10.5px 'Zen Kaku Gothic New',sans-serif;color:#7c2d1c;white-space:nowrap">⚠1</span>
+          <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">2/4</span>
+          <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▾</span>
+        </div>
+
+        <div style="padding:12px;border-bottom:1.5px solid #e2ded6;background:#fdfcf8;display:flex;flex-direction:column;gap:10px">
+          <span style="font:400 11px 'Yomogi',cursive;color:#6b6b6b">↓ 開いた行だけ詳細を表示（アコーディオン）</span>
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;background:#f4e3c6;border:1.5px solid #c8862a;color:#6b4611">要レビュー</span>
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a">出典 2</span>
+          </div>
+          <div style="font:500 14px/1.55 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">営業担当者が外出先からモバイル端末でシステムにアクセスする必要がある。</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+            <div style="padding:8px 10px;border:1.5px solid #b9b4aa;border-radius:8px;background:#fff;display:flex;flex-direction:column;gap:5px">
+              <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">ソリューション</span>
+              <div style="height:7px;background:#d8d5cf;border-radius:4px"></div>
+              <div style="height:7px;width:60%;background:#d8d5cf;border-radius:4px"></div>
+            </div>
+            <div style="padding:8px 10px;border:1.5px dashed #b9b4aa;border-radius:8px;background:#fff;display:flex;flex-direction:column;gap:5px">
+              <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">KPI</span>
+              <span style="font:400 11.5px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b">未入力 ＋</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 14px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff;white-space:nowrap">確定する</span>
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 10px;border:1.5px solid #2b2b2b;border-radius:7px">⋯</span>
+            <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">確定すると自動で次の行が開く</span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 11px">
+          <span style="font:400 12px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+          <span style="width:9px;height:9px;border-radius:50%;background:#4a7c59;flex:none"></span>
+          <span style="flex:1;min-width:0;font:400 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">システムの利用者（営業約40名／…）への対応</span>
+          <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">4/4</span>
+          <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▸</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 2px">
+        <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▾</span>
+        <span style="font:700 12.5px 'Zen Kaku Gothic New',sans-serif">性能・非機能</span>
+        <div style="flex:1;height:6px;border:1.5px solid #b9b4aa;border-radius:4px;overflow:hidden;background:#fff"><div style="width:0;height:100%;background:#2b2b2b"></div></div>
+        <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">0/2 確定</span>
+      </div>
+      <div style="border:1.5px solid #2b2b2b;border-radius:9px;background:#fff;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1.5px solid #e2ded6">
+          <span style="font:400 12px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+          <span style="width:9px;height:9px;border-radius:50%;background:#b9b4aa;flex:none"></span>
+          <span style="flex:1;min-width:0;font:400 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">ピーク時の同時アクセス数の想定</span>
+          <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">1/4</span>
+          <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▸</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 11px">
+          <span style="font:400 12px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+          <span style="width:9px;height:9px;border-radius:50%;background:#b9b4aa;flex:none"></span>
+          <span style="flex:1;min-width:0;font:400 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">障害時の復旧目標（RTO / RPO）</span>
+          <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">0/4</span>
+          <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▸</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div style="width:560px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 8件でも1画面に収まる＝並べ替えが圧倒的にやりやすい</span>
+  <span>◎ 行の「2/4」は入力済み項目数。空欄が数字で分かる</span>
+  <span>◎ 確定→次の行が自動で開く：流し作業に強い</span>
+</div>
+</div>
+
+<!-- ============ 3c ============ -->
+<div class="dv-opt" id="3c">
+<div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a>画面全体（左ナビ込み）：グループが章の目次にも効く</div>
+<div class="dv-card" style="width:900px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+  <div style="display:grid;grid-template-columns:210px minmax(0,1fr)">
+
+    <div style="border-right:2px solid #2b2b2b;background:#faf9f6;display:flex;flex-direction:column">
+      <div style="padding:12px 13px;border-bottom:1.5px solid #e2ded6;display:flex;flex-direction:column;gap:6px">
+        <span style="font:400 11px 'Yomogi',cursive;color:#4a4a4a">← 案件一覧</span>
+        <span style="font:700 14px 'Zen Kaku Gothic New',sans-serif">Salesforce導入支援</span>
+        <div style="display:flex;align-items:center;gap:7px">
+          <div style="flex:1;height:7px;border:1.5px solid #2b2b2b;border-radius:4px;overflow:hidden"><div style="width:11%;height:100%;background:#2b2b2b"></div></div>
+          <span style="font:400 10.5px 'Yomogi',cursive;color:#4a4a4a">11%</span>
+        </div>
+      </div>
+
+      <div style="padding:10px 13px 4px;font:700 11px 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">要件定義</div>
+      <div style="display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:7px;padding:6px 13px">
+          <span style="width:7px;height:7px;border-radius:50%;background:#4a7c59"></span>
+          <span style="font:400 12px 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">4. KPI</span>
+        </div>
+        <div style="padding:7px 13px;background:#fff;border-left:5px solid #2b2b2b;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="width:7px;height:7px;border-radius:50%;background:#c8862a"></span>
+            <span style="font:700 12px 'Zen Kaku Gothic New',sans-serif">5. システム要件</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding-left:14px">
+            <span style="font:400 11px 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">連携・データ <span style="color:#6b6b6b">1/3</span></span>
+            <span style="font:400 11px 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">性能・非機能 <span style="color:#6b6b6b">0/2</span></span>
+            <span style="font:400 11px 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">運用・体制 <span style="color:#6b6b6b">2/3</span></span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;padding:6px 13px">
+          <span style="width:7px;height:7px;border-radius:50%;background:#b9b4aa"></span>
+          <span style="font:400 12px 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">6. 開発スコープ</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;padding:6px 13px">
+          <span style="width:7px;height:7px;border-radius:50%;background:#b9b4aa"></span>
+          <span style="font:400 12px 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">7. ビジネス要件</span>
+        </div>
+        <div style="padding:6px 13px;font:400 11px 'Yomogi',cursive;color:#6b6b6b">… 8〜15章</div>
+      </div>
+
+      <div style="margin-top:auto;padding:11px 13px;border-top:1.5px solid #2b2b2b;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:6px 9px;border:1.5px solid #2b2b2b;border-radius:6px;text-align:center">確定判定ダッシュボード</span>
+        <span style="font:400 11px 'Yomogi',cursive;color:#4a4a4a">整合性チェック（全体）</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;min-width:0">
+      <div style="display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:2px solid #2b2b2b">
+        <div style="font:700 18px/1.2 'Zen Kaku Gothic New',sans-serif">5. システム要件</div>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border:1.5px solid #c8862a;border-radius:20px;color:#6b4611;background:#f7ecd8;white-space:nowrap">要対応 3</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:7px 11px;border:1.5px solid #2b2b2b;border-radius:7px;white-space:nowrap">他案件から参照</span>
+          <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:7px 11px;border:1.5px solid #2b2b2b;border-radius:7px;white-space:nowrap">グループ：要件区分 ▾</span>
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 12px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff;white-space:nowrap">AI素案を生成</span>
+        </div>
+      </div>
+
+      <div style="padding:12px 18px 16px;background:#f4f2ee;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+          <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:2px solid #2b2b2b;border-radius:20px;background:#2b2b2b;color:#fff">すべて 8</span>
+          <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">要対応 3</span>
+          <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">⚠ 曖昧 2</span>
+          <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">左ナビのグループ名をクリック＝その束へジャンプ</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▾</span>
+            <div style="width:13px;height:13px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+            <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif">連携・データ</span>
+            <span style="font:500 10.5px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #c8862a;border-radius:20px;color:#6b4611;background:#f7ecd8">未確定 2</span>
+            <span style="margin-left:auto;font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:4px 9px;border:1.5px solid #2b2b2b;border-radius:6px;white-space:nowrap">この束を一括確定</span>
+          </div>
+
+          <div style="display:flex;gap:10px;padding:12px 14px;border:1.5px solid #2b2b2b;border-left:6px solid #c8862a;border-radius:9px;background:#fff">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:none">
+              <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+              <span style="font:400 13px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+              <div style="display:flex;gap:7px;flex-wrap:wrap">
+                <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;background:#f4e3c6;border:1.5px solid #c8862a;color:#6b4611">要レビュー</span>
+                <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #a8402a;color:#7c2d1c">⚠ 曖昧 1</span>
+                <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a">出典 2</span>
+              </div>
+              <div style="font:500 14.5px/1.55 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">既存の基幹システム（会計システム）との間で、顧客情報を連携する必要がある。</div>
+              <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px">
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">ソリューション</span>
+                  <div style="height:7px;background:#d8d5cf;border-radius:4px"></div>
+                  <div style="height:7px;width:70%;background:#d8d5cf;border-radius:4px"></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">KPI</span>
+                  <span style="font:400 11.5px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b;padding:3px 8px;border:1.5px dashed #b9b4aa;border-radius:6px;align-self:flex-start">＋ 未入力</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">メリット・デメリット</span>
+                  <span style="font:400 11.5px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b;padding:3px 8px;border:1.5px dashed #b9b4aa;border-radius:6px;align-self:flex-start">＋ 未入力</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 14px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff;white-space:nowrap">確定する</span>
+                <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 12px;border:1.5px solid #2b2b2b;border-radius:7px;white-space:nowrap">開いて編集</span>
+                <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 10px;border:1.5px solid #2b2b2b;border-radius:7px">⋯</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:9px;padding:10px 13px;border:1.5px solid #b9b4aa;border-radius:9px;background:#fbfaf7">
+            <span style="font:400 12px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+            <span style="width:9px;height:9px;border-radius:50%;background:#b9b4aa;flex:none"></span>
+            <span style="flex:1;min-width:0;font:400 13px/1.4 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">監査ログの保持期間を定める必要がある</span>
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:4px 9px;border:1.5px solid #2b2b2b;border-radius:6px;white-space:nowrap">開く</span>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▸</span>
+            <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif">性能・非機能</span>
+            <span style="font:500 10.5px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">2</span>
+          </div>
+          <div style="height:30px;border:1.5px solid #b9b4aa;border-radius:9px;background:repeating-linear-gradient(135deg,#fbfaf7 0 8px,#f2efe9 8px 16px)"></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▸</span>
+            <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif">運用・体制</span>
+            <span style="font:500 10.5px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #4a7c59;border-radius:20px;color:#2d4d37;background:#e2ede5">確定 2/3</span>
+          </div>
+          <div style="height:30px;border:1.5px solid #b9b4aa;border-radius:9px;background:repeating-linear-gradient(135deg,#fbfaf7 0 8px,#f2efe9 8px 16px)"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:2px solid #2b2b2b;background:#fff">
+        <span style="font:500 12.5px 'Zen Kaku Gothic New',sans-serif">← 4. KPI</span>
+        <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:8px 13px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff;white-space:nowrap">この章を完了して次へ →</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div style="width:900px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 左ナビに章＋グループの2階層目次。全15章で同じ骨格が使える</span>
+  <span>◎ 章末の「完了して次へ」で15章を流れ作業として進められる</span>
+  <span>◎ ナビの●色＝章の状態。どこが残っているか一目で分かる</span>
+</div>
+</div>
+
+</div>
+<p class="dv-next">次の一手：「<a class="dv-oid" href="#3c">3c</a> を高精度デザインに」・「<a class="dv-oid" href="#3b">3b</a> の行の情報量をもう少し増やして」・「<a class="dv-oid" href="#3a">3a</a> のグループ変更・分類フローだけ詳しく」</p>
+</section>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname"><a class="dv-oid" href="#1a">1a</a> をベースに「並び順」の扱いを3案</span></div>
+<div class="dv-opts">
+
+<!-- ============ 2a ============ -->
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>並び順＝成果物の掲載順（手動固定・番号つき）</div>
+<div class="dv-card" style="width:600px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+  <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:2px solid #2b2b2b">
+    <div style="font:700 18px/1.2 'Zen Kaku Gothic New',sans-serif">5. システム要件</div>
+    <span style="font:400 11.5px 'Yomogi',cursive;color:#4a4a4a">確定 1 / 3</span>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:8px 12px;border:1.5px solid #2b2b2b;border-radius:7px">＋ 行を追加</span>
+      <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:8px 12px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">AI素案を生成</span>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1.5px dashed #b9b4aa;background:#faf9f6;flex-wrap:wrap">
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 11px;border:2px solid #2b2b2b;border-radius:20px;background:#2b2b2b;color:#fff">並び：手動（提案書の順）</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 11px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">ステータス順</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 11px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">更新順</span>
+    <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b;white-space:nowrap">手動以外は「表示だけ」＝実データの順は変えない</span>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0;padding:8px 18px 16px;background:#f4f2ee">
+
+    <div style="display:flex;gap:10px;padding:13px 14px;border:1.5px solid #2b2b2b;border-radius:9px;background:#fff;margin-top:8px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:7px;width:34px;flex:none">
+        <span style="font:700 15px/1 'Zen Kaku Gothic New',sans-serif;color:#2b2b2b;width:26px;height:26px;border:1.5px solid #2b2b2b;border-radius:50%;display:flex;align-items:center;justify-content:center">1</span>
+        <span style="font:400 14px 'Yomogi',cursive;color:#4a4a4a;cursor:grab">⠿</span>
+        <span style="font:400 11px 'Yomogi',cursive;color:#b9b4aa">▲</span>
+        <span style="font:400 11px 'Yomogi',cursive;color:#4a4a4a">▼</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:9px;min-width:0">
+        <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;background:#f4e3c6;border:1.5px solid #c8862a;color:#6b4611">要レビュー</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #a8402a;color:#7c2d1c">⚠ 曖昧 1</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a">出典 2</span>
+        </div>
+        <div style="font:500 14.5px/1.55 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">既存の基幹システム（会計システム）との間で、顧客情報を連携する必要がある。</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 14px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">確定する</span>
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 12px;border:1.5px solid #2b2b2b;border-radius:7px">開いて編集</span>
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 10px;border:1.5px solid #2b2b2b;border-radius:7px">⋯</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0 6px 44px">
+      <div style="flex:1;height:0;border-top:2px dashed #2b2b2b"></div>
+      <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 10px;border:1.5px solid #2b2b2b;border-radius:20px;background:#fff">ここに挿入 ＋</span>
+      <div style="flex:1;height:0;border-top:2px dashed #2b2b2b"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;padding:13px 14px;border:2px dashed #2b2b2b;border-radius:9px;background:#fdfcf8;box-shadow:4px 4px 0 rgba(0,0,0,.08)">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:7px;width:34px;flex:none">
+        <span style="font:700 15px/1 'Zen Kaku Gothic New',sans-serif;width:26px;height:26px;border:1.5px solid #2b2b2b;border-radius:50%;display:flex;align-items:center;justify-content:center">2</span>
+        <span style="font:400 14px 'Yomogi',cursive;color:#2b2b2b">⠿</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:7px;min-width:0">
+        <span style="font:400 11px 'Yomogi',cursive;color:#6b6b6b">ドラッグ中：つかんだカードは1行に縮んで動く</span>
+        <div style="font:500 13.5px/1.4 'Zen Kaku Gothic New',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">営業担当者が外出先からモバイル端末でシステムにアクセス…</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;padding:12px 14px;border:1.5px solid #b9b4aa;border-radius:9px;background:#fbfaf7;margin-top:8px;opacity:.85">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:7px;width:34px;flex:none">
+        <span style="font:700 15px/1 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a;width:26px;height:26px;border:1.5px solid #b9b4aa;border-radius:50%;display:flex;align-items:center;justify-content:center">3</span>
+        <span style="font:400 14px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #4a7c59;background:#e2ede5;color:#2d4d37;align-self:flex-start">✓ 確定済</span>
+        <div style="font:400 13.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">システムの利用者（営業約40名／マネージャー8名／情シス2名）への対応。</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:11px 18px;border-top:1.5px solid #2b2b2b;background:#fff;display:flex;align-items:center;gap:9px">
+    <span style="font:400 11.5px 'Yomogi',cursive;color:#4a4a4a">並び順は自動保存・この順で提案書に出力されます</span>
+    <span style="margin-left:auto;font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 10px;border:1.5px solid #2b2b2b;border-radius:6px">元に戻す</span>
+  </div>
+</div>
+<div style="width:600px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 番号＋⠿＋▲▼：ドラッグが苦手でも1クリックで動かせる</span>
+  <span>◎ 「ここに挿入」ラインで落とす場所が明確</span>
+  <span>◎ ソートは表示のみ／手動が唯一の“正”＝出力順が迷わない</span>
+</div>
+</div>
+
+<!-- ============ 2b ============ -->
+<div class="dv-opt" id="2b">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>グループ分け＋グループ内は手動順（見出しで束ねる）</div>
+<div class="dv-card" style="width:560px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+  <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:2px solid #2b2b2b">
+    <div style="font:700 18px/1.2 'Zen Kaku Gothic New',sans-serif">5. システム要件</div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:7px 11px;border:1.5px solid #2b2b2b;border-radius:7px">グループ：区分 ▾</span>
+      <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:8px 12px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">AI素案を生成</span>
+    </div>
+  </div>
+
+  <div style="padding:10px 18px;border-bottom:1.5px dashed #b9b4aa;background:#faf9f6;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span style="font:400 11px 'Yomogi',cursive;color:#6b6b6b">束ね方を切替：</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:2px solid #2b2b2b;border-radius:20px;background:#2b2b2b;color:#fff">要件区分</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">ステータス</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">優先度</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">なし</span>
+  </div>
+
+  <div style="padding:12px 18px 16px;background:#f4f2ee;display:flex;flex-direction:column;gap:14px">
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▾</span>
+        <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif">連携・データ</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">1</span>
+        <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b">⠿ 見出しごと並べ替え</span>
+      </div>
+      <div style="display:flex;gap:10px;padding:12px 14px;border:1.5px solid #2b2b2b;border-radius:9px;background:#fff">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:none">
+          <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+          <span style="font:400 13px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;background:#f4e3c6;border:1.5px solid #c8862a;color:#6b4611">要レビュー</span>
+            <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #a8402a;color:#7c2d1c">⚠ 曖昧 1</span>
+          </div>
+          <div style="font:500 14px/1.55 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">既存の基幹システムとの間で、顧客情報を連携する必要がある。</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 14px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">確定する</span>
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 10px;border:1.5px solid #2b2b2b;border-radius:7px">⋯</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font:400 12px 'Yomogi',cursive;color:#4a4a4a">▾</span>
+        <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif">利用環境・アクセス</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:2px 8px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">2</span>
+      </div>
+      <div style="display:flex;gap:10px;padding:12px 14px;border:1.5px solid #2b2b2b;border-radius:9px;background:#fff">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:none">
+          <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+          <span style="font:400 13px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a;align-self:flex-start">下書き</span>
+          <div style="font:500 14px/1.55 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">営業担当者が外出先からモバイル端末でアクセスする必要がある。</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 14px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">確定する</span>
+            <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 10px;border:1.5px solid #2b2b2b;border-radius:7px">⋯</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;padding:11px 14px;border:1.5px solid #b9b4aa;border-radius:9px;background:#fbfaf7;opacity:.85">
+        <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px;flex:none;margin-top:3px"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #4a7c59;background:#e2ede5;color:#2d4d37;align-self:flex-start">✓ 確定済</span>
+          <div style="font:400 13px/1.5 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">システムの利用者（営業約40名／…）への対応。</div>
+        </div>
+      </div>
+      <div style="font:400 11.5px 'Yomogi',cursive;color:#6b6b6b;padding:8px 12px;border:1.5px dashed #b9b4aa;border-radius:8px">＋ このグループに追加</div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1.5px dashed #b9b4aa;border-radius:8px;background:#fff">
+      <span style="font:400 11.5px 'Yomogi',cursive;color:#6b6b6b">未分類 0 件 — ドラッグでグループ間の移動＝分類も同時に完了</span>
+    </div>
+  </div>
+</div>
+<div style="width:560px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 並べ替えが「分類」も兼ねる（グループ間ドラッグ＝区分変更）</span>
+  <span>◎ 見出し単位でも並べ替え → 章の構成そのものを組み立てられる</span>
+  <span>◎ 項目が10件以上に増えても見通しが崩れない</span>
+</div>
+</div>
+
+<!-- ============ 2c ============ -->
+<div class="dv-opt" id="2c">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>並べ替え専用モード（全件を1行に圧縮して一気に組み替え）</div>
+<div class="dv-card" style="width:520px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#2b2b2b;color:#fff">
+    <span style="font:700 14px 'Zen Kaku Gothic New',sans-serif">並べ替えモード</span>
+    <span style="font:400 11px 'Yomogi',cursive;color:#e8e4dc">編集・確定は一時停止中</span>
+    <div style="margin-left:auto;display:flex;gap:7px">
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:6px 11px;border:1.5px solid #fff;border-radius:6px">キャンセル</span>
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:6px 11px;border:1.5px solid #fff;border-radius:6px;background:#fff;color:#2b2b2b">この順で確定</span>
+    </div>
+  </div>
+
+  <div style="padding:11px 16px;border-bottom:1.5px dashed #b9b4aa;background:#faf9f6;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span style="font:400 11px 'Yomogi',cursive;color:#6b6b6b">下書きの並べ方：</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #2b2b2b;border-radius:20px">ステータス順に整列</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #2b2b2b;border-radius:20px">重要度順に整列</span>
+    <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:4px 10px;border:1.5px solid #2b2b2b;border-radius:20px">元に戻す</span>
+  </div>
+
+  <div style="padding:12px 16px 16px;display:flex;flex-direction:column;gap:7px;background:#f4f2ee">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #2b2b2b;border-radius:8px;background:#fff">
+      <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif;width:18px">1</span>
+      <span style="font:400 13px 'Yomogi',cursive;color:#4a4a4a">⠿</span>
+      <span style="width:9px;height:9px;border-radius:50%;background:#c8862a;flex:none"></span>
+      <span style="flex:1;font:500 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">既存の基幹システムとの間で、顧客情報を連携する必要がある</span>
+      <span style="font:500 10.5px 'Zen Kaku Gothic New',sans-serif;color:#7c2d1c">⚠1</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #2b2b2b;border-radius:8px;background:#fff">
+      <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif;width:18px">2</span>
+      <span style="font:400 13px 'Yomogi',cursive;color:#4a4a4a">⠿</span>
+      <span style="width:9px;height:9px;border-radius:50%;background:#b9b4aa;flex:none"></span>
+      <span style="flex:1;font:500 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">営業担当者が外出先からモバイル端末でアクセスする必要がある</span>
+    </div>
+    <div style="height:0;border-top:2px solid #2b2b2b;margin:1px 0"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid #2b2b2b;border-radius:8px;background:#fdfcf8;box-shadow:3px 3px 0 rgba(0,0,0,.1)">
+      <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif;width:18px">3</span>
+      <span style="font:400 13px 'Yomogi',cursive;color:#2b2b2b">⠿</span>
+      <span style="width:9px;height:9px;border-radius:50%;background:#4a7c59;flex:none"></span>
+      <span style="flex:1;font:500 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">システムの利用者（営業約40名／…）への対応</span>
+      <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">つかみ中</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #b9b4aa;border-radius:8px;background:#fbfaf7">
+      <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif;width:18px;color:#6b6b6b">4</span>
+      <span style="font:400 13px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+      <span style="width:9px;height:9px;border-radius:50%;background:#b9b4aa;flex:none"></span>
+      <span style="flex:1;font:400 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">監査ログの保持期間について（AI素案）</span>
+    </div>
+    <span style="font:400 11px 'Yomogi',cursive;color:#6b6b6b;padding-top:4px">↑↓ で移動・space でつかむ／離す・数字入力で位置指定</span>
+  </div>
+</div>
+<div style="width:520px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 通常時のカードは並べ替えUIを持たず、閲覧・判断に集中できる</span>
+  <span>◎ 全件が1画面に収まるので「章の流れ」を見ながら組める</span>
+  <span>◎ 確定するまで反映されない＝誤操作で順が崩れない</span>
+</div>
+</div>
+
+</div>
+<p class="dv-next">次の一手：「<a class="dv-oid" href="#2a">2a</a> と <a class="dv-oid" href="#2c">2c</a> を合体（通常は▲▼のみ・大幅入替は専用モード）」・「<a class="dv-oid" href="#2b">2b</a> のグループ名を要件区分の実データで」・「<a class="dv-oid" href="#2a">2a</a> を高精度デザイン＋左ナビ込みの画面全体に」</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">「5. システム要件」型画面の改善案 3種（低精度ワイヤー）</span></div>
+
+<div class="dv-opts">
+
+<!-- ============ 1a ============ -->
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>カード型リスト＋一括操作バー（作成者向け・現状からの最小移行）</div>
+<div class="dv-card" style="width:600px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:16px 18px 12px;border-bottom:2px solid #2b2b2b">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font:700 19px/1.2 'Zen Kaku Gothic New',sans-serif;color:#1a1a1a">5. システム要件</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:120px;height:8px;border:1.5px solid #2b2b2b;border-radius:5px;overflow:hidden;background:#fff"><div style="width:33%;height:100%;background:#2b2b2b"></div></div>
+        <span style="font:400 11.5px 'Yomogi',cursive;color:#4a4a4a">確定 1 / 3 件</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end">
+      <div style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;padding:9px 12px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">AI素案を生成</div>
+      <div style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;padding:9px 12px;border:1.5px solid #2b2b2b;border-radius:7px;color:#2b2b2b">＋ 行を追加</div>
+      <div style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;padding:9px 10px;border:1.5px solid #2b2b2b;border-radius:7px;color:#2b2b2b">⋯</div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 18px;border-bottom:1.5px dashed #b9b4aa;background:#faf9f6">
+    <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+    <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;color:#2b2b2b;padding:4px 10px;border:1.5px solid #2b2b2b;border-radius:20px;background:#2b2b2b;color:#fff">すべて 3</span>
+    <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;color:#2b2b2b;padding:4px 10px;border:1.5px solid #2b2b2b;border-radius:20px">要対応 2</span>
+    <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;color:#2b2b2b;padding:4px 10px;border:1.5px solid #2b2b2b;border-radius:20px">⚠ 曖昧 2</span>
+    <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;color:#2b2b2b;padding:4px 10px;border:1.5px solid #2b2b2b;border-radius:20px">確定 1</span>
+    <span style="margin-left:auto;font:400 11.5px 'Yomogi',cursive;color:#555;white-space:nowrap">並び替え：ステータス ▾</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;padding:9px 18px;background:#2b2b2b;color:#fff">
+    <div style="width:14px;height:14px;border:1.5px solid #fff;border-radius:3px;background:#fff"></div>
+    <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif">2件を選択中</span>
+    <div style="display:flex;gap:7px;margin-left:auto">
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 10px;border:1.5px solid #fff;border-radius:6px">一括で確定</span>
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 10px;border:1.5px solid #fff;border-radius:6px">不採用</span>
+      <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 10px;border:1.5px solid #fff;border-radius:6px">削除</span>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;padding:14px 18px 18px;background:#f4f2ee">
+
+    <div style="display:flex;gap:10px;padding:13px 14px;border:1.5px solid #2b2b2b;border-left:6px solid #c8862a;border-radius:9px;background:#fff">
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center;padding-top:2px">
+        <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px;background:#2b2b2b"></div>
+        <span style="font:400 12px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;background:#f4e3c6;border:1.5px solid #c8862a;color:#6b4611">要レビュー</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px dashed #7a7568;color:#4a4a4a">AI素案</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a">出典 2</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #a8402a;color:#7c2d1c">⚠ 曖昧 1</span>
+        </div>
+        <div style="font:500 14.5px/1.55 'Zen Kaku Gothic New',sans-serif;color:#1a1a1a;text-wrap:pretty">既存の基幹システム（会計システム）との間で、<span style="border-bottom:2px wavy #a8402a">顧客情報</span>を連携する必要がある。</div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">ソリューション</span>
+            <div style="height:7px;background:#d8d5cf;border-radius:4px"></div>
+            <div style="height:7px;width:70%;background:#d8d5cf;border-radius:4px"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">KPI</span>
+            <span style="font:400 11.5px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b;padding:3px 8px;border:1.5px dashed #b9b4aa;border-radius:6px;align-self:flex-start">＋ 未入力</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">メリット・デメリット</span>
+            <span style="font:400 11.5px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b;padding:3px 8px;border:1.5px dashed #b9b4aa;border-radius:6px;align-self:flex-start">＋ 未入力</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:2px">
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 14px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">確定する</span>
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 12px;border:1.5px solid #2b2b2b;border-radius:7px;color:#2b2b2b">この項目を確認</span>
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 10px;border:1.5px solid #2b2b2b;border-radius:7px;color:#2b2b2b">⋯</span>
+          <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b">⋯ に「リスク許容で確定 / 不採用 / 削除」を格納</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;padding:13px 14px;border:1.5px solid #2b2b2b;border-left:6px solid #b9b4aa;border-radius:9px;background:#fff">
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center;padding-top:2px">
+        <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px;background:#2b2b2b"></div>
+        <span style="font:400 12px 'Yomogi',cursive;color:#6b6b6b">⠿</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:9px;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a">下書き</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #b9b4aa;color:#4a4a4a">出典 2</span>
+        </div>
+        <div style="font:500 14.5px/1.55 'Zen Kaku Gothic New',sans-serif;color:#1a1a1a;text-wrap:pretty">営業担当者が外出先からモバイル端末でシステムにアクセスする必要がある。</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 14px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">確定する</span>
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:7px 12px;border:1.5px solid #2b2b2b;border-radius:7px;color:#2b2b2b">開いて編集</span>
+          <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b">未入力欄は畳んで表示 → 縦を圧縮</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;padding:12px 14px;border:1.5px solid #b9b4aa;border-left:6px solid #4a7c59;border-radius:9px;background:#fbfaf7;opacity:.85">
+      <div style="width:14px;height:14px;border:1.5px solid #2b2b2b;border-radius:3px;margin-top:3px"></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:7px;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #4a7c59;background:#e2ede5;color:#2d4d37">✓ 確定済</span>
+          <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b">確定済は折りたたみ・淡色</span>
+        </div>
+        <div style="font:400 13.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">システムの利用者（営業約40名／マネージャー8名／情シス2名）への対応。</div>
+      </div>
+    </div>
+
+    <div style="font:400 12px 'Yomogi',cursive;color:#6b6b6b;padding:9px 12px;border:1.5px dashed #b9b4aa;border-radius:8px;text-align:center">＋ 行を追加（この位置に挿入）</div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;padding:12px 18px;border-top:1.5px solid #2b2b2b;font:500 12.5px 'Zen Kaku Gothic New',sans-serif;color:#2b2b2b">
+    <span>← 4. KPI</span><span>6. 開発スコープ →</span>
+  </div>
+</div>
+<div style="width:600px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 空欄の列が消え、1件＝1カードで縦が短い</span>
+  <span>◎ 主要アクション1つ＋⋯メニューでリンク羅列を解消</span>
+  <span>◎ 選択チェック＋一括操作バー／フィルタで「要対応」に直行</span>
+</div>
+</div>
+
+<!-- ============ 1b ============ -->
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>レビュー・キュー型（確認者向け・状態ごとに束ねて1件ずつ判断）</div>
+<div class="dv-card" style="width:520px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+
+  <div style="padding:16px 18px 13px;border-bottom:2px solid #2b2b2b;display:flex;flex-direction:column;gap:11px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+      <div style="font:700 19px/1.2 'Zen Kaku Gothic New',sans-serif">5. システム要件</div>
+      <span style="font:400 11.5px 'Yomogi',cursive;color:#4a4a4a">15章のうち 5章目・全体 11%</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1;padding:8px 10px;border:1.5px solid #c8862a;border-radius:8px;background:#f7ecd8;display:flex;flex-direction:column;gap:2px">
+        <span style="font:700 17px/1 'Zen Kaku Gothic New',sans-serif;color:#6b4611">2</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#6b4611">要レビュー</span>
+      </div>
+      <div style="flex:1;padding:8px 10px;border:1.5px solid #a8402a;border-radius:8px;display:flex;flex-direction:column;gap:2px">
+        <span style="font:700 17px/1 'Zen Kaku Gothic New',sans-serif;color:#7c2d1c">2</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#7c2d1c">曖昧表現あり</span>
+      </div>
+      <div style="flex:1;padding:8px 10px;border:1.5px solid #4a7c59;border-radius:8px;display:flex;flex-direction:column;gap:2px">
+        <span style="font:700 17px/1 'Zen Kaku Gothic New',sans-serif;color:#2d4d37">1</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#2d4d37">確定</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:14px 18px 6px;display:flex;align-items:center;gap:9px">
+    <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif;color:#6b4611">要レビュー</span>
+    <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#6b4611;padding:2px 8px;border:1.5px solid #c8862a;border-radius:20px">2</span>
+    <span style="margin-left:auto;font:500 11.5px 'Zen Kaku Gothic New',sans-serif;padding:5px 10px;border:1.5px solid #2b2b2b;border-radius:6px">このレーンを一括確定</span>
+  </div>
+
+  <div style="padding:6px 18px 14px;display:flex;flex-direction:column;gap:9px">
+    <div style="border:2px solid #2b2b2b;border-radius:9px;background:#fff;padding:12px 13px;display:flex;flex-direction:column;gap:10px;box-shadow:3px 3px 0 #e2ded6">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font:400 11px 'Yomogi',cursive;color:#6b6b6b">1 / 2</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px dashed #7a7568;color:#4a4a4a">AI素案</span>
+        <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px solid #a8402a;color:#7c2d1c">⚠ 曖昧 1</span>
+        <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b">出典 2 ▾</span>
+      </div>
+      <div style="font:500 14.5px/1.55 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">既存の基幹システムとの間で、<span style="border-bottom:2px wavy #a8402a">顧客情報</span>を連携する必要がある。</div>
+      <div style="padding:9px 11px;border:1.5px dashed #a8402a;border-radius:8px;background:#fbf0ec;display:flex;flex-direction:column;gap:5px">
+        <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;color:#7c2d1c">曖昧：「顧客情報」の範囲が未定義</span>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:4px 9px;border:1.5px solid #7c2d1c;border-radius:6px;color:#7c2d1c">言い換え案を見る</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:4px 9px;border:1.5px solid #b9b4aa;border-radius:6px;color:#4a4a4a">許容して進める</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div style="padding:8px 10px;border:1.5px solid #b9b4aa;border-radius:8px;display:flex;flex-direction:column;gap:5px">
+          <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">ソリューション</span>
+          <div style="height:7px;background:#d8d5cf;border-radius:4px"></div>
+          <div style="height:7px;width:60%;background:#d8d5cf;border-radius:4px"></div>
+        </div>
+        <div style="padding:8px 10px;border:1.5px dashed #b9b4aa;border-radius:8px;display:flex;flex-direction:column;gap:5px">
+          <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">KPI・メリデメ</span>
+          <span style="font:400 11.5px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b">未入力 ＋</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;border-top:1.5px dashed #b9b4aa;padding-top:10px">
+        <span style="font:500 12.5px 'Zen Kaku Gothic New',sans-serif;padding:8px 15px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">確定</span>
+        <span style="font:500 12.5px 'Zen Kaku Gothic New',sans-serif;padding:8px 12px;border:1.5px solid #2b2b2b;border-radius:7px">不採用</span>
+        <span style="font:500 12.5px 'Zen Kaku Gothic New',sans-serif;padding:8px 12px;border:1.5px solid #2b2b2b;border-radius:7px">保留</span>
+        <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b">J / K で次へ · Enter で確定</span>
+      </div>
+    </div>
+
+    <div style="border:1.5px solid #b9b4aa;border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:9px;background:#fbfaf7">
+      <span style="font:400 11px 'Yomogi',cursive;color:#6b6b6b">2 / 2</span>
+      <span style="flex:1;font:400 13px/1.4 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">営業担当者が外出先からモバイル端末でシステムに…</span>
+      <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 8px;border:1.5px solid #b9b4aa;border-radius:20px;color:#4a4a4a">出典 2</span>
+    </div>
+  </div>
+
+  <div style="padding:10px 18px 16px;display:flex;flex-direction:column;gap:9px;border-top:1.5px dashed #b9b4aa">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="font:700 13px 'Zen Kaku Gothic New',sans-serif;color:#2d4d37">確定済</span>
+      <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#2d4d37;padding:2px 8px;border:1.5px solid #4a7c59;border-radius:20px">1</span>
+      <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b">▾ 開く</span>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:2px solid #2b2b2b;background:#f4f2ee">
+    <span style="font:500 12.5px 'Zen Kaku Gothic New',sans-serif">← 4. KPI</span>
+    <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:8px 13px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">この章を完了して次へ →</span>
+  </div>
+</div>
+<div style="width:520px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 「今なにを判断すべきか」が上部サマリで一目瞭然</span>
+  <span>◎ 判断対象だけ開き、残りは1行に畳む → スクロール激減</span>
+  <span>◎ 曖昧表現をバッジではなく「対処カード」として提示</span>
+</div>
+</div>
+
+<!-- ============ 1c ============ -->
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>2ペイン（一覧＋詳細エディタ）・入力フローを明示</div>
+<div class="dv-card" style="width:820px;border:2px solid #2b2b2b;border-radius:10px;background:#fff">
+
+  <div style="display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:2px solid #2b2b2b">
+    <div style="font:700 18px/1.2 'Zen Kaku Gothic New',sans-serif">5. システム要件</div>
+    <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border:1.5px solid #c8862a;border-radius:20px;color:#6b4611;background:#f7ecd8">要レビュー 2</span>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:8px 12px;border:1.5px solid #2b2b2b;border-radius:7px">他案件から参照</span>
+      <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;padding:8px 12px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">AI素案を生成</span>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:270px minmax(0,1fr)">
+
+    <div style="border-right:2px solid #2b2b2b;background:#faf9f6;display:flex;flex-direction:column">
+      <div style="padding:11px 13px;border-bottom:1.5px dashed #b9b4aa;display:flex;align-items:center;gap:8px">
+        <div style="width:13px;height:13px;border:1.5px solid #2b2b2b;border-radius:3px"></div>
+        <span style="font:400 11.5px 'Yomogi',cursive;color:#4a4a4a">要対応のみ表示</span>
+        <span style="margin-left:auto;font:400 11.5px 'Yomogi',cursive;color:#6b6b6b">3件</span>
+      </div>
+
+      <div style="padding:11px 13px;border-left:5px solid #c8862a;background:#fff;border-bottom:1.5px solid #e2ded6;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="width:8px;height:8px;border-radius:50%;background:#c8862a"></span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#6b4611">要レビュー</span>
+          <span style="margin-left:auto;font:500 10.5px 'Zen Kaku Gothic New',sans-serif;color:#7c2d1c">⚠1</span>
+        </div>
+        <div style="font:500 12.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#1a1a1a">既存の基幹システムとの間で、顧客情報を連携する必要が…</div>
+        <div style="display:flex;gap:4px">
+          <span style="height:5px;flex:1;background:#2b2b2b;border-radius:3px"></span>
+          <span style="height:5px;flex:1;background:#d8d5cf;border-radius:3px"></span>
+          <span style="height:5px;flex:1;background:#d8d5cf;border-radius:3px"></span>
+          <span style="height:5px;flex:1;background:#d8d5cf;border-radius:3px"></span>
+        </div>
+        <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">入力 1 / 4 項目</span>
+      </div>
+
+      <div style="padding:11px 13px;border-bottom:1.5px solid #e2ded6;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="width:8px;height:8px;border-radius:50%;background:#b9b4aa"></span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">下書き</span>
+        </div>
+        <div style="font:400 12.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">営業担当者が外出先からモバイル端末でシステムに…</div>
+        <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">入力 1 / 4 項目</span>
+      </div>
+
+      <div style="padding:11px 13px;border-bottom:1.5px solid #e2ded6;display:flex;flex-direction:column;gap:6px;opacity:.8">
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="width:8px;height:8px;border-radius:50%;background:#4a7c59"></span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#2d4d37">確定済</span>
+        </div>
+        <div style="font:400 12.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#4a4a4a">システムの利用者（営業約40名／…）への対応。</div>
+      </div>
+
+      <div style="padding:11px 13px;font:400 11.5px 'Yomogi',cursive;color:#6b6b6b;border-bottom:1.5px dashed #b9b4aa">＋ 行を追加</div>
+      <div style="margin-top:auto;padding:12px 13px;border-top:1.5px solid #2b2b2b;font:500 12px 'Zen Kaku Gothic New',sans-serif;display:flex;justify-content:space-between">
+        <span>← 4. KPI</span><span>6. →</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column">
+      <div style="padding:14px 18px;display:flex;flex-direction:column;gap:14px">
+
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font:400 11.5px 'Yomogi',cursive;color:#6b6b6b">項目 1 / 3</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;background:#f4e3c6;border:1.5px solid #c8862a;color:#6b4611">要レビュー</span>
+          <span style="font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:3px 9px;border-radius:20px;border:1.5px dashed #7a7568;color:#4a4a4a">AI素案から作成</span>
+          <span style="margin-left:auto;font:400 11px 'Yomogi',cursive;color:#6b6b6b">最終更新 3分前・田中</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font:700 12px 'Zen Kaku Gothic New',sans-serif;color:#2b2b2b">課題・要望</span>
+          <div style="border:2px solid #2b2b2b;border-radius:8px;padding:11px 12px;font:500 14px/1.6 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">既存の基幹システム（会計システム）との間で、<span style="background:#f7dfd8;border-bottom:2px wavy #a8402a">顧客情報</span>を連携する必要がある。連携頻度は<span style="background:#f7dfd8;border-bottom:2px wavy #a8402a">日次を想定</span>。</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 11px;border:1.5px dashed #a8402a;border-radius:8px;background:#fbf0ec">
+            <span style="font:500 11.5px 'Zen Kaku Gothic New',sans-serif;color:#7c2d1c">曖昧表現 2件：本文の該当箇所をクリックで修正</span>
+            <span style="margin-left:auto;font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:4px 9px;border:1.5px solid #7c2d1c;border-radius:6px;color:#7c2d1c">まとめて確認</span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:baseline;gap:7px">
+              <span style="font:700 12px 'Zen Kaku Gothic New',sans-serif">ソリューション</span>
+              <span style="font:500 10.5px 'Zen Kaku Gothic New',sans-serif;padding:2px 7px;border:1.5px dashed #7a7568;border-radius:20px;color:#4a4a4a">AI素案あり</span>
+            </div>
+            <div style="border:1.5px solid #2b2b2b;border-radius:8px;padding:10px 11px;display:flex;flex-direction:column;gap:6px">
+              <div style="height:7px;background:#d8d5cf;border-radius:4px"></div>
+              <div style="height:7px;width:85%;background:#d8d5cf;border-radius:4px"></div>
+              <div style="height:7px;width:45%;background:#d8d5cf;border-radius:4px"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:700 12px 'Zen Kaku Gothic New',sans-serif">KPI <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">任意</span></span>
+            <div style="border:1.5px dashed #b9b4aa;border-radius:8px;padding:12px;display:flex;align-items:center;gap:8px;background:#faf9f6">
+              <span style="font:400 12px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b">未入力</span>
+              <span style="margin-left:auto;font:500 11px 'Zen Kaku Gothic New',sans-serif;padding:4px 9px;border:1.5px solid #2b2b2b;border-radius:6px">AI素案を入れる</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font:700 12px 'Zen Kaku Gothic New',sans-serif">メリット・デメリット <span style="font:400 10.5px 'Yomogi',cursive;color:#6b6b6b">任意</span></span>
+          <div style="border:1.5px dashed #b9b4aa;border-radius:8px;padding:12px;background:#faf9f6;font:400 12px 'Zen Kaku Gothic New',sans-serif;color:#6b6b6b">＋ 追記する</div>
+        </div>
+
+        <div style="border:1.5px solid #b9b4aa;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:9px;background:#faf9f6">
+          <span style="font:500 12px 'Zen Kaku Gothic New',sans-serif;color:#2b2b2b">出典 2件</span>
+          <span style="font:400 11.5px 'Yomogi',cursive;color:#6b6b6b">議事録 2024-05-12 ／ ヒアリングシート</span>
+          <span style="margin-left:auto;font:400 11.5px 'Yomogi',cursive;color:#6b6b6b">▾</span>
+        </div>
+      </div>
+
+      <div style="margin-top:auto;border-top:2px solid #2b2b2b;padding:12px 18px;display:flex;align-items:center;gap:9px;background:#f4f2ee;flex-wrap:wrap">
+        <span style="font:500 12.5px 'Zen Kaku Gothic New',sans-serif;padding:9px 16px;border:2px solid #2b2b2b;border-radius:7px;background:#2b2b2b;color:#fff">この項目を確定</span>
+        <span style="font:500 12.5px 'Zen Kaku Gothic New',sans-serif;padding:9px 12px;border:1.5px solid #2b2b2b;border-radius:7px">リスク許容で確定</span>
+        <span style="font:500 12.5px 'Zen Kaku Gothic New',sans-serif;padding:9px 10px;border:1.5px solid #2b2b2b;border-radius:7px">⋯</span>
+        <span style="margin-left:auto;font:500 12.5px 'Zen Kaku Gothic New',sans-serif;padding:9px 12px;border:1.5px solid #2b2b2b;border-radius:7px">保存して次の項目 →</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div style="width:820px;font:400 11.5px/1.7 'Yomogi',cursive;color:#4a4a4a;display:flex;flex-direction:column;gap:3px">
+  <span>◎ 一覧は「状態＋入力進捗」だけに絞り、編集は右で完結</span>
+  <span>◎ 曖昧表現は本文にインライン表示（バッジ不要）</span>
+  <span>◎ 15章あっても同じ骨格で使い回せる（章＝一覧の中身が変わるだけ）</span>
+</div>
+</div>
+
+</div>
+<p class="dv-next">次の一手：「<a class="dv-oid" href="#1a">1a</a> の一括操作を <a class="dv-oid" href="#1c">1c</a> の2ペインに載せて」・「<a class="dv-oid" href="#1b">1b</a> をもっと詰めて画面全体（左ナビ含む）で見たい」・「<a class="dv-oid" href="#1c">1c</a> を高精度デザインに」</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}"></script>
+</body>
+</html>
