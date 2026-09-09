@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useReducer, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { Children, useCallback, useReducer, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { updateRequirementItemStatus, type RequirementItem } from "@/actions/requirement-items";
 import { Button } from "@/components/ui/button";
 import { Checkbox, type CheckedState } from "@/components/ui/checkbox";
@@ -60,6 +60,7 @@ export function RequirementGroup({
   onHeaderDrop,
   selectionState,
   onToggleSelectGroup,
+  dragEnabled = true,
   children,
 }: {
   projectId: string;
@@ -74,6 +75,8 @@ export function RequirementGroup({
   onHeaderDrop: (e: React.DragEvent) => void;
   selectionState: CheckedState;
   onToggleSelectGroup: () => void;
+  // フェーズ4：グループ軸が「要件区分」以外のときはグループ見出し自体の並び替えも無効化する
+  dragEnabled?: boolean;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useCollapsed(projectId, chapterNo, category);
@@ -114,15 +117,17 @@ export function RequirementGroup({
         onDragOver={onHeaderDragOver}
         onDrop={onHeaderDrop}
       >
-        <span
-          draggable
-          onDragStart={onHeaderDragStart}
-          onDragEnd={onHeaderDragEnd}
-          className="cursor-grab text-faint flex-none"
-          title="ドラッグしてグループを並び替え"
-        >
-          ⠿
-        </span>
+        {dragEnabled && (
+          <span
+            draggable
+            onDragStart={onHeaderDragStart}
+            onDragEnd={onHeaderDragEnd}
+            className="cursor-grab text-faint flex-none"
+            title="ドラッグしてグループを並び替え"
+          >
+            ⠿
+          </span>
+        )}
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
@@ -161,6 +166,14 @@ export function RequirementGroup({
           {hasAmbiguous && <span style={{ color: "var(--status-needhearing-text)" }}>曖昧表現を含む</span>}
           <span className="ml-auto text-primary font-medium">開く ▾</span>
         </button>
+      ) : Children.count(children) === 0 ? (
+        // フィルタチップの絞り込みでこのグループが0件になった場合。見出し自体は残し
+        // （やってはいけないこと：見出しを非表示にしない）、カード一覧の代わりにこれを出す。
+        // 見出しの件数・未確定N等はitems（フィルタ前の全件）基準のままなので、フィルタ中でも
+        // グループ全体としての進捗は読める。
+        <div className="border border-dashed border-border rounded-lg px-4 py-3 text-xs text-faint text-center">
+          該当する項目がありません
+        </div>
       ) : (
         <div className="flex flex-col gap-2.5">{children}</div>
       )}

@@ -54,6 +54,7 @@ export function RequirementCard({
   onDrop,
   selected,
   onToggleSelect,
+  dragEnabled = true,
 }: {
   item: RequirementItem;
   columns: ColumnDef[];
@@ -68,6 +69,9 @@ export function RequirementCard({
   onDrop: (e: React.DragEvent) => void;
   selected: boolean;
   onToggleSelect: () => void;
+  // フェーズ4：グループ軸が「要件区分」以外のときはドラッグ並び替えを無効化する
+  // （手動並び順が意味を持つのは要件区分軸のときのみ、との指示書の設計判断）。
+  dragEnabled?: boolean;
 }) {
   const locked = isItemLocked(item.status);
   const [expanded, setExpanded] = useState(!locked);
@@ -176,15 +180,17 @@ export function RequirementCard({
       {locked && !expanded ? (
         <div className="flex items-center gap-3 px-4 py-3">
           <Checkbox checked={selected} onChange={onToggleSelect} ariaLabel="この項目を選択" />
-          <span
-            draggable
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            className="cursor-grab text-faint flex-none"
-            title="ドラッグして並び替え"
-          >
-            ⠿
-          </span>
+          {dragEnabled && (
+            <span
+              draggable
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              className="cursor-grab text-faint flex-none"
+              title="ドラッグして並び替え"
+            >
+              ⠿
+            </span>
+          )}
           <span className="text-sm text-secondary truncate flex-1 min-w-0">{bodyValue || "（未入力）"}</span>
           <span className="font-mono text-xs text-faint flex-none">
             {filledCount}/{columns.length}
@@ -198,15 +204,17 @@ export function RequirementCard({
         <div className="flex gap-3 px-4 py-4">
           <div className="flex flex-col items-center gap-2.5 flex-none pt-0.5">
             <Checkbox checked={selected} onChange={onToggleSelect} ariaLabel="この項目を選択" />
-            <span
-              draggable
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
-              className="cursor-grab text-faint"
-              title="ドラッグして並び替え"
-            >
-              ⠿
-            </span>
+            {dragEnabled && (
+              <span
+                draggable
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                className="cursor-grab text-faint"
+                title="ドラッグして並び替え"
+              >
+                ⠿
+              </span>
+            )}
           </div>
 
           <div className="flex-1 min-w-0 flex flex-col gap-3">

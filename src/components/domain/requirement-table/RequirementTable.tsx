@@ -10,10 +10,18 @@ import {
   type ColumnDef,
   type RequirementItem,
 } from "@/actions/requirement-items";
-import { groupByCategory } from "@/lib/requirement-grouping";
+import {
+  groupByCategory,
+  groupByStatus,
+  groupByNone,
+  applyFilter,
+  type FilterType,
+  type GroupByAxis,
+} from "@/lib/requirement-grouping";
 import { RequirementCard } from "@/components/domain/requirement-table/RequirementCard";
 import { RequirementGroup } from "@/components/domain/requirement-table/RequirementGroup";
 import { BulkActionBar } from "@/components/domain/requirement-table/BulkActionBar";
+import { FilterBar } from "@/components/domain/requirement-table/FilterBar";
 import { Checkbox, type CheckedState } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/error-message";
@@ -44,9 +52,24 @@ export function RequirementTable({
   const [draggedCategory, setDraggedCategory] = useState<string | null>(null);
   const [groupDropTarget, setGroupDropTarget] = useState<{ category: string; position: "before" | "after" } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [groupBy, setGroupBy] = useState<GroupByAxis>("category");
   const { show } = useToast();
 
-  const groups = groupByCategory(items);
+  // カテゴリ一覧（「グループを変更」ドロップダウン用・ドラッグ&ドロップの対象カテゴリ判定用）は
+  // 現在の表示軸（groupBy）に関わらず、常にcontent.category基準で計算する（フェーズ2/3から
+  // 変更なし）。表示グループ自体は軸に応じてgroupByCategory/groupByStatus/groupByNoneを
+  // 使い分ける。並び替えは「要件区分」軸のときのみ有効（指示書の重要な設計判断）。
+  const categoryGroups = groupByCategory(items);
+  const dragEnabled = groupBy === "category";
+  const groups = groupBy === "category" ? categoryGroups : groupBy === "status" ? groupByStatus(items) : groupByNone(items);
+
+  const filterCounts: Record<FilterType, number> = {
+    all: items.length,
+    todo: applyFilter(items, "todo").length,
+    ambiguous: applyFilter(items, "ambiguous").length,
+    confirmed: applyFilter(items, "confirmed").length,
+  };
 
   // --- 選択状態（チェックボックス選択・一括操作バー） ---
   function toggleSelect(id: string) {
@@ -142,13 +165,19 @@ export function RequirementTable({
   }
 
   // --- カードのドラッグ&ドロップ（同一グループ内の並び替え・別グループへの移動の両方） ---
+  // フェーズ4：「要件区分」軸のときのみ並び替えを有効にする。ハンドル非表示（dragEnabled）で
+  // UI操作自体は防いでいるが、それとは別にハンドラ側でも早期returnし、万一何らかの経路で
+  // ドラッグイベントが発火してもorder_indexを書き換えないようにする（やってはいけないこと：
+  // 「要件区分」以外のときに誤ってorder_indexを書き換える経路を残さない、への対応）。
   function handleCardDragStart(e: React.DragEvent, itemId: string) {
+    if (!dragEnabled) return;
     e.dataTransfer.setData("text/plain", `${ITEM_PREFIX}${itemId}`);
     e.dataTransfer.effectAllowed = "move";
     setDraggedId(itemId);
   }
 
   function handleCardDragOver(e: React.DragEvent, itemId: string) {
+    if (!dragEnabled) return;
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     const midpoint = rect.top + rect.height / 2;
@@ -163,6 +192,7 @@ export function RequirementTable({
   }
 
   function handleCardDrop(e: React.DragEvent, targetItemId: string, targetCategory: string) {
+    if (!dragEnabled) return;
     e.preventDefault();
     const raw = e.dataTransfer.getData("text/plain");
     const position = dropTarget?.position ?? "before";
@@ -192,12 +222,14 @@ export function RequirementTable({
 
   // --- グループ見出し自体のドラッグ&ドロップ（並び替え）＋ カードをグループ見出しへドロップ ---
   function handleGroupDragStart(e: React.DragEvent, category: string) {
+    if (!dragEnabled) return;
     e.dataTransfer.setData("text/plain", `${GROUP_PREFIX}${category}`);
     e.dataTransfer.effectAllowed = "move";
     setDraggedCategory(category);
   }
 
   function handleGroupDragOver(e: React.DragEvent, category: string) {
+    if (!dragEnabled) return;
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     const midpoint = rect.top + rect.height / 2;
@@ -212,6 +244,7 @@ export function RequirementTable({
   }
 
   function handleGroupDrop(e: React.DragEvent, targetCategory: string) {
+    if (!dragEnabled) return;
     e.preventDefault();
     const raw = e.dataTransfer.getData("text/plain");
     const position = groupDropTarget?.position ?? "before";
@@ -273,9 +306,11 @@ export function RequirementTable({
         <span className="text-xs text-secondary">全選択</span>
       </div>
 
+      <FilterBar filter={filter} onFilterChange={setFilter} counts={filterCounts} groupBy={groupBy} onGroupByChange={setGroupBy} />
+
       <BulkActionBar
         count={selectedIds.size}
-        categories={groups.map((g) => g.category)}
+        categories={categoryGroups.map((g) => g.category)}
         pending={isPending}
         onConfirm={handleBulkConfirm}
         onSetCategory={handleBulkSetCategory}
@@ -284,42 +319,48 @@ export function RequirementTable({
       />
 
       <div className="flex flex-col gap-5">
-        {groups.map((group) => (
-          <RequirementGroup
-            key={group.category}
-            projectId={projectId}
-            chapterNo={chapterNo}
-            category={group.category}
-            items={group.items}
-            isDraggingThisGroup={draggedCategory === group.category}
-            dropIndicator={groupDropTarget?.category === group.category ? groupDropTarget.position : null}
-            onHeaderDragStart={(e) => handleGroupDragStart(e, group.category)}
-            onHeaderDragOver={(e) => handleGroupDragOver(e, group.category)}
-            onHeaderDragEnd={handleGroupDragEnd}
-            onHeaderDrop={(e) => handleGroupDrop(e, group.category)}
-            selectionState={selectionStateOf(group.items.map((i) => i.id))}
-            onToggleSelectGroup={() => toggleSelectGroup(group.items.map((i) => i.id))}
-          >
-            {group.items.map((item) => (
-              <RequirementCard
-                key={item.id}
-                item={item}
-                columns={columns}
-                projectId={projectId}
-                chapterNo={chapterNo}
-                showPlatformSuggestion={showPlatformSuggestion}
-                isDragging={draggedId === item.id}
-                dropPosition={dropTarget?.id === item.id ? dropTarget.position : null}
-                onDragStart={(e) => handleCardDragStart(e, item.id)}
-                onDragOver={(e) => handleCardDragOver(e, item.id)}
-                onDragEnd={handleCardDragEnd}
-                onDrop={(e) => handleCardDrop(e, item.id, group.category)}
-                selected={selectedIds.has(item.id)}
-                onToggleSelect={() => toggleSelect(item.id)}
-              />
-            ))}
-          </RequirementGroup>
-        ))}
+        {groups.map((group) => {
+          const visibleItems = applyFilter(group.items, filter);
+          const displayLabel = group.category || "すべての項目"; // groupByNoneの唯一のグループ用
+          return (
+            <RequirementGroup
+              key={group.category || "__none__"}
+              projectId={projectId}
+              chapterNo={chapterNo}
+              category={displayLabel}
+              items={group.items}
+              isDraggingThisGroup={draggedCategory === group.category}
+              dropIndicator={groupDropTarget?.category === group.category ? groupDropTarget.position : null}
+              onHeaderDragStart={(e) => handleGroupDragStart(e, group.category)}
+              onHeaderDragOver={(e) => handleGroupDragOver(e, group.category)}
+              onHeaderDragEnd={handleGroupDragEnd}
+              onHeaderDrop={(e) => handleGroupDrop(e, group.category)}
+              selectionState={selectionStateOf(group.items.map((i) => i.id))}
+              onToggleSelectGroup={() => toggleSelectGroup(group.items.map((i) => i.id))}
+              dragEnabled={dragEnabled}
+            >
+              {visibleItems.map((item) => (
+                <RequirementCard
+                  key={item.id}
+                  item={item}
+                  columns={columns}
+                  projectId={projectId}
+                  chapterNo={chapterNo}
+                  showPlatformSuggestion={showPlatformSuggestion}
+                  dragEnabled={dragEnabled}
+                  isDragging={draggedId === item.id}
+                  dropPosition={dropTarget?.id === item.id ? dropTarget.position : null}
+                  onDragStart={(e) => handleCardDragStart(e, item.id)}
+                  onDragOver={(e) => handleCardDragOver(e, item.id)}
+                  onDragEnd={handleCardDragEnd}
+                  onDrop={(e) => handleCardDrop(e, item.id, group.category)}
+                  selected={selectedIds.has(item.id)}
+                  onToggleSelect={() => toggleSelect(item.id)}
+                />
+              ))}
+            </RequirementGroup>
+          );
+        })}
       </div>
     </div>
   );
