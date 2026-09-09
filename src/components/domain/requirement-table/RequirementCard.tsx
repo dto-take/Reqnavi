@@ -16,6 +16,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Menu, MenuItem } from "@/components/ui/menu";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
 import { errorMessage } from "@/lib/error-message";
@@ -51,6 +52,8 @@ export function RequirementCard({
   onDragOver,
   onDragEnd,
   onDrop,
+  selected,
+  onToggleSelect,
 }: {
   item: RequirementItem;
   columns: ColumnDef[];
@@ -63,6 +66,8 @@ export function RequirementCard({
   onDragOver: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   onDrop: (e: React.DragEvent) => void;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const locked = isItemLocked(item.status);
   const [expanded, setExpanded] = useState(!locked);
@@ -170,6 +175,7 @@ export function RequirementCard({
       {/* 1行形：確定済・不採用等のロック状態の既定表示（簡略表示、クリックで展開） */}
       {locked && !expanded ? (
         <div className="flex items-center gap-3 px-4 py-3">
+          <Checkbox checked={selected} onChange={onToggleSelect} ariaLabel="この項目を選択" />
           <span
             draggable
             onDragStart={onDragStart}
@@ -190,15 +196,18 @@ export function RequirementCard({
         </div>
       ) : (
         <div className="flex gap-3 px-4 py-4">
-          <span
-            draggable
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            className="cursor-grab text-faint flex-none pt-0.5"
-            title="ドラッグして並び替え"
-          >
-            ⠿
-          </span>
+          <div className="flex flex-col items-center gap-2.5 flex-none pt-0.5">
+            <Checkbox checked={selected} onChange={onToggleSelect} ariaLabel="この項目を選択" />
+            <span
+              draggable
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              className="cursor-grab text-faint"
+              title="ドラッグして並び替え"
+            >
+              ⠿
+            </span>
+          </div>
 
           <div className="flex-1 min-w-0 flex flex-col gap-3">
             {/* バッジ行 */}

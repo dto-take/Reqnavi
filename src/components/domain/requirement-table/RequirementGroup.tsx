@@ -3,6 +3,7 @@
 import { useCallback, useReducer, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { updateRequirementItemStatus, type RequirementItem } from "@/actions/requirement-items";
 import { Button } from "@/components/ui/button";
+import { Checkbox, type CheckedState } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
 import { errorMessage } from "@/lib/error-message";
@@ -57,6 +58,8 @@ export function RequirementGroup({
   onHeaderDragOver,
   onHeaderDragEnd,
   onHeaderDrop,
+  selectionState,
+  onToggleSelectGroup,
   children,
 }: {
   projectId: string;
@@ -69,6 +72,8 @@ export function RequirementGroup({
   onHeaderDragOver: (e: React.DragEvent) => void;
   onHeaderDragEnd: () => void;
   onHeaderDrop: (e: React.DragEvent) => void;
+  selectionState: CheckedState;
+  onToggleSelectGroup: () => void;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useCollapsed(projectId, chapterNo, category);
@@ -126,6 +131,7 @@ export function RequirementGroup({
         >
           {collapsed ? "▸" : "▾"}
         </button>
+        <Checkbox checked={selectionState} onChange={onToggleSelectGroup} ariaLabel={`${category}グループを選択`} />
         <h2 className="text-sm font-semibold text-primary">{category}</h2>
         <span className="font-mono text-[11px] text-faint">{items.length}件</span>
         <span

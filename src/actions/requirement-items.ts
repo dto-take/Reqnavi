@@ -255,6 +255,88 @@ export async function deleteRequirementItem(itemId: string, projectId: string, c
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }
 
+// 単票の「確定する」ボタンは!isItemLocked(status)の項目にしか表示されない（ロック済み
+// ＝confirmed/exception_approved/rejectedは再確定できない）。一括確定は「全選択」やグループ
+// 選択で選択集合にロック済み項目が紛れうるため、単票確定と矛盾しないようサーバー側でも
+// 同じ条件（status in ai_draft/se_reviewing）に絞り込む（指示書Step3の注意書き対応）。
+const UNLOCKED_STATUSES = ["ai_draft", "se_reviewing"];
+
+export async function bulkConfirm(projectId: string, chapterNo: number, itemIds: string[]) {
+  if (itemIds.length === 0) return;
+  const supabase = await createServerActionClient();
+  const { error } = await supabase
+    .from("requirement_items")
+    .update({ status: "confirmed" })
+    .in("id", itemIds)
+    .eq("project_id", projectId)
+    .eq("chapter_no", chapterNo)
+    .in("status", UNLOCKED_STATUSES);
+  if (error) throw new UserFacingError(errorMessage(error));
+  revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+}
+
+export async function bulkReject(projectId: string, chapterNo: number, itemIds: string[]) {
+  if (itemIds.length === 0) return;
+  const supabase = await createServerActionClient();
+  const { error } = await supabase
+    .from("requirement_items")
+    .update({ status: "rejected" })
+    .in("id", itemIds)
+    .eq("project_id", projectId)
+    .eq("chapter_no", chapterNo)
+    .in("status", UNLOCKED_STATUSES);
+  if (error) throw new UserFacingError(errorMessage(error));
+  revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+}
+
+// 選択項目のcontent.categoryを一括変更する。フェーズ2のmoveItemToGroupと違い対象が複数件の
+// ため、jsonbのcontentは行ごとに異なる値を持ち、まとめて1回のUPDATEでは書けない
+// （指示書Step3のコメント通り、対象行を取得してcontentを組み直し、個別UPDATEするループで
+// 実装する）。並び替えは移動対象を対象グループの末尾にまとめて配置する形でorder_indexを
+// 振り直す（フェーズ2のreorderGroupsと同じ「章全体を一旦グループ化してから並べ直す」考え方）。
+// カテゴリ変更自体はフェーズ2のmoveItemToGroup（ドラッグでの単票移動）でもロック状態を
+// 問わず行えるため、一括版でも同じくロック状態による制限は設けない（既存動作との整合）。
+export async function bulkSetCategory(
+  projectId: string,
+  chapterNo: number,
+  itemIds: string[],
+  targetCategory: string
+) {
+  if (itemIds.length === 0) return;
+  const supabase = await createServerActionClient();
+  const all = await fetchOrderedItems(supabase, projectId, chapterNo);
+  const idSet = new Set(itemIds);
+  const normalizedCategory = targetCategory === UNCATEGORIZED_LABEL ? "" : targetCategory;
+
+  for (const item of all) {
+    if (!idSet.has(item.id)) continue;
+    const { error } = await supabase
+      .from("requirement_items")
+      .update({ content: { ...item.content, category: normalizedCategory }, updated_at: new Date().toISOString() })
+      .eq("id", item.id);
+    if (error) throw new UserFacingError(errorMessage(error));
+  }
+
+  const remaining = all.filter((i) => !idSet.has(i.id));
+  const movedIds = all.filter((i) => idSet.has(i.id)).map((i) => i.id);
+  const grouped = groupByCategory(remaining);
+
+  const reordered: string[] = [];
+  let inserted = false;
+  for (const g of grouped) {
+    reordered.push(...g.items.map((i) => i.id));
+    if (g.category === targetCategory) {
+      reordered.push(...movedIds);
+      inserted = true;
+    }
+  }
+  // targetCategoryが（新規入力等により）章内にまだ存在しないグループ名だった場合は末尾に追加
+  if (!inserted) reordered.push(...movedIds);
+
+  await applyOrder(supabase, reordered);
+  revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+}
+
 export async function updateRequirementItemStatus(
   itemId: string,
   projectId: string,
