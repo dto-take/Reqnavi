@@ -9,7 +9,7 @@ import { runAmbiguousCheck, runAmbiguousCheckAI } from "@/actions/ambiguous-chec
 import { RequirementTable } from "@/components/domain/requirement-table/RequirementTable";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { CHAPTER_NAMES, CHAPTER_TEMPLATE_MAP } from "@/lib/chapters";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { AiGenerateButton } from "@/components/domain/ai-generate-button";
@@ -98,14 +98,17 @@ export default async function ChapterPage({
         items={items}
         showPlatformSuggestion={chapterNum === 9}
       />
-      <div className="flex justify-between mt-6 pt-4 border-t border-border">
+      {/* フェーズ5：カード型レイアウト（角丸・境界線を持つカードの集まり）に馴染むよう、
+          プレーンなテキストリンクではなくボタン風の見た目（buttonClasses）にし、
+          カード間の余白（gap-5）に近い間隔を上部に確保する */}
+      <div className="flex justify-between items-center gap-3 mt-8 pt-5 border-t border-border">
         {prevChapter ? (
-          <Link href={`/projects/${id}/chapters/${prevChapter}`} className="text-sm text-secondary hover:text-primary">
+          <Link href={`/projects/${id}/chapters/${prevChapter}`} className={buttonClasses("secondary", "sm")}>
             ← {prevChapter}. {CHAPTER_NAMES[prevChapter]}
           </Link>
         ) : <span />}
         {nextChapter ? (
-          <Link href={`/projects/${id}/chapters/${nextChapter}`} className="text-sm text-secondary hover:text-primary">
+          <Link href={`/projects/${id}/chapters/${nextChapter}`} className={buttonClasses("secondary", "sm")}>
             {nextChapter}. {CHAPTER_NAMES[nextChapter]} →
           </Link>
         ) : <span />}

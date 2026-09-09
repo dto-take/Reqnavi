@@ -15,6 +15,7 @@ import {
   groupByStatus,
   groupByNone,
   applyFilter,
+  UNCATEGORIZED_LABEL,
   type FilterType,
   type GroupByAxis,
 } from "@/lib/requirement-grouping";
@@ -290,6 +291,43 @@ export function RequirementTable({
     }
   }
 
+  // --- フェーズ5：ドラッグが困難な利用者向けの代替手段（⋯メニューの「上へ／下へ移動」） ---
+  // フラットな並び順（items、既にorder_index順）で隣の項目と入れ替える。隣が別グループの
+  // 場合は、ドラッグでそのグループ境界を越えた場合と同じ結果になるよう、隣接項目のカテゴリを
+  // 採用してmoveItemToGroupに渡す（1ステップ分のドラッグ操作と等価にするため）。
+  // dragEnabledがfalse（要件区分軸以外）のときはメニュー自体を非表示にしているが、
+  // 万一呼ばれても実行しないよう、他のドラッグ系ハンドラと同様にここでも早期returnする。
+  function handleMoveUp(itemId: string) {
+    if (!dragEnabled) return;
+    const idx = items.findIndex((i) => i.id === itemId);
+    if (idx <= 0) return;
+    const prevItem = items[idx - 1];
+    const targetCategory = prevItem.content.category?.trim() || UNCATEGORIZED_LABEL;
+    startTransition(async () => {
+      try {
+        await moveItemToGroup(projectId, chapterNo, itemId, targetCategory, prevItem.id);
+      } catch (err) {
+        show(errorMessage(err), "error");
+      }
+    });
+  }
+
+  function handleMoveDown(itemId: string) {
+    if (!dragEnabled) return;
+    const idx = items.findIndex((i) => i.id === itemId);
+    if (idx === -1 || idx >= items.length - 1) return;
+    const nextItem = items[idx + 1];
+    const targetCategory = nextItem.content.category?.trim() || UNCATEGORIZED_LABEL;
+    const insertBeforeItemId = items[idx + 2]?.id ?? null;
+    startTransition(async () => {
+      try {
+        await moveItemToGroup(projectId, chapterNo, itemId, targetCategory, insertBeforeItemId);
+      } catch (err) {
+        show(errorMessage(err), "error");
+      }
+    });
+  }
+
   if (items.length === 0) {
     return (
       <div className="border border-dashed border-border rounded-lg py-10 text-center">
@@ -356,6 +394,10 @@ export function RequirementTable({
                   onDrop={(e) => handleCardDrop(e, item.id, group.category)}
                   selected={selectedIds.has(item.id)}
                   onToggleSelect={() => toggleSelect(item.id)}
+                  onMoveUp={() => handleMoveUp(item.id)}
+                  onMoveDown={() => handleMoveDown(item.id)}
+                  canMoveUp={items.findIndex((i) => i.id === item.id) > 0}
+                  canMoveDown={items.findIndex((i) => i.id === item.id) < items.length - 1}
                 />
               ))}
             </RequirementGroup>

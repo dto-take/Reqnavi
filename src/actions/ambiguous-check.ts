@@ -42,6 +42,7 @@ const AiAmbiguitySchema = z.object({
   ambiguous: z.boolean(),
   field: z.string().nullable(),
   reason: z.string().nullable(),
+  phrase: z.string().nullable(),
 });
 
 const AI_AMBIGUITY_RESPONSE_SCHEMA = {
@@ -50,8 +51,9 @@ const AI_AMBIGUITY_RESPONSE_SCHEMA = {
     ambiguous: { type: "boolean" },
     field: { type: ["string", "null"] },
     reason: { type: ["string", "null"] },
+    phrase: { type: ["string", "null"] },
   },
-  required: ["ambiguous", "field", "reason"],
+  required: ["ambiguous", "field", "reason", "phrase"],
 };
 
 async function runAmbiguousCheckAIInternal(projectId: string, chapterNo: number) {
@@ -94,7 +96,12 @@ async function runAmbiguousCheckAIInternal(projectId: string, chapterNo: number)
     );
     const nextFlags: AmbiguousFlag[] = [
       ...existingOtherFlags,
-      { source: "ai", field: parsed.data.field ?? "", reason: parsed.data.reason ?? undefined, matched_text: "" },
+      {
+        source: "ai",
+        field: parsed.data.field ?? "",
+        reason: parsed.data.reason ?? undefined,
+        phrase: parsed.data.phrase ?? undefined,
+      },
     ];
 
     await supabase.from("requirement_items").update({ ambiguous_flags: nextFlags }).eq("id", item.id);

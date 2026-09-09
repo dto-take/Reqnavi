@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
 import { errorMessage } from "@/lib/error-message";
+import { highlightAmbiguousPhrases } from "@/lib/highlight-ambiguous";
 
 // 「内容」等、文字数が多くなりやすいセルは横スクロールで隠れるのではなく折り返して見えて
 // ほしい。<input>は仕様上折り返せないため<textarea>を使い、内容量に応じて高さを自動調整する。
@@ -55,6 +56,10 @@ export function RequirementCard({
   selected,
   onToggleSelect,
   dragEnabled = true,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
 }: {
   item: RequirementItem;
   columns: ColumnDef[];
@@ -72,6 +77,12 @@ export function RequirementCard({
   // フェーズ4：グループ軸が「要件区分」以外のときはドラッグ並び替えを無効化する
   // （手動並び順が意味を持つのは要件区分軸のときのみ、との指示書の設計判断）。
   dragEnabled?: boolean;
+  // フェーズ5：ドラッグが困難な利用者向けの代替手段（⋯メニューの「上へ／下へ移動」）。
+  // dragEnabledがfalseのとき（要件区分軸以外）はメニュー自体から非表示にする。
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }) {
   const locked = isItemLocked(item.status);
   const [expanded, setExpanded] = useState(!locked);
@@ -86,6 +97,29 @@ export function RequirementCard({
   const [bodyColumn, ...summaryColumns] = columns;
   const bodyValue = bodyColumn ? (item.content[bodyColumn.column_key] ?? "") : "";
   const filledCount = columns.filter((c) => (item.content[c.column_key] ?? "").trim() !== "").length;
+
+  // フェーズ5：曖昧表現のインライン表示。指示書の指定通り「本文表示部分」（bodyColumn）
+  // に対応するフラグのみを対象にする（他フィールドのフラグの文字列がたまたま本文中に
+  // 含まれていても誤ってハイライトしないため）。
+  // 注意：テンプレートCではbodyColumn（先頭列）が「区分・分類（category）」であり、
+  // 曖昧な言い回しが実際に出現しやすい「内容（detail）」等の項目サマリ列はこの
+  // インライン表示の対象外（バッジ表示のみ）となる。項目サマリ列は編集用の<textarea>の
+  // ままであり<mark>を描画できないため、本フェーズでは指示書の指定範囲（本文欄のみ）に
+  // 留める（全列への拡張はスコープ外）。
+  // phraseを持たないフラグ（extraction由来等）はhighlightAmbiguousPhrases側で自動的に
+  // 無視され、従来通りバッジのみの表示にフォールバックする（やってはいけないこと：無理に
+  // インライン表示を試みてエラーにしない、への対応）。
+  const bodyAmbiguousFlags = bodyColumn
+    ? (item.ambiguous_flags ?? []).filter((f) => f.field === bodyColumn.column_key && f.phrase)
+    : [];
+  const { segments: bodySegments } = highlightAmbiguousPhrases(bodyValue, bodyAmbiguousFlags);
+  const hasBodyHighlight = bodySegments.some((s) => s.isAmbiguous);
+  // 本文はデフォルトで編集可能な<textarea>だが、<textarea>内にインライン要素（<mark>）は
+  // 描画できない。ハイライト対象がある場合のみ、クリックで編集に切り替わる読み取り専用の
+  // 表示に切り替える（ロック済み項目はそもそも編集不可なので常に表示専用でよい）。
+  const [bodyEditing, setBodyEditing] = useState(false);
+  const showBodyHighlightView = hasBodyHighlight && (locked || !bodyEditing);
+  const [activeAmbiguousReason, setActiveAmbiguousReason] = useState<string | null>(null);
 
   function handleContentChange(key: string, value: string) {
     const nextContent = { ...item.content, [key]: value };
@@ -271,18 +305,58 @@ export function RequirementCard({
 
             {/* 本文（先頭列） */}
             {bodyColumn && (
-              <Textarea
-                variant="bare"
-                rows={1}
-                ref={(el: HTMLTextAreaElement | null) => {
-                  if (el) autoGrowTextarea(el);
-                }}
-                defaultValue={bodyValue}
-                onBlur={(e) => handleContentChange(bodyColumn.column_key, e.target.value)}
-                onInput={(e) => autoGrowTextarea(e.currentTarget)}
-                disabled={locked}
-                className="resize-none overflow-hidden text-sm leading-relaxed px-0"
-              />
+              showBodyHighlightView ? (
+                <div
+                  onClick={() => {
+                    if (!locked) setBodyEditing(true);
+                  }}
+                  className={`text-sm leading-relaxed whitespace-pre-wrap ${locked ? "" : "cursor-text"}`}
+                >
+                  {bodyValue === "" && <span className="text-faint">（未入力）</span>}
+                  {bodySegments.map((seg, i) =>
+                    seg.isAmbiguous ? (
+                      <mark
+                        key={i}
+                        title={seg.reason}
+                        className="bg-[#FBEAE5] border-b-2 border-[#CF7F66] cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveAmbiguousReason(seg.reason ?? null);
+                        }}
+                      >
+                        {seg.text}
+                      </mark>
+                    ) : (
+                      <span key={i}>{seg.text}</span>
+                    )
+                  )}
+                </div>
+              ) : (
+                <Textarea
+                  variant="bare"
+                  rows={1}
+                  ref={(el: HTMLTextAreaElement | null) => {
+                    if (el) autoGrowTextarea(el);
+                  }}
+                  defaultValue={bodyValue}
+                  autoFocus={hasBodyHighlight && bodyEditing}
+                  onBlur={(e) => {
+                    handleContentChange(bodyColumn.column_key, e.target.value);
+                    if (hasBodyHighlight) setBodyEditing(false);
+                  }}
+                  onInput={(e) => autoGrowTextarea(e.currentTarget)}
+                  disabled={locked}
+                  className="resize-none overflow-hidden text-sm leading-relaxed px-0"
+                />
+              )
+            )}
+            {activeAmbiguousReason && (
+              <p
+                className="text-xs px-2.5 py-1.5 rounded-md"
+                style={{ background: "var(--status-needhearing-bg)", color: "var(--status-needhearing-text)" }}
+              >
+                {activeAmbiguousReason}
+              </p>
             )}
 
             {/* 項目サマリ（残りの列。テンプレート非依存で動的に列挙） */}
@@ -353,6 +427,16 @@ export function RequirementCard({
                   <MenuItem onClick={() => setExceptionOpen(true)}>リスク許容で確定</MenuItem>
                 )}
                 {!locked && <MenuItem onClick={handleReject}>不採用にする</MenuItem>}
+                {dragEnabled && (
+                  <MenuItem onClick={onMoveUp} disabled={!canMoveUp}>
+                    上へ移動
+                  </MenuItem>
+                )}
+                {dragEnabled && (
+                  <MenuItem onClick={onMoveDown} disabled={!canMoveDown}>
+                    下へ移動
+                  </MenuItem>
+                )}
                 <MenuItem href={`/projects/${projectId}/chapters/${chapterNo}/consistency?item_id=${item.id}`}>
                   この項目を確認
                 </MenuItem>

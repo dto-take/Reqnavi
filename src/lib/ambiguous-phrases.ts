@@ -6,9 +6,11 @@ export const AMBIGUOUS_PHRASES = [
 export type AmbiguousFlag = {
   source: "dictionary" | "ai" | "extraction";
   field?: string; // dictionary/ai判定時のみ（フィールド単位の判定）
-  phrase?: string; // dictionary判定時のみ
+  // 本文中のインライン表示（フェーズ5）に使う該当フレーズの文字列。dictionaryは検出した
+  // 辞書語そのもの、aiはプロンプトが返した該当箇所の文字列。extraction由来は元々この情報を
+  // 持たないため、phraseが無い場合はインライン表示せずバッジのみの表示にフォールバックする。
+  phrase?: string;
   reason?: string; // ai/extraction判定時のみ
-  matched_text?: string;
 };
 
 export function scanContentForAmbiguousPhrases(
@@ -19,7 +21,7 @@ export function scanContentForAmbiguousPhrases(
     if (!value) continue;
     for (const phrase of AMBIGUOUS_PHRASES) {
       if (value.includes(phrase)) {
-        flags.push({ source: "dictionary", field, phrase, matched_text: value });
+        flags.push({ source: "dictionary", field, phrase });
       }
     }
   }
