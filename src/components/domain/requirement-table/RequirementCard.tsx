@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
 import { errorMessage } from "@/lib/error-message";
 import { highlightAmbiguousPhrases } from "@/lib/highlight-ambiguous";
+import { pickBodyColumnKey } from "@/lib/requirement-body-field";
 
 // 「内容」等、文字数が多くなりやすいセルは横スクロールで隠れるのではなく折り返して見えて
 // ほしい。<input>は仕様上折り返せないため<textarea>を使い、内容量に応じて高さを自動調整する。
@@ -92,20 +93,26 @@ export function RequirementCard({
   const [suggesting, setSuggesting] = useState(false);
   const { show } = useToast();
 
-  // テンプレートA/B/Cで列名が異なるため、先頭列（listColumnDefsのorder_index最小）を
-  // 「本文」、残りを「項目サマリ」として汎用的に扱う（テンプレートA固有の列名はハードコードしない）。
-  const [bodyColumn, ...summaryColumns] = columns;
+  // テンプレートA/B/Cで列名が異なるため、内容のある列を優先して「本文」を選ぶ
+  // （pickBodyColumnKeyに一本化。旧実装の「先頭列＝本文」だと、テンプレートCで
+  // グループ見出しと重複する短い分類名「区分・分類」が本文になってしまっていた）。
+  // 選ばれた本文列は項目サマリからは除外し、categoryは本文候補から除外した上で
+  // バッジ行に小さなタグとして残す（fix_card_body_field.md Step2）。
+  const bodyColumnKey = pickBodyColumnKey(columns.map((c) => c.column_key));
+  const bodyColumn = columns.find((c) => c.column_key === bodyColumnKey) ?? null;
+  const summaryColumns = columns.filter((c) => c.column_key !== bodyColumnKey && c.column_key !== "category");
+  const categoryValue = item.content.category?.trim() || null;
   const bodyValue = bodyColumn ? (item.content[bodyColumn.column_key] ?? "") : "";
   const filledCount = columns.filter((c) => (item.content[c.column_key] ?? "").trim() !== "").length;
 
-  // フェーズ5：曖昧表現のインライン表示。指示書の指定通り「本文表示部分」（bodyColumn）
-  // に対応するフラグのみを対象にする（他フィールドのフラグの文字列がたまたま本文中に
-  // 含まれていても誤ってハイライトしないため）。
-  // 注意：テンプレートCではbodyColumn（先頭列）が「区分・分類（category）」であり、
-  // 曖昧な言い回しが実際に出現しやすい「内容（detail）」等の項目サマリ列はこの
-  // インライン表示の対象外（バッジ表示のみ）となる。項目サマリ列は編集用の<textarea>の
-  // ままであり<mark>を描画できないため、本フェーズでは指示書の指定範囲（本文欄のみ）に
-  // 留める（全列への拡張はスコープ外）。
+  // フェーズ5：曖昧表現のインライン表示。「本文表示部分」（bodyColumn）に対応する
+  // フラグのみを対象にする（他フィールドのフラグの文字列がたまたま本文中に含まれていても
+  // 誤ってハイライトしないため）。fix_card_body_field.mdでbodyColumnがpickBodyColumnKey
+  // により内容のある列（テンプレートCなら「内容」等）を優先して選ばれるようになったため、
+  // 実際に曖昧な言い回しが出現しやすい列に対してインライン表示が機能するようになった
+  // （フェーズ5時点では先頭列＝categoryが選ばれておりインライン表示の対象外だった）。
+  // それでも本文以外に選ばれた列のフラグは項目サマリの<textarea>内では<mark>を描画
+  // できないため対象外のまま（バッジ表示のみ）。
   // phraseを持たないフラグ（extraction由来等）はhighlightAmbiguousPhrases側で自動的に
   // 無視され、従来通りバッジのみの表示にフォールバックする（やってはいけないこと：無理に
   // インライン表示を試みてエラーにしない、への対応）。
@@ -255,6 +262,9 @@ export function RequirementCard({
             {/* バッジ行 */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <StatusBadge status={item.status} />
+              {categoryValue && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-hover text-faint">{categoryValue}</span>
+              )}
               {item.confidence === "inferred" && (
                 <span title="資料からの推測に基づく内容です" className="text-[10px] px-1.5 py-0.5 rounded bg-hover text-faint">
                   推測
@@ -303,7 +313,7 @@ export function RequirementCard({
               )}
             </div>
 
-            {/* 本文（先頭列） */}
+            {/* 本文（pickBodyColumnKeyで選ばれた、内容のある列） */}
             {bodyColumn && (
               showBodyHighlightView ? (
                 <div

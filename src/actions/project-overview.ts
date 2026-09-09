@@ -2,7 +2,9 @@
 
 import { createServerActionClient } from "@/lib/supabase/server";
 import { getReadinessSummary, getSimpleChapterStatuses } from "@/actions/readiness";
+import { listColumnDefs } from "@/actions/requirement-items";
 import { chapterStatusFromReadiness, type ChapterStatus } from "@/lib/chapter-status";
+import { pickBodyColumnKey } from "@/lib/requirement-body-field";
 
 type ProjectOverviewProject = {
   name: string;
@@ -80,17 +82,34 @@ export async function getRecentKnowledge(projectId: string): Promise<KnowledgeIt
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
     .from("requirement_items")
-    .select("chapter_no, content, status, updated_at")
+    .select("chapter_no, template_type, content, status, updated_at")
     .eq("project_id", projectId)
     .in("status", ["confirmed", "exception_approved"])
     .order("updated_at", { ascending: false })
     .limit(6);
   if (error) throw error;
 
-  return ((data ?? []) as unknown as { chapter_no: number; content: Record<string, string | null>; status: string; updated_at: string }[]).map((item) => ({
-    chapterNo: item.chapter_no,
-    summary: item.content?.name ?? item.content?.detail ?? item.content?.issue ?? item.content?.why ?? "(内容なし)",
-    status: item.status,
-    updatedAt: item.updated_at,
-  }));
+  const items = (data ?? []) as unknown as {
+    chapter_no: number;
+    template_type: string;
+    content: Record<string, string | null>;
+    status: string;
+    updated_at: string;
+  }[];
+
+  // 本文列の選定はRequirementCardと同じpickBodyColumnKeyに一本化する（重複させない）。
+  // テンプレートごとに列一覧が異なるため、項目ごとにlistColumnDefsで該当章の列を取得する。
+  return Promise.all(
+    items.map(async (item) => {
+      const columns = await listColumnDefs(item.template_type, item.chapter_no);
+      const bodyKey = pickBodyColumnKey(columns.map((c) => c.column_key));
+      const summary = (bodyKey ? item.content?.[bodyKey] : null) ?? "(内容なし)";
+      return {
+        chapterNo: item.chapter_no,
+        summary,
+        status: item.status,
+        updatedAt: item.updated_at,
+      };
+    })
+  );
 }
