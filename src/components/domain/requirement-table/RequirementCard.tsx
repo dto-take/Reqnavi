@@ -21,7 +21,7 @@ import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
 import { errorMessage } from "@/lib/error-message";
 import { highlightAmbiguousPhrases } from "@/lib/highlight-ambiguous";
-import { pickBodyColumnKey } from "@/lib/requirement-body-field";
+import { pickBodyColumnKey, hasTitleColumn } from "@/lib/requirement-body-field";
 
 // 「内容」等、文字数が多くなりやすいセルは横スクロールで隠れるのではなく折り返して見えて
 // ほしい。<input>は仕様上折り返せないため<textarea>を使い、内容量に応じて高さを自動調整する。
@@ -96,11 +96,17 @@ export function RequirementCard({
   // テンプレートA/B/Cで列名が異なるため、内容のある列を優先して「本文」を選ぶ
   // （pickBodyColumnKeyに一本化。旧実装の「先頭列＝本文」だと、テンプレートCで
   // グループ見出しと重複する短い分類名「区分・分類」が本文になってしまっていた）。
-  // 選ばれた本文列は項目サマリからは除外し、categoryは本文候補から除外した上で
-  // バッジ行に小さなタグとして残す（fix_card_body_field.md Step2）。
-  const bodyColumnKey = pickBodyColumnKey(columns.map((c) => c.column_key));
+  // fix_card_title_body_order.md：nameが存在する場合は「見出し」として本文より先に、
+  // より目立つ太字で表示する（本文候補・項目サマリの両方からnameを除外する）。
+  // categoryは引き続き本文候補から除外した上でバッジ行に小さなタグとして残す。
+  const columnKeys = columns.map((c) => c.column_key);
+  const bodyColumnKey = pickBodyColumnKey(columnKeys);
   const bodyColumn = columns.find((c) => c.column_key === bodyColumnKey) ?? null;
-  const summaryColumns = columns.filter((c) => c.column_key !== bodyColumnKey && c.column_key !== "category");
+  const showTitle = hasTitleColumn(columnKeys);
+  const titleValue = showTitle ? (item.content.name?.trim() || null) : null;
+  const summaryColumns = columns.filter(
+    (c) => c.column_key !== bodyColumnKey && c.column_key !== "category" && c.column_key !== "name"
+  );
   const categoryValue = item.content.category?.trim() || null;
   const bodyValue = bodyColumn ? (item.content[bodyColumn.column_key] ?? "") : "";
   const filledCount = columns.filter((c) => (item.content[c.column_key] ?? "").trim() !== "").length;
@@ -312,6 +318,28 @@ export function RequirementCard({
                 </Button>
               )}
             </div>
+
+            {/* 見出し（name列。存在しないテンプレートAでは省略）
+                指示書のサンプルは読み取り専用<div>だが、nameは元々summaryColumns経由で
+                編集可能だった列であり、単純な<div>化すると編集手段が失われてしまう
+                （項目サマリからは除外したため、他に編集経路が無くなる）。他の列と同じ
+                インライン編集パターン（Textarea variant="bare"）を保ちつつ、太字・
+                通常よりやや大きい見た目にすることで指示書の見た目の意図を満たす。 */}
+            {showTitle && (
+              <Textarea
+                variant="bare"
+                rows={1}
+                ref={(el: HTMLTextAreaElement | null) => {
+                  if (el) autoGrowTextarea(el);
+                }}
+                defaultValue={titleValue ?? ""}
+                onBlur={(e) => handleContentChange("name", e.target.value)}
+                onInput={(e) => autoGrowTextarea(e.currentTarget)}
+                disabled={locked}
+                placeholder="＋ 見出しを入力"
+                className="resize-none overflow-hidden text-sm font-semibold text-primary px-0"
+              />
+            )}
 
             {/* 本文（pickBodyColumnKeyで選ばれた、内容のある列） */}
             {bodyColumn && (

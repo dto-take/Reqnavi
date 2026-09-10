@@ -4,13 +4,19 @@
 // 「内容」等の長文が項目サマリの小さな表示に埋もれる不具合を起こしていたための是正。
 // RequirementCard（カード表示）とgetRecentKnowledge（案件トップのナレッジ一覧）の
 // 両方から参照し、本文選定ロジックを一本化する（やってはいけないこと：別々に持たせない）。
-const BODY_FIELD_PRIORITY = ["detail", "issue", "why", "name"];
+// fix_card_title_body_order.md：nameは「見出し」として本文とは別枠で表示するため、
+// 本文の優先リスト・フォールバックの両方からnameを除外する（hasTitleColumnで別途判定）。
+const BODY_FIELD_PRIORITY = ["detail", "issue", "why"];
 
 export function pickBodyColumnKey(availableKeys: string[]): string | null {
   for (const key of BODY_FIELD_PRIORITY) {
     if (availableKeys.includes(key)) return key;
   }
-  // 優先リストに無いテンプレートの場合、categoryは短い分類名でしかなく本文には
-  // 不適切なため除外した上で、それ以外の先頭列にフォールバックする。
-  return availableKeys.find((k) => k !== "category") ?? null;
+  // 優先リストに無いテンプレートの場合、category・nameは本文には不適切なため除外した上で、
+  // それ以外の先頭列にフォールバックする。
+  return availableKeys.find((k) => k !== "category" && k !== "name") ?? null;
+}
+
+export function hasTitleColumn(availableKeys: string[]): boolean {
+  return availableKeys.includes("name");
 }
