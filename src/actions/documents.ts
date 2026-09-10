@@ -6,45 +6,34 @@ import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { revalidatePath } from "next/cache";
 
-async function uploadDocumentInternal(projectId: string, formData: FormData) {
+// ファイル本体はクライアントから直接Supabase Storageへアップロード済み（規約：
+// Next.jsのServer Actionボディサイズ上限・Vercelサーバーレス関数のペイロード上限に
+// 大きめのPDF/Word/PowerPointファイルが引っかかるため、direct_storage_upload.mdの方針で
+// document-upload-zone.tsx側に移した）。このServer Actionはstorage_pathのみを受け取り、
+// 分類・DB登録のみを担当する軽量な処理にする。
+// 注意：storage_pathからのdownloadはBlobを返す（Fileではない）。classifyDocumentは
+// 元々Blobを受け取る設計（reclassifyDocumentInternal参照）のため、不要なキャストはしない。
+export async function registerUploadedDocument(projectId: string, storagePath: string, fileName: string) {
   const supabase = await createServerActionClient();
-  const file = formData.get("file") as File;
-  if (!file) throw new UserFacingError("ファイルが選択されていません");
 
-  const safeExtension = file.name.match(/\.[a-zA-Z0-9]+$/)?.[0] ?? "";
-  const storagePath = `${projectId}/uploads/${crypto.randomUUID()}${safeExtension}`;
-
-  const { error: uploadError } = await supabase.storage
+  const { data: file, error: downloadError } = await supabase.storage
     .from("project-documents")
-    .upload(storagePath, file);
-  if (uploadError) throw uploadError;
+    .download(storagePath);
+  if (downloadError || !file) {
+    throw new UserFacingError(downloadError ? errorMessage(downloadError) : "アップロードしたファイルの取得に失敗しました");
+  }
 
-  const classification = await classifyDocument(file, file.name);
+  const classification = await classifyDocument(file, fileName);
 
   const { error: insertError } = await supabase.from("source_documents").insert({
     project_id: projectId,
-    file_name: file.name,
+    file_name: fileName,
     storage_path: storagePath,
     classified_tags: classification.tags,
   });
-  if (insertError) throw insertError;
+  if (insertError) throw new UserFacingError(errorMessage(insertError));
 
   revalidatePath(`/projects/${projectId}/documents`);
-}
-
-// classifyDocument経由でGeminiを呼ぶため、AiCallErrorをthrowせず戻り値で返す
-// （error.tsxがServer Action由来のメッセージを表示できないため。ai-draft.ts参照）。
-export async function uploadDocument(
-  projectId: string,
-  _prevState: { error: string | null },
-  formData: FormData
-): Promise<{ error: string | null }> {
-  try {
-    await uploadDocumentInternal(projectId, formData);
-    return { error: null };
-  } catch (e) {
-    return { error: errorMessage(e) };
-  }
 }
 
 // 分類プロンプトのカテゴリ一覧を修正した際など、既存資料を再アップロードせずに

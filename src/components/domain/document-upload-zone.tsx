@@ -1,11 +1,29 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { uploadDocument } from "@/actions/documents";
+import { createClient } from "@/lib/supabase/client";
+import { registerUploadedDocument } from "@/actions/documents";
+import { errorMessage } from "@/lib/error-message";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 
 type QueueItem = { file: File; status: "pending" | "uploading" | "done" | "error"; error?: string };
+
+// direct_storage_upload.md：ファイル本体をServer Actionの引数として送らず、ブラウザから
+// 直接Supabase Storageへアップロードし、Server Actionにはstorage_pathのみを渡す。
+// Next.js Server ActionのボディサイズDefault上限（1MB）・Vercelサーバーレス関数の
+// ペイロード上限（約4.5MB）が、大きめのPDF/PowerPointファイルで413エラーの原因になっていたため。
+// storagePathの組み立ては規約35（日本語ファイル名をStorageキーに含めない）を踏襲する。
+async function uploadOneFile(projectId: string, file: File) {
+  const supabase = createClient();
+  const safeExtension = file.name.match(/\.[a-zA-Z0-9]+$/)?.[0] ?? "";
+  const storagePath = `${projectId}/uploads/${crypto.randomUUID()}${safeExtension}`;
+
+  const { error: uploadError } = await supabase.storage.from("project-documents").upload(storagePath, file);
+  if (uploadError) throw uploadError;
+
+  await registerUploadedDocument(projectId, storagePath, file.name);
+}
 
 export function DocumentUploadZone({ projectId }: { projectId: string }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -32,21 +50,19 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
         if (queue[i].status !== "pending") continue;
         setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: "uploading" } : item)));
 
-        const formData = new FormData();
-        formData.append("file", queue[i].file);
-        // uploadDocumentはuseActionState向けのシグネチャ（第2引数はprevState）で、
-        // 失敗してもthrowせず{error: string}を返す設計（Server Action境界を越える際の
-        // エラーメッセージ欠落を避けるため、documents.ts側で意図的にこうなっている）。
-        // そのためtry/catchではなく戻り値のerrorを見て判定する。
-        const result = await uploadDocument(projectId, { error: null }, formData);
-        if (result.error) {
-          setQueue((q) =>
-            q.map((item, idx) => (idx === i ? { ...item, status: "error", error: result.error ?? undefined } : item))
-          );
-          errorCount++;
-        } else {
+        // uploadOneFile・registerUploadedDocumentはどちらも成功時に値を返さず失敗時にthrowする
+        // 通常の非同期関数（useActionStateパターンではない）。onClick+startTransition経由の
+        // 呼び出しなのでerror.tsxには届かず、ここで明示的にtry/catchする（規約44）。
+        try {
+          await uploadOneFile(projectId, queue[i].file);
           setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: "done" } : item)));
           successCount++;
+        } catch (e) {
+          const message = errorMessage(e);
+          setQueue((q) =>
+            q.map((item, idx) => (idx === i ? { ...item, status: "error", error: message } : item))
+          );
+          errorCount++;
         }
       }
       show(
