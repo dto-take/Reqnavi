@@ -5,7 +5,9 @@ import {
   updateKpiNodeField,
   deleteKpiNode,
   createKpiNode,
-  confirmKpiNode,
+  moveKpiNodeUpDown,
+  changeKpiNodeLevel,
+  duplicateKpiNode,
   type KpiNode,
 } from "@/actions/kpi-tree";
 import { KPI_LEVELS, type KpiLevel } from "@/lib/kpi-levels";
@@ -13,6 +15,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Input, Textarea } from "@/components/ui/input";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
+import { KpiCandidatePanel } from "@/components/domain/kpi-tree/KpiCandidatePanel";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/error-message";
 import { isItemLocked } from "@/lib/item-lock";
@@ -29,7 +32,8 @@ export function KpiDetailPane({
   selectedNode,
   onSelect,
   visibleFlatList,
-  onConfirmed,
+  onConfirm,
+  confirmPending,
 }: {
   projectId: string;
   tenantId: string;
@@ -39,7 +43,10 @@ export function KpiDetailPane({
   // kpi_ux_phase2.md Step4：折りたたみ状態を反映した表示中の平坦なノード順序。
   // 「N / M件目」の表示と、「確定して次へ」の遷移先の計算に使う（KpiTree.tsx側で計算）。
   visibleFlatList: KpiNode[];
-  onConfirmed: (nodeId: string) => void;
+  // フェーズ4 Step3：Cmd/Ctrl+Enterのキーボードショートカットからも同じ処理を呼べるよう、
+  // 確定ロジック自体（Server Action呼び出し＋次ノードへの遷移）をKpiTree.tsx側に引き上げた。
+  onConfirm: (nodeId: string) => void;
+  confirmPending: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const { show } = useToast();
@@ -71,6 +78,17 @@ export function KpiDetailPane({
   const childCount = nodes.filter((n) => n.parent_id === selectedNode.id).length;
   const flatIndex = visibleFlatList.findIndex((n) => n.id === selectedNode.id);
   const positionLabel = flatIndex >= 0 ? `${flatIndex + 1} / ${visibleFlatList.length} 件目` : null;
+
+  // フェーズ4：上へ/下へ移動・1段上げる/下げるの各メニュー項目を、実行しても意味が無い
+  // 境界では無効化する（サーバー側のmoveKpiNodeUpDown/changeKpiNodeLevelも同じ境界を
+  // 「範囲外は何もしない／throw」で防御しているが、UI側でも操作可能に見せない）。
+  const siblings = nodes.filter((n) => n.parent_id === selectedNode.parent_id);
+  const siblingIndex = siblings.findIndex((n) => n.id === selectedNode.id);
+  const canMoveUp = siblingIndex > 0;
+  const canMoveDown = siblingIndex >= 0 && siblingIndex < siblings.length - 1;
+  const parentNode = selectedNode.parent_id ? nodes.find((n) => n.id === selectedNode.parent_id) ?? null : null;
+  const canPromote = selectedNode.content.level !== "ゴール" && !!parentNode?.parent_id;
+  const canDemote = selectedNode.content.level !== "戦術" && siblingIndex > 0;
 
   function handleFieldBlur(field: "text" | "metric" | "owner" | "due_date", value: string) {
     const node = selectedNode;
@@ -114,15 +132,63 @@ export function KpiDetailPane({
     });
   }
 
-  // kpi_ux_phase2.md Step3/5：確定して次へ。確定後は表示中ツリーの次のノードへ自動移動する
-  // （遷移先の決定自体はKpiTree.tsx側のonConfirmedに委ねる）。
-  function handleConfirm() {
+  // フェーズ4：上へ/下へ移動、1段上げる/下げる、複製。いずれも確定済みノードでは
+  // メニュー自体を表示しないため（下記JSX）、ここでのnullガードは主に型のため。
+  function handleMoveUp() {
     const node = selectedNode;
     if (!node) return;
     startTransition(async () => {
       try {
-        await confirmKpiNode(node.id, projectId);
-        onConfirmed(node.id);
+        await moveKpiNodeUpDown(node.id, projectId, "up");
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
+  function handleMoveDown() {
+    const node = selectedNode;
+    if (!node) return;
+    startTransition(async () => {
+      try {
+        await moveKpiNodeUpDown(node.id, projectId, "down");
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
+  function handlePromote() {
+    const node = selectedNode;
+    if (!node) return;
+    startTransition(async () => {
+      try {
+        await changeKpiNodeLevel(node.id, projectId, "promote");
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
+  function handleDemote() {
+    const node = selectedNode;
+    if (!node) return;
+    startTransition(async () => {
+      try {
+        await changeKpiNodeLevel(node.id, projectId, "demote");
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
+  function handleDuplicate() {
+    const node = selectedNode;
+    if (!node) return;
+    startTransition(async () => {
+      try {
+        const newId = await duplicateKpiNode(node.id, projectId, tenantId);
+        onSelect(newId);
       } catch (e) {
         show(errorMessage(e), "error");
       }
@@ -208,6 +274,21 @@ export function KpiDetailPane({
         </div>
       </div>
 
+      {/* AI候補パネル：選択ノードの1つ下の階層の候補を提案する（確定済みノードでは非表示。
+          指示書のやってはいけないこと：確定済みノードにAI候補パネルを表示・操作可能にしない）。
+          key={selectedNode.id}でノード切替のたびに候補状態をリセットする */}
+      {!locked && (
+        <KpiCandidatePanel
+          key={selectedNode.id}
+          projectId={projectId}
+          tenantId={tenantId}
+          node={selectedNode}
+          onAdopted={(newNodeId) => {
+            if (newNodeId) onSelect(newNodeId);
+          }}
+        />
+      )}
+
       {/* フッター：確定して次へ（未確定時）／確定済み表示（確定済み時）＋「⋯」メニュー */}
       <div className="mt-auto pt-4 border-t border-border flex items-center gap-2">
         {locked ? (
@@ -218,7 +299,7 @@ export function KpiDetailPane({
             ✓ 確定済
           </span>
         ) : (
-          <Button variant="primary" size="sm" disabled={isPending} onClick={handleConfirm}>
+          <Button variant="primary" size="sm" disabled={isPending || confirmPending} onClick={() => onConfirm(selectedNode.id)}>
             確定して次へ
           </Button>
         )}
@@ -231,6 +312,23 @@ export function KpiDetailPane({
           )}
         >
           {childLevel && <MenuItem onClick={handleAddChild}>{childLevel}を追加</MenuItem>}
+          {!locked && (
+            <>
+              <MenuItem onClick={handleMoveUp} disabled={!canMoveUp}>
+                上へ移動
+              </MenuItem>
+              <MenuItem onClick={handleMoveDown} disabled={!canMoveDown}>
+                下へ移動
+              </MenuItem>
+              <MenuItem onClick={handlePromote} disabled={!canPromote}>
+                1段上げる
+              </MenuItem>
+              <MenuItem onClick={handleDemote} disabled={!canDemote}>
+                1段下げる
+              </MenuItem>
+              <MenuItem onClick={handleDuplicate}>複製</MenuItem>
+            </>
+          )}
           <MenuItem onClick={handleDelete} danger>
             削除
           </MenuItem>

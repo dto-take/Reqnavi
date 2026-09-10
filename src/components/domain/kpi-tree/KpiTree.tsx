@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import type { KpiNode } from "@/actions/kpi-tree";
+import { useState, useTransition } from "react";
+import { confirmKpiNode, type KpiNode } from "@/actions/kpi-tree";
 import { KpiTreePane } from "@/components/domain/kpi-tree/KpiTreePane";
 import { KpiDetailPane } from "@/components/domain/kpi-tree/KpiDetailPane";
+import { useToast } from "@/components/ui/toast";
+import { errorMessage } from "@/lib/error-message";
+import { isItemLocked } from "@/lib/item-lock";
 
 // kpi_ux_phase1.md：単一ツリー表示（階層が深いほど入力欄が狭くなる）を、
 // 左＝構造ペイン（ツリー）／右＝編集ペインの2ペイン構成に置き換える。
@@ -47,6 +50,8 @@ export function KpiTree({
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [isPending, startTransition] = useTransition();
+  const { show } = useToast();
 
   function toggleCollapse(id: string) {
     setCollapsedIds((prev) => {
@@ -64,13 +69,57 @@ export function KpiTree({
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? nodes[0] ?? null;
   const visibleFlatList = getVisibleFlatList(nodes, collapsedIds);
 
-  // 確定後に「表示中ツリーの次のノード」へ自動移動する（kpi_ux_phase2.md Step4/5）。
-  function handleConfirmed(confirmedNodeId: string) {
-    setSelectedId(getNextVisibleId(visibleFlatList, confirmedNodeId));
+  // フェーズ4 Step3：キーボードショートカット（Cmd/Ctrl+Enter＝確定して次へ）からも
+  // 同じ処理を呼べるよう、確定ロジック自体をKpiDetailPaneからここに引き上げる
+  // （確定後の「次のノードへ移動」は元々ここが持っていたため、両方を1箇所に統合する）。
+  function handleConfirmNode(nodeId: string) {
+    startTransition(async () => {
+      try {
+        await confirmKpiNode(nodeId, projectId);
+        setSelectedId(getNextVisibleId(visibleFlatList, nodeId));
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
   }
 
+  // フェーズ4 Step3：上下矢印キーでツリー内の選択を移動、Cmd/Ctrl+Enterで確定して次へ。
+  // フォーカスがinput/textareaにある場合は矢印キーを本来のカーソル移動に任せる
+  // （選択移動を横取りしない）。Tab/Shift+Tab自体は一切ハンドリングしない＝ブラウザ標準の
+  // フォーカス移動のまま（指示書の注意書き：アクセシビリティを損なうため本フェーズでは
+  // 実装しない）。
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const target = e.target as HTMLElement;
+    const isTextInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+
+    if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !isTextInput) {
+      if (!selectedNode) return;
+      const idx = visibleFlatList.findIndex((n) => n.id === selectedNode.id);
+      if (idx === -1) return;
+      const nextIdx = e.key === "ArrowUp" ? idx - 1 : idx + 1;
+      if (nextIdx < 0 || nextIdx >= visibleFlatList.length) return;
+      e.preventDefault();
+      setSelectedId(visibleFlatList[nextIdx].id);
+      return;
+    }
+
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      if (!selectedNode || isItemLocked(selectedNode.status)) return;
+      e.preventDefault();
+      handleConfirmNode(selectedNode.id);
+    }
+  }
+
+  // フェーズ4 Step4：1024px未満（Tailwindのlgブレークポイントと一致）で構造ペインが
+  // 極端に潰れないよう、狭い画面では2ペインを縦積みに切り替える簡易対応
+  // （ハンドオフの「ドロワー化」までは行わないが、指示書の「必須ではない」範囲での対応）。
+  // kpi_pane_width.md Step1：構造ペイン（ツリー）が狭く長い文言が過剰に省略される問題を
+  // 解消するため、220-300pxから300-420pxへ拡幅する。
   return (
-    <div className="grid gap-5 items-start" style={{ gridTemplateColumns: "minmax(220px,300px) minmax(0,1fr)" }}>
+    <div
+      className="grid grid-cols-1 lg:grid-cols-[minmax(300px,420px)_minmax(0,1fr)] gap-5 items-start"
+      onKeyDown={handleKeyDown}
+    >
       <KpiTreePane
         projectId={projectId}
         tenantId={tenantId}
@@ -87,7 +136,8 @@ export function KpiTree({
         selectedNode={selectedNode}
         onSelect={setSelectedId}
         visibleFlatList={visibleFlatList}
-        onConfirmed={handleConfirmed}
+        onConfirm={handleConfirmNode}
+        confirmPending={isPending}
       />
     </div>
   );

@@ -65,7 +65,10 @@ export function KpiTreePane({
         <div
           data-kpi-node={node.id}
           onClick={() => onSelect(node.id)}
-          className="flex items-center gap-1.5 rounded-md cursor-pointer text-[12.5px]"
+          role="treeitem"
+          aria-selected={selected}
+          tabIndex={0}
+          className="flex items-start gap-1.5 rounded-md cursor-pointer text-[12.5px] focus:outline-2 focus:-outline-offset-2"
           style={{
             padding: `7px 8px 7px ${8 + depth * 15}px`,
             background: selected ? "#fff" : "transparent",
@@ -78,17 +81,19 @@ export function KpiTreePane({
               e.stopPropagation();
               if (hasChildren) onToggleCollapse(node.id);
             }}
-            className="w-2.5 flex-none text-faint font-mono text-[10px] cursor-pointer"
+            className="w-2.5 flex-none text-faint font-mono text-[10px] cursor-pointer mt-0.5"
             tabIndex={hasChildren ? 0 : -1}
           >
             {hasChildren ? (collapsed ? "▸" : "▾") : ""}
           </button>
-          <span className="font-mono text-[9.5px] text-faint flex-none tracking-wide">{node.content.level}</span>
-          <span className={`flex-1 min-w-0 truncate ${isBold ? "font-bold" : selected ? "font-medium" : ""}`}>
+          <span className="font-mono text-[9.5px] text-faint flex-none tracking-wide mt-0.5">{node.content.level}</span>
+          {/* kpi_pane_width.md Step2：拡幅後もなお長い文言は省略されがちなため、1行省略から
+              2行までの折り返し表示（line-clamp-2）に変更する */}
+          <span className={`flex-1 min-w-0 line-clamp-2 leading-snug ${isBold ? "font-bold" : selected ? "font-medium" : ""}`}>
             {node.content.text || "（未入力）"}
           </span>
           <span
-            className="w-1.5 h-1.5 rounded-full flex-none"
+            className="w-1.5 h-1.5 rounded-full flex-none mt-1.5"
             style={{ background: statusDotColor(node.status) }}
           />
         </div>
