@@ -9,6 +9,11 @@ import { Spinner } from "@/components/ui/spinner";
 
 type QueueItem = { file: File; status: "pending" | "uploading" | "done" | "error"; error?: string };
 
+// upload_size_limit.md：1ファイルあたり20MBを上限とする。Storage側のfile_size_limit
+// （20260910041626_set_project_documents_size_limit.sqlマイグレーション）と合わせた
+// 多重防御で、こちらはアップロード自体を試みる前に即座に弾くためのクライアント側チェック。
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
 // direct_storage_upload.md：ファイル本体をServer Actionの引数として送らず、ブラウザから
 // 直接Supabase Storageへアップロードし、Server Actionにはstorage_pathのみを渡す。
 // Next.js Server ActionのボディサイズDefault上限（1MB）・Vercelサーバーレス関数の
@@ -32,7 +37,12 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
   const { show } = useToast();
 
   function addFiles(files: FileList | File[]) {
-    const items = Array.from(files).map((file) => ({ file, status: "pending" as const }));
+    const items = Array.from(files).map((file) => {
+      if (file.size > MAX_FILE_SIZE) {
+        return { file, status: "error" as const, error: "ファイルサイズが上限（20MB）を超えています" };
+      }
+      return { file, status: "pending" as const };
+    });
     setQueue((q) => [...q, ...items]);
   }
 
@@ -97,7 +107,9 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
             onChange={(e) => e.target.files && addFiles(e.target.files)}
           />
         </label>
-        <p className="text-xs text-faint mt-1">PDF・Word・Excel・PowerPoint・画像・テキストに対応</p>
+        <p className="text-xs text-faint mt-1">
+          PDF・Word・Excel・PowerPoint・画像・テキストに対応（1ファイルあたり20MBまで）
+        </p>
       </div>
 
       {queue.length > 0 && (
