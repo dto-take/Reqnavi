@@ -19,6 +19,7 @@ export function KpiTreePane({
   nodes,
   selectedId,
   onSelect,
+  onCreated,
   collapsedIds,
   onToggleCollapse,
 }: {
@@ -27,6 +28,9 @@ export function KpiTreePane({
   nodes: KpiNode[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  // kpi_add_goal.md Step1：新規作成直後は選択に加えて本文入力へフォーカスを当てる必要があるため、
+  // 単なる選択（onSelect）とは別のコールバックとして受け取る（KpiTree.tsx側のselectAndFocus）。
+  onCreated: (id: string) => void;
   collapsedIds: Set<string>;
   onToggleCollapse: (id: string) => void;
 }) {
@@ -46,7 +50,7 @@ export function KpiTreePane({
         const newId = goal
           ? await createKpiNode(projectId, tenantId, goal.id, "目標")
           : await createKpiNode(projectId, tenantId, null, "ゴール");
-        onSelect(newId);
+        onCreated(newId);
       } catch (e) {
         show(errorMessage(e), "error");
       }

@@ -50,8 +50,17 @@ export function KpiTree({
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  // kpi_add_goal.md Step1：ゴール/目標等の新規追加ボタンで作成した直後は、選択するだけでなく
+  // 本文編集欄にフォーカスを当てる。単なる選択（ツリー行クリック等）とは区別する必要があるため、
+  // 「直近で新規作成され、まだフォーカスを当てていないノードID」を別state として持つ。
+  const [autoFocusId, setAutoFocusId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { show } = useToast();
+
+  function selectAndFocus(id: string) {
+    setSelectedId(id);
+    setAutoFocusId(id);
+  }
 
   function toggleCollapse(id: string) {
     setCollapsedIds((prev) => {
@@ -126,6 +135,7 @@ export function KpiTree({
         nodes={nodes}
         selectedId={selectedNode?.id ?? null}
         onSelect={setSelectedId}
+        onCreated={selectAndFocus}
         collapsedIds={collapsedIds}
         onToggleCollapse={toggleCollapse}
       />
@@ -135,6 +145,8 @@ export function KpiTree({
         nodes={nodes}
         selectedNode={selectedNode}
         onSelect={setSelectedId}
+        onCreated={selectAndFocus}
+        autoFocusId={autoFocusId}
         visibleFlatList={visibleFlatList}
         onConfirm={handleConfirmNode}
         confirmPending={isPending}

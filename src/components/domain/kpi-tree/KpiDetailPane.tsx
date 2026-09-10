@@ -31,6 +31,8 @@ export function KpiDetailPane({
   nodes,
   selectedNode,
   onSelect,
+  onCreated,
+  autoFocusId,
   visibleFlatList,
   onConfirm,
   confirmPending,
@@ -40,6 +42,11 @@ export function KpiDetailPane({
   nodes: KpiNode[];
   selectedNode: KpiNode | null;
   onSelect: (id: string) => void;
+  // kpi_add_goal.md Step1：目標/戦略/戦術等の新規追加時も、選択に加えて本文入力へフォーカスを
+  // 当てる（KpiTree.tsx側のselectAndFocus）。ノード切替のみのonSelectとは区別する。
+  onCreated: (id: string) => void;
+  // 直近で新規作成され、まだフォーカスを当てていないノードID（一致する間だけ本文欄にautoFocusする）
+  autoFocusId: string | null;
   // kpi_ux_phase2.md Step4：折りたたみ状態を反映した表示中の平坦なノード順序。
   // 「N / M件目」の表示と、「確定して次へ」の遷移先の計算に使う（KpiTree.tsx側で計算）。
   visibleFlatList: KpiNode[];
@@ -108,7 +115,7 @@ export function KpiDetailPane({
     startTransition(async () => {
       try {
         const newId = await createKpiNode(projectId, tenantId, node.id, childLevel);
-        onSelect(newId);
+        onCreated(newId);
       } catch (e) {
         show(errorMessage(e), "error");
       }
@@ -235,6 +242,10 @@ export function KpiDetailPane({
           rows={3}
           placeholder="内容を入力"
           disabled={locked}
+          // kpi_add_goal.md Step1：keyにselectedNode.idを含むため、ノード切替のたびに
+          // このTextareaは再マウントされる。autoFocusIdが一致する間だけ、マウント時に
+          // ネイティブautoFocusで本文編集にフォーカスを当てる（新規作成直後のみ発火）。
+          autoFocus={selectedNode.id === autoFocusId}
           className="text-[15px] leading-relaxed resize-none"
         />
         {!locked && <p className="text-[11px] text-faint">階層が深くても入力幅は一定です。クリックしてそのまま編集できます。</p>}
