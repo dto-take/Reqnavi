@@ -10,6 +10,7 @@ import { CHAPTER_NAMES } from "@/lib/chapters";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { extractContent } from "@/lib/ai/extract-content";
+import { DOCUMENT_EXCERPT_MAX_LENGTH } from "@/lib/ai/excerpt-limit";
 
 const DraftItemSchema = z.object({
   content: z.record(z.string(), z.string().nullable()),
@@ -100,26 +101,57 @@ async function generateDraftInternal(
     | { kind: "text"; content: string }
     | { kind: "image"; base64: string; mimeType: string; fileName: string };
 
-  const excerptParts: ExcerptPart[] = await Promise.all(
-    documents.map(async (d): Promise<ExcerptPart> => {
+  // pdf_multimodal_input.md：officeparserによるテキスト抽出では、ガントチャート表や
+  // プロジェクト進行フロー図等のページで行列・図形の位置関係が失われ、Geminiが内容を
+  // 正しく解釈できないケースが実際に確認された（3章・ロードマップの導入スケジュール表）。
+  // PDFについては、テキスト抜粋に加えてファイル本体もマルチモーダル入力としてそのまま渡し、
+  // Geminiのネイティブなドキュメント理解（表・図・レイアウトを含めて解釈できる）を併用する。
+  // ページ単位の自前レンダリングは行わない。
+  const MAX_PDF_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+  type PdfAttachment =
+    | { fileName: string; kind: "included"; base64: string }
+    | { fileName: string; kind: "skipped_too_large"; sizeBytes: number };
+
+  const results = await Promise.all(
+    documents.map(async (d): Promise<{ excerpt: ExcerptPart; pdfAttachment: PdfAttachment | null }> => {
       const { data: file } = await supabase.storage.from("project-documents").download(d.storage_path);
-      if (!file) return { kind: "text", content: `[取得不可: ${d.file_name}]` };
+      if (!file) return { excerpt: { kind: "text", content: `[取得不可: ${d.file_name}]` }, pdfAttachment: null };
 
       const extracted = await extractContent(file, d.file_name);
-      if (extracted.kind === "text") {
-        return { kind: "text", content: `--- ${d.file_name} ---\n${extracted.content.slice(0, 3000)}` };
+      const excerpt: ExcerptPart =
+        extracted.kind === "text"
+          ? { kind: "text", content: `--- ${d.file_name} ---\n${extracted.content.slice(0, DOCUMENT_EXCERPT_MAX_LENGTH)}` }
+          : extracted.kind === "image"
+          ? { kind: "image", base64: extracted.base64, mimeType: extracted.mimeType, fileName: d.file_name }
+          : { kind: "text", content: `[未対応の形式: ${d.file_name}]` };
+
+      let pdfAttachment: PdfAttachment | null = null;
+      if (/\.pdf$/i.test(d.file_name)) {
+        if (file.size > MAX_PDF_ATTACHMENT_BYTES) {
+          pdfAttachment = { fileName: d.file_name, kind: "skipped_too_large", sizeBytes: file.size };
+        } else {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          pdfAttachment = { fileName: d.file_name, kind: "included", base64: buffer.toString("base64") };
+        }
       }
-      if (extracted.kind === "image") {
-        return { kind: "image", base64: extracted.base64, mimeType: extracted.mimeType, fileName: d.file_name };
-      }
-      return { kind: "text", content: `[未対応の形式: ${d.file_name}]` };
+
+      return { excerpt, pdfAttachment };
     })
   );
 
+  const excerptParts = results.map((r) => r.excerpt);
   const excerpts = excerptParts
     .filter((p): p is Extract<ExcerptPart, { kind: "text" }> => p.kind === "text")
     .map((p) => p.content);
   const imageParts = excerptParts.filter((p): p is Extract<ExcerptPart, { kind: "image" }> => p.kind === "image");
+
+  const pdfAttachments = results.map((r) => r.pdfAttachment).filter((p): p is PdfAttachment => p !== null);
+  const includedPdfAttachments = pdfAttachments.filter(
+    (p): p is Extract<PdfAttachment, { kind: "included" }> => p.kind === "included"
+  );
+  const skippedPdfAttachments = pdfAttachments.filter(
+    (p): p is Extract<PdfAttachment, { kind: "skipped_too_large" }> => p.kind === "skipped_too_large"
+  );
 
   // 3.5 9章（機能要件）の場合のみ、Salesforce標準機能マッピングを参考情報として注入する
   let platformContext = "";
@@ -168,6 +200,10 @@ async function generateDraftInternal(
     contents.push(`--- ${img.fileName}（画像） ---`);
     contents.push({ inlineData: { mimeType: img.mimeType, data: img.base64 } });
   }
+  for (const pdf of includedPdfAttachments) {
+    contents.push(`--- ${pdf.fileName}（PDF原本。表・図のレイアウトはテキスト抜粋より正確な場合がある） ---`);
+    contents.push({ inlineData: { mimeType: "application/pdf", data: pdf.base64 } });
+  }
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await callGeminiSafely(() =>
@@ -192,7 +228,17 @@ async function generateDraftInternal(
   await supabase.from("ai_interactions").insert({
     project_id: projectId,
     prompt_id: promptId,
-    input_summary: { chapter_no: chapterNo, document_count: documents.length },
+    input_summary: {
+      chapter_no: chapterNo,
+      document_count: documents.length,
+      // pdf_multimodal_input.md Step1：PDF原本添付の実施状況を後から追跡できるよう記録する。
+      // サイズ上限（15MB）超過時はテキスト抜粋のみへフォールバックしており、その旨をここに残す。
+      pdf_attachments_included: includedPdfAttachments.map((p) => p.fileName),
+      pdf_attachments_skipped_too_large: skippedPdfAttachments.map((p) => ({
+        fileName: p.fileName,
+        sizeBytes: p.sizeBytes,
+      })),
+    },
     output: parsed.success ? parsed.data : { error: "validation_failed" },
   });
 

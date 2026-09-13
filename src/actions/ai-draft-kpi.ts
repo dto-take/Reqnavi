@@ -4,6 +4,7 @@ import { createServerActionClient } from "@/lib/supabase/server";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
 import { extractContent } from "@/lib/ai/extract-content";
+import { DOCUMENT_EXCERPT_MAX_LENGTH } from "@/lib/ai/excerpt-limit";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { revalidatePath } from "next/cache";
@@ -39,7 +40,7 @@ async function generateKpiDraftInternal(projectId: string, tenantId: string) {
       if (!file) return `[取得不可: ${d.file_name}]`;
       const extracted = await extractContent(file, d.file_name);
       return extracted.kind === "text"
-        ? `--- ${d.file_name} ---\n${extracted.content.slice(0, 3000)}`
+        ? `--- ${d.file_name} ---\n${extracted.content.slice(0, DOCUMENT_EXCERPT_MAX_LENGTH)}`
         : `[テキスト抽出不可: ${d.file_name}]`;
     })
   );

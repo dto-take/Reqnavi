@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
 import { extractContent } from "@/lib/ai/extract-content";
+import { DOCUMENT_EXCERPT_MAX_LENGTH } from "@/lib/ai/excerpt-limit";
 
 const ClassificationSchema = z.object({
   tags: z.array(z.string()),
@@ -26,7 +27,7 @@ export async function classifyDocument(file: Blob, fileName: string) {
 
   let contents: PartUnion[];
   if (extracted.kind === "text") {
-    contents = [promptBody.replace("{document_excerpt}", extracted.content.slice(0, 4000))];
+    contents = [promptBody.replace("{document_excerpt}", extracted.content.slice(0, DOCUMENT_EXCERPT_MAX_LENGTH))];
   } else if (extracted.kind === "image") {
     contents = [
       promptBody.replace("{document_excerpt}", "（画像を直接参照してください）"),
