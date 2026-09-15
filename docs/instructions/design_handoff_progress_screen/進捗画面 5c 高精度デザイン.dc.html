@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;background:#f2efe7;color:#1b1a17;font-family:"Zen Kaku Gothic New",system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:#2f5d45;text-decoration:none}a:hover{color:#20422f}@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}</style></helmet>
+
+<div style="display:grid;min-height:100vh;background:#f2efe7;grid-template-columns:{{ gridCols }}">
+
+  <aside style="background:#1b1a17;color:#efeae0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto">
+   <sc-if value="{{ navClosed }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px 0">
+      <button onClick="{{ toggleNav }}" style="font:500 13px/1 'IBM Plex Mono',monospace;color:#efeae0;background:rgba(239,234,224,.1);border:none;border-radius:7px;padding:9px 10px;cursor:pointer" style-hover="background:rgba(239,234,224,.2)">☰</button>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8d8778;letter-spacing:.06em">04</span>
+      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8d8778;letter-spacing:.06em">05</span>
+      <span style="font:700 11px/1 'IBM Plex Mono',monospace;color:#fff;background:#2b2924;border-radius:6px;padding:7px 6px;letter-spacing:.04em">15</span>
+    </div>
+   </sc-if>
+   <sc-if value="{{ navOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <div style="padding:20px 16px 15px;border-bottom:1px solid rgba(239,234,224,.14);display:flex;flex-direction:column;gap:9px">
+      <button onClick="{{ toggleNav }}" style="align-self:flex-start;font:500 12px/1 'IBM Plex Mono',monospace;color:#a8a294;background:transparent;border:none;cursor:pointer;padding:0">‹ 閉じる</button>
+      <span style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#a8a294">← 案件一覧</span>
+      <span style="font:600 16px/1.35 'Shippori Mincho',serif;color:#fff">Salesforce<br>導入支援</span>
+      <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#a8a294">{{ spanLabel }}</span>
+    </div>
+    <div style="padding:15px 16px 6px;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#8d8778">要件定義</div>
+    <nav style="display:flex;flex-direction:column;padding:0 8px 10px">
+      <div style="display:flex;align-items:center;gap:9px;padding:7px 10px">
+        <span style="width:6px;height:6px;border-radius:50%;background:#e2a851;flex:none"></span>
+        <span style="font:400 12.5px/1.3 'Zen Kaku Gothic New',sans-serif;color:#c9c3b5">4. KPI</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:9px;padding:7px 10px">
+        <span style="width:6px;height:6px;border-radius:50%;background:#e2a851;flex:none"></span>
+        <span style="font:400 12.5px/1.3 'Zen Kaku Gothic New',sans-serif;color:#c9c3b5">5. システム要件</span>
+      </div>
+      <div style="padding:6px 10px;font:400 11.5px/1.4 'Zen Kaku Gothic New',sans-serif;color:#8d8778">6〜14章を表示 ▾</div>
+      <div style="background:#2b2924;border-radius:8px;padding:9px 10px;display:flex;flex-direction:column;gap:7px;margin:2px 0">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span style="width:6px;height:6px;border-radius:50%;background:#e2a851;flex:none"></span>
+          <span style="font:700 12.5px/1.3 'Zen Kaku Gothic New',sans-serif;color:#fff">15. 進捗</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;padding-left:15px">
+          <div style="display:flex;align-items:baseline;gap:6px"><span style="font:400 11.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#d5cfc1">大工程</span><span style="margin-left:auto;font:400 10.5px 'IBM Plex Mono',monospace;color:#8d8778">{{ groupCount }}</span></div>
+          <div style="display:flex;align-items:baseline;gap:6px"><span style="font:400 11.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#d5cfc1">中工程</span><span style="margin-left:auto;font:400 10.5px 'IBM Plex Mono',monospace;color:#8d8778">{{ taskCount }}</span></div>
+          <div style="display:flex;align-items:baseline;gap:6px"><span style="font:400 11.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#d5cfc1">稼働日</span><span style="margin-left:auto;font:400 10.5px 'IBM Plex Mono',monospace;color:#8d8778">{{ totalWorkdays }}</span></div>
+        </div>
+      </div>
+    </nav>
+    <div style="margin-top:auto;padding:14px 14px 18px;border-top:1px solid rgba(239,234,224,.14)">
+      <span style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;background:#efeae0;border-radius:7px;padding:10px 12px;text-align:center;display:block">確定判定ダッシュボード</span>
+    </div>
+    </div>
+   </sc-if>
+  </aside>
+
+  <!-- ===== ガント ===== -->
+  <main style="min-width:0;display:flex;flex-direction:column;background:#fff">
+    <header style="padding:18px 22px 13px;border-bottom:1px solid #e3ded2;background:#faf8f3;display:flex;flex-direction:column;gap:13px">
+      <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6f6a5e">CHAPTER 15 / 15</span>
+          <h1 style="margin:0;font:600 23px/1.25 'Shippori Mincho',serif">進捗</h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap">
+          <div style="display:flex;border:1px solid #d8d2c4;border-radius:8px;overflow:hidden;background:#fff">
+            <button onClick="{{ setDay }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;border:none;padding:9px 13px;cursor:pointer;background:{{ dayBg }};color:{{ dayFg }}">日</button>
+            <button onClick="{{ setWeek }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;border:none;border-left:1px solid #e3ded2;padding:9px 13px;cursor:pointer;background:{{ weekBg }};color:{{ weekFg }}">週</button>
+            <button onClick="{{ setMonth }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;border:none;border-left:1px solid #e3ded2;padding:9px 13px;cursor:pointer;background:{{ monthBg }};color:{{ monthFg }}">月</button>
+          </div>
+          <button onClick="{{ jumpToday }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:8px;padding:10px 13px;cursor:pointer;white-space:nowrap" style-hover="background:#f4f1e9">今日へ</button>
+          <button onClick="{{ addGroup }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#fff;background:#2f5d45;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;white-space:nowrap" style-hover="background:#254a37">＋ 大工程</button>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+        <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">主担当</span>
+        <sc-for list="{{ owners }}" as="o" hint-placeholder-count="4">
+          <button onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:7px;border-radius:20px;padding:6px 12px;cursor:pointer;font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;border:1px solid {{ o.bd }};background:{{ o.bg }};color:{{ o.fg }}">
+            <span style="width:10px;height:10px;border-radius:3px;flex:none;background:{{ o.color }}"></span>{{ o.name }}
+            <span style="font-family:'IBM Plex Mono',monospace;color:{{ o.numFg }}">{{ o.count }}</span>
+          </button>
+        </sc-for>
+        <span style="width:1px;height:18px;background:#e3ded2"></span>
+        <button onClick="{{ toggleDeps }}" style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;border-radius:20px;padding:6px 12px;cursor:pointer;white-space:nowrap;border:1px solid {{ depBd }};background:{{ depBg }};color:{{ depFg }}">依存関係を表示</button>
+        <span style="margin-left:auto;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;white-space:nowrap">{{ rangeLabel }}</span>
+      </div>
+    </header>
+
+    <div style="display:flex;min-width:0;flex:1">
+      <!-- WBS列 -->
+      <div style="width:176px;flex:none;border-right:1px solid #e3ded2;background:#faf8f3;display:flex;flex-direction:column">
+        <div style="height:38px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #e3ded2;font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">WBS</div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <div onClick="{{ r.onSelect }}" style="height:36px;display:flex;align-items:center;gap:7px;border-bottom:1px solid #ece7dc;cursor:pointer;padding-right:10px;padding-left:{{ r.pad }};background:{{ r.bg }};border-left:3px solid {{ r.edge }}" style-hover="background:#f1ede2">
+            <span onClick="{{ r.onCaret }}" style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6f6a5e;width:10px;flex:none">{{ r.caret }}</span>
+            <span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ r.dot }}"></span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#1b1a17;font:{{ r.font }}">{{ r.name }}</span>
+            <span style="font:400 10px/1 'Zen Kaku Gothic New',sans-serif;flex:none;color:#7a7466">{{ r.ownerLabel }}</span>
+          </div>
+        </sc-for>
+        <div onClick="{{ addGroup }}" style="height:36px;display:flex;align-items:center;padding:0 12px;font:400 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;cursor:pointer" style-hover="color:#2f5d45">＋ 大工程を追加</div>
+      </div>
+
+      <!-- タイムライン -->
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+       <div style="flex:1;min-width:0;overflow-x:auto;overflow-y:hidden">
+        <div style="display:flex;flex-direction:column;min-width:{{ trackMin }}">
+        <div style="height:38px;display:flex;border-bottom:1px solid #e3ded2;background:#faf8f3">
+          <sc-for list="{{ cols }}" as="c" hint-placeholder-count="10">
+            <div style="display:flex;align-items:center;justify-content:center;border-left:1px solid #ece7dc;font:400 10px/1 'IBM Plex Mono',monospace;color:#6f6a5e;min-width:0;flex:{{ c.flex }}">{{ c.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="position:relative;min-width:0;height:{{ bodyH }}">
+          <div style="position:absolute;inset:0;display:flex;pointer-events:none">
+            <sc-for list="{{ cols }}" as="c" hint-placeholder-count="10">
+              <div style="border-left:1px solid #f1ede2;min-width:0;flex:{{ c.flex }}"></div>
+            </sc-for>
+          </div>
+
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+            <div onClick="{{ r.onSelect }}" style="height:36px;border-bottom:1px solid #ece7dc;position:relative;cursor:pointer;background:{{ r.barRowBg }}">
+              <sc-if value="{{ r.isGroup }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;top:13px;height:11px;border-radius:2px;border:1px solid #1b1a17;background:#1b1a17;left:{{ r.left }};width:{{ r.width }}"></div>
+              </sc-if>
+              <sc-if value="{{ r.isTask }}" hint-placeholder-val="{{ true }}">
+                <div style="position:absolute;top:11px;height:15px;border-radius:4px;left:{{ r.left }};width:{{ r.width }};border:1px solid {{ r.barBd }};background:{{ r.barBg }};box-shadow:{{ r.barShadow }};opacity:{{ r.barOpacity }}"></div>
+                <span style="position:absolute;top:11px;font:400 10px/15px 'Zen Kaku Gothic New',sans-serif;color:#7a7466;white-space:nowrap;left:{{ r.afterLeft }}">{{ r.ownerLabel }}</span>
+              </sc-if>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{ showDeps }}" hint-placeholder-val="{{ true }}">
+            <div style="position:absolute;inset:0;pointer-events:none">
+              <sc-for list="{{ links }}" as="k" hint-placeholder-count="5">
+                <div style="position:absolute;width:0;border-left:1.5px {{ k.style }} {{ k.color }};left:{{ k.x }};top:{{ k.top }};height:{{ k.h }}"></div>
+              </sc-for>
+              <sc-for list="{{ links }}" as="k" hint-placeholder-count="5">
+                <div style="position:absolute;height:0;border-top:1.5px {{ k.style }} {{ k.color }};left:{{ k.hx }};width:{{ k.hw }};top:{{ k.hy }}"></div>
+              </sc-for>
+              <sc-for list="{{ links }}" as="k" hint-placeholder-count="5">
+                <div style="position:absolute;width:0;height:0;border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;border-left:5px solid {{ k.color }};left:{{ k.ax }};top:{{ k.ay }}"></div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <div style="position:absolute;top:0;bottom:0;width:2px;background:#8f3a22;pointer-events:none;left:{{ todayX }}"></div>
+          <div style="position:absolute;top:2px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#8f3a22;background:#fff;padding:2px 4px;border-radius:3px;pointer-events:none;left:{{ todayX }}">TODAY</div>
+        </div>
+        </div>
+       </div>
+
+        <div style="border-top:1px solid #e3ded2;background:#faf8f3;padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:6px;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e"><span style="width:16px;height:9px;background:#1b1a17;border-radius:2px"></span>大工程（中工程から自動集計）</span>
+          <span style="display:flex;align-items:center;gap:6px;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e"><span style="width:2px;height:12px;background:#8f3a22"></span>今日</span>
+          <span style="display:flex;align-items:center;gap:6px;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e"><span style="width:16px;height:0;border-top:1.5px solid #c3bcab"></span>先行→後続</span>
+          <span style="margin-left:auto;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;white-space:nowrap">バーのドラッグで期間変更・端をつかんで伸縮</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== 詳細パネル ===== -->
+  <aside style="background:#faf8f3;border-left:1px solid #e3ded2;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto">
+   <sc-if value="{{ panelClosed }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ togglePanel }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 0;cursor:pointer" style-hover="background:#f4f1e9">
+      <span style="font:500 13px/1 'IBM Plex Mono',monospace;color:#3c382f;border:1px solid #d8d2c4;border-radius:7px;padding:8px 9px;background:#fff">‹</span>
+      <span style="font:500 11px/1.9 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;writing-mode:vertical-rl">工程の詳細</span>
+    </div>
+   </sc-if>
+   <sc-if value="{{ panelOpen }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <div style="padding:14px 18px 0;display:flex;flex-direction:column;gap:14px;flex:1">
+      <button onClick="{{ togglePanel }}" style="align-self:flex-end;font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;background:#fff;border:1px solid #d8d2c4;border-radius:7px;padding:7px 11px;cursor:pointer" style-hover="background:#f4f1e9;color:#3c382f">詳細を閉じる ›</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">{{ selCrumb }}</span>
+        <span style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;border:1px solid #1b1a17;border-radius:20px;padding:5px 11px;white-space:nowrap">{{ selKind }}</span>
+        <span style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;border-radius:20px;padding:5px 11px;white-space:nowrap;color:{{ stFg }};background:{{ stBg }};border:1px solid {{ stBd }}">{{ stLabel }}</span>
+      </div>
+
+      <div style="font:600 17px/1.5 'Shippori Mincho',serif;color:#1b1a17;text-wrap:pretty">{{ selName }}</div>
+
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">期間</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="flex:1;font:400 12px/1 'IBM Plex Mono',monospace;padding:10px 8px;border:1px solid #d8d2c4;border-radius:8px;background:#fff;text-align:center;cursor:pointer" style-hover="border-color:#b3ac9c">{{ selStart }}</span>
+          <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#7a7466">→</span>
+          <span style="flex:1;font:400 12px/1 'IBM Plex Mono',monospace;padding:10px 8px;border:1px solid #d8d2c4;border-radius:8px;background:#fff;text-align:center;cursor:pointer" style-hover="border-color:#b3ac9c">{{ selEnd }}</span>
+        </div>
+        <span style="font:400 11px/1.5 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">{{ selDurationLabel }}</span>
+      </div>
+
+      <sc-if value="{{ selIsTask }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">主担当（バー色）</span>
+            <span style="display:flex;align-items:center;gap:8px;font:400 12.5px/1 'Zen Kaku Gothic New',sans-serif;padding:10px 11px;border:1px solid #d8d2c4;border-radius:8px;background:#fff;cursor:pointer" style-hover="border-color:#b3ac9c"><span style="width:11px;height:11px;border-radius:3px;flex:none;background:{{ selOwnerColor }}"></span>{{ selOwner }} ▾</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">副担当</span>
+            <span style="font:400 12.5px/1 'Zen Kaku Gothic New',sans-serif;padding:10px 11px;border:1px solid #d8d2c4;border-radius:8px;background:#fff;cursor:pointer" style-hover="border-color:#b3ac9c">{{ selSub }} ▾</span>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;padding:13px;border:1px solid #e3ded2;border-radius:10px;background:#fff">
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">依存関係</span>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">先行工程</span>
+            <span onClick="{{ selectPred }}" style="font:400 12.5px/1.5 'Zen Kaku Gothic New',sans-serif;padding:9px 11px;border:1px solid {{ predBd }};border-radius:8px;background:#faf8f3;color:#1b1a17;cursor:pointer;text-wrap:pretty" style-hover="border-color:#a9c3b4">{{ predLabel }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">後続工程 {{ succCount }}</span>
+            <sc-if value="{{ hasSucc }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <sc-for list="{{ succs }}" as="s" hint-placeholder-count="2">
+                  <span onClick="{{ s.onSelect }}" style="font:400 12px/1.5 'Zen Kaku Gothic New',sans-serif;padding:8px 10px;border:1px solid #e3ded2;border-left:3px solid {{ s.dot }};border-radius:8px;background:#faf8f3;cursor:pointer;text-wrap:pretty" style-hover="background:#f4f1e9">{{ s.name }}</span>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noSucc }}" hint-placeholder-val="{{ false }}">
+              <span style="font:400 12px/1.5 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">なし（この工程が最終）</span>
+            </sc-if>
+          </div>
+          <span style="font:400 11px/1.6 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;text-wrap:pretty">先行工程を動かすと、後続工程の開始日も自動で追従します。</span>
+          <button onClick="{{ pushBack }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#faf8f3;border:1px solid #d8d2c4;border-radius:7px;padding:9px 12px;cursor:pointer;white-space:nowrap;align-self:flex-start" style-hover="background:#f4f1e9">この工程を3日後ろへ（後続も追従）</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ selIsGroup }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">この大工程の中工程 {{ childCount }}</span>
+          <sc-for list="{{ childList }}" as="c" hint-placeholder-count="2">
+            <div onClick="{{ c.onSelect }}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e3ded2;border-left:3px solid {{ c.dot }};border-radius:9px;background:#fff;cursor:pointer" style-hover="background:#f4f1e9">
+              <span style="flex:1;min-width:0;font:400 12.5px/1.5 'Zen Kaku Gothic New',sans-serif;color:#3c382f;text-wrap:pretty">{{ c.name }}</span>
+              <span style="font:400 10.5px/1 'Zen Kaku Gothic New',sans-serif;color:#7a7466;flex:none">{{ c.owner }}</span>
+            </div>
+          </sc-for>
+          <span style="font:400 11px/1.6 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;text-wrap:pretty">大工程の期間は中工程から自動集計されます（直接編集はしません）。</span>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="position:sticky;bottom:0;border-top:1px solid #e3ded2;background:#fff;padding:13px 18px;display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+      <button onClick="{{ addChild }}" style="font:500 13px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:8px;padding:11px 14px;cursor:pointer;white-space:nowrap" style-hover="background:#f4f1e9">中工程を追加</button>
+      <button style="font:500 13px/1 'IBM Plex Mono',monospace;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:8px;padding:11px 13px;cursor:pointer" style-hover="background:#f4f1e9">⋯</button>
+    </div>
+    </div>
+   </sc-if>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1380,&quot;height&quot;:880},&quot;showDeps&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;表示&quot;}}">
+const OWNERS = [
+  { name: '田中', color: '#2f5d45' },
+  { name: '佐藤', color: '#8f3a22' },
+  { name: '鈴木', color: '#4a6b8a' },
+  { name: '高橋', color: '#8a5a18' }
+];
+const BASE = new Date(2026, 8, 1);
+const TODAY = 18;
+const DAY = 86400000;
+
+function fmt(off) {
+  const d = new Date(BASE.getTime() + off * DAY);
+  return (d.getMonth() + 1) + '/' + d.getDate();
+}
+function workdays(a, b) {
+  let n = 0;
+  for (let i = a; i <= b; i++) {
+    const w = new Date(BASE.getTime() + i * DAY).getDay();
+    if (w !== 0 && w !== 6) n++;
+  }
+  return n;
+}
+
+class Component extends DCLogic {
+  state = {
+    groups: [
+      { id: 'g1', name: '1. 要件定義' },
+      { id: 'g2', name: '2. 設計・開発' },
+      { id: 'g3', name: '3. 移行・定着' }
+    ],
+    tasks: [
+      { id: 't1', g: 'g1', name: 'ヒアリング・現状分析', s: 0, e: 6, own: '田中', sub: '—', pred: null },
+      { id: 't2', g: 'g1', name: '要件定義書の作成', s: 7, e: 16, own: '佐藤', sub: '田中', pred: 't1' },
+      { id: 't3', g: 'g2', name: '基本設計', s: 17, e: 26, own: '佐藤', sub: '鈴木', pred: 't2' },
+      { id: 't4', g: 'g2', name: '詳細設計', s: 27, e: 33, own: '鈴木', sub: '—', pred: 't3' },
+      { id: 't5', g: 'g2', name: '実装・単体テスト', s: 34, e: 48, own: '鈴木', sub: '高橋', pred: 't4' },
+      { id: 't6', g: 'g2', name: '結合テスト', s: 49, e: 55, own: '高橋', sub: '—', pred: 't5' },
+      { id: 't7', g: 'g3', name: 'データ移行', s: 56, e: 62, own: '田中', sub: '鈴木', pred: 't6' },
+      { id: 't8', g: 'g3', name: '研修・定着支援', s: 63, e: 69, own: '田中', sub: '—', pred: 't7' }
+    ],
+    focus: null,
+    collapsed: {},
+    sel: 't2',
+    scale: 'week',
+    deps: null,
+    nav: false,
+    panel: true,
+    seq: 0
+  };
+
+  win() {
+    const s = this.state.scale;
+    if (s === 'day') return { a: 12, n: 21 };
+    return { a: 0, n: 70 };
+  }
+
+  kids(gid) { return this.state.tasks.filter(t => t.g === gid); }
+
+  rollup(gid) {
+    const k = this.kids(gid);
+    if (!k.length) return { s: 0, e: 0 };
+    return { s: Math.min.apply(null, k.map(t => t.s)), e: Math.max.apply(null, k.map(t => t.e)) };
+  }
+
+  ownerColor(name) {
+    const o = OWNERS.find(x => x.name === name);
+    return o ? o.color : '#b3ac9c';
+  }
+
+  visible() {
+    const out = [];
+    this.state.groups.forEach(g => {
+      const r = this.rollup(g.id);
+      out.push({ kind: 'group', id: g.id, name: g.name, s: r.s, e: r.e });
+      if (!this.state.collapsed[g.id]) this.kids(g.id).forEach(t => out.push({ kind: 'task', id: t.id, t }));
+    });
+    return out;
+  }
+
+  shift(id, days, seen) {
+    seen = seen || {};
+    this.state.tasks.filter(t => t.pred === id).forEach(t => {
+      if (seen[t.id]) return;
+      seen[t.id] = 1;
+      t.s += days; t.e += days;
+      this.shift(t.id, days, seen);
+    });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const w = this.win();
+    const pos = d => ((d - w.a) / w.n * 100);
+    const clampBar = (a, b) => {
+      const l = Math.max(0, pos(a)), r = Math.min(100, pos(b + 1));
+      return { left: l.toFixed(2) + '%', width: Math.max(0, r - l).toFixed(2) + '%', vis: r > 0 && l < 100 };
+    };
+
+    const cols = [];
+    if (s.scale === 'week') for (let i = 0; i < 10; i++) cols.push({ flex: '1 1 0', label: fmt(i * 7) });
+    else if (s.scale === 'day') for (let i = 0; i < w.n; i++) cols.push({ flex: '1 1 0', label: fmt(w.a + i) });
+    else [['9月', 30], ['10月', 31], ['11月', 9]].forEach(m => cols.push({ flex: m[1] + ' 1 0', label: m[0] }));
+
+    const vis = this.visible();
+    const rowIdx = {};
+    vis.forEach((v, i) => rowIdx[v.id] = i);
+
+    const rows = vis.map((v, i) => {
+      if (v.kind === 'group') {
+        const b = clampBar(v.s, v.e);
+        const k = this.kids(v.id);
+        return {
+          id: v.id, name: v.name, isGroup: true, isTask: false,
+          pad: '10px', caret: s.collapsed[v.id] ? '▸' : '▾',
+          dot: '#1b1a17',
+          font: '700 12.5px/1.4 "Zen Kaku Gothic New",sans-serif',
+          ownerLabel: '中工程 ' + k.length,
+          bg: s.sel === v.id ? '#fff' : '#f4f1e9', edge: s.sel === v.id ? '#1b1a17' : 'transparent',
+          barRowBg: s.sel === v.id ? '#fdfcf8' : '#f7f4ec',
+          left: b.left, width: b.width,
+          barBd: '#1b1a17', barBg: '#1b1a17', barShadow: 'none', barOpacity: '1',
+          afterLeft: '0%',
+          onSelect: () => this.setState({ sel: v.id }),
+          onCaret: () => this.setState(p => ({ collapsed: { ...p.collapsed, [v.id]: !p.collapsed[v.id] } }))
+        };
+      }
+      const t = v.t;
+      const b = clampBar(t.s, t.e);
+      const isSel = s.sel === t.id;
+      const col = this.ownerColor(t.own);
+      const dim = s.focus && t.own !== s.focus;
+      return {
+        id: t.id, name: t.name, isGroup: false, isTask: true,
+        pad: '26px', caret: '',
+        dot: col,
+        font: (isSel ? '500' : '400') + ' 12.5px/1.4 "Zen Kaku Gothic New",sans-serif',
+        ownerLabel: t.own,
+        bg: isSel ? '#fff' : 'transparent', edge: isSel ? '#1b1a17' : 'transparent',
+        barRowBg: isSel ? '#fdfcf8' : 'transparent',
+        left: b.left, width: b.width,
+        barBd: col, barBg: col,
+        barShadow: isSel ? '0 0 0 2px rgba(27,26,23,.22)' : 'none',
+        barOpacity: dim ? '.22' : '1',
+        afterLeft: (Math.min(94, pos(t.e + 1)) + 0.8).toFixed(2) + '%',
+        onSelect: () => this.setState({ sel: t.id }),
+        onCaret: () => this.setState({ sel: t.id })
+      };
+    });
+
+    const links = [];
+    s.tasks.forEach(t => {
+      if (!t.pred) return;
+      const p = s.tasks.find(x => x.id === t.pred);
+      if (!p) return;
+      if (rowIdx[t.id] === undefined || rowIdx[p.id] === undefined) return;
+      const y1 = rowIdx[p.id] * 36 + 18, y2 = rowIdx[t.id] * 36 + 18;
+      const x1 = pos(p.e + 1), x2 = pos(t.s);
+      if (x1 < -5 || x1 > 105) return;
+      const hot = s.sel === t.id || s.sel === p.id;
+      links.push({
+        color: hot ? '#8f3a22' : '#c3bcab',
+        style: 'solid',
+        x: x1.toFixed(2) + '%',
+        top: Math.min(y1, y2) + 'px',
+        h: Math.abs(y2 - y1) + 'px',
+        hx: Math.min(x1, x2).toFixed(2) + '%',
+        hw: Math.abs(x2 - x1).toFixed(2) + '%',
+        hy: y2 + 'px',
+        ax: (x2 - 0.6).toFixed(2) + '%',
+        ay: (y2 - 3.5) + 'px'
+      });
+    });
+
+    const selG = s.groups.find(g => g.id === s.sel);
+    const selT = s.tasks.find(t => t.id === s.sel);
+    const isTask = !!selT;
+    const r = selG ? this.rollup(selG.id) : null;
+    const st = isTask
+      ? { l: selT.own + ' 担当', fg: '#3c382f', bg: '#fff', bd: '#e3ded2' }
+      : { l: '自動集計', fg: '#6f6a5e', bg: '#fff', bd: '#e3ded2' };
+
+    const pred = selT && selT.pred ? s.tasks.find(x => x.id === selT.pred) : null;
+    const succs = selT ? s.tasks.filter(t => t.pred === selT.id) : [];
+    const pStart = s.tasks.length ? Math.min.apply(null, s.tasks.map(t => t.s)) : 0;
+    const pEnd = s.tasks.length ? Math.max.apply(null, s.tasks.map(t => t.e)) : 0;
+
+    const chipStyle = on => on
+      ? { bg: '#1b1a17', fg: '#f6f3ec', bd: '#1b1a17' }
+      : { bg: '#fff', fg: '#3c382f', bd: '#d8d2c4' };
+    const sc = k => chipStyle(s.scale === k);
+    const scd = sc('day'), scw = sc('week'), scm = sc('month');
+    const depsOn = s.deps === null ? (this.props.showDeps ?? true) : s.deps;
+    const dep = chipStyle(depsOn);
+
+    return {
+      rows, cols, links,
+      gridCols: (s.nav ? 'minmax(0,176px)' : '56px') + ' minmax(320px,1fr) ' + (s.panel ? 'minmax(260px,288px)' : '46px'),
+      navOpen: s.nav, navClosed: !s.nav,
+      toggleNav: () => this.setState(p => ({ nav: !p.nav })),
+      panelOpen: s.panel, panelClosed: !s.panel,
+      togglePanel: () => this.setState(p => ({ panel: !p.panel })),
+      trackMin: s.scale === 'week' ? '600px' : s.scale === 'day' ? '660px' : '100%',
+      bodyH: (vis.length * 36 + 36) + 'px',
+      todayX: pos(TODAY).toFixed(2) + '%',
+      rangeLabel: fmt(w.a) + ' 〜 ' + fmt(w.a + w.n - 1) + '（土日を除く稼働日で算出）',
+      showDeps: depsOn,
+      depBg: dep.bg, depFg: dep.fg, depBd: dep.bd,
+      toggleDeps: () => this.setState({ deps: !depsOn }),
+
+      spanLabel: fmt(pStart) + ' 〜 ' + fmt(pEnd),
+      totalWorkdays: workdays(pStart, pEnd),
+      groupCount: s.groups.length,
+      taskCount: s.tasks.length,
+      owners: OWNERS.map(o => {
+        const on = s.focus === o.name;
+        return {
+          name: o.name, color: o.color,
+          count: s.tasks.filter(t => t.own === o.name).length,
+          bg: on ? '#1b1a17' : '#fff', fg: on ? '#f6f3ec' : '#3c382f',
+          bd: on ? '#1b1a17' : '#d8d2c4', numFg: on ? '#b8b1a1' : '#7a7466',
+          onClick: () => this.setState(p => ({ focus: p.focus === o.name ? null : o.name }))
+        };
+      }),
+
+      dayBg: scd.bg, dayFg: scd.fg, weekBg: scw.bg, weekFg: scw.fg, monthBg: scm.bg, monthFg: scm.fg,
+      setDay: () => this.setState({ scale: 'day' }),
+      setWeek: () => this.setState({ scale: 'week' }),
+      setMonth: () => this.setState({ scale: 'month' }),
+      jumpToday: () => this.setState({ scale: 'day' }),
+
+      selKind: isTask ? '中工程' : '大工程',
+      selCrumb: isTask ? (s.groups.find(g => g.id === selT.g) || {}).name + ' ›' : '15. 進捗 ›',
+      selName: isTask ? selT.name : (selG ? selG.name : ''),
+      selStart: fmt(isTask ? selT.s : r.s),
+      selEnd: fmt(isTask ? selT.e : r.e),
+      selDurationLabel: isTask
+        ? (workdays(selT.s, selT.e) + '稼働日（' + (selT.e - selT.s + 1) + '暦日・土日を除く）')
+        : (workdays(r.s, r.e) + '稼働日・中工程から自動集計'),
+      stLabel: st.l, stFg: st.fg, stBg: st.bg, stBd: st.bd,
+
+      selIsTask: isTask, selIsGroup: !isTask,
+      selOwner: isTask ? selT.own : '—',
+      selOwnerColor: isTask ? this.ownerColor(selT.own) : '#1b1a17',
+      selSub: isTask ? selT.sub : '—',
+
+      predLabel: pred ? pred.name + ' の完了後' : '先行工程なし（＋ 設定する）',
+      predBd: pred ? '#cfd9d2' : '#cdc6b6',
+      selectPred: () => pred && this.setState({ sel: pred.id }),
+      succCount: succs.length,
+      hasSucc: succs.length > 0,
+      noSucc: isTask && succs.length === 0,
+      succs: succs.map(t => ({
+        name: t.name,
+        dot: this.ownerColor(t.own),
+        onSelect: () => this.setState({ sel: t.id })
+      })),
+
+      pushBack: () => this.setState(p => {
+        const tasks = p.tasks.map(x => ({ ...x }));
+        const cur = tasks.find(x => x.id === p.sel);
+        if (!cur) return {};
+        cur.s += 3; cur.e += 3;
+        const walk = (id, seen) => tasks.filter(x => x.pred === id).forEach(x => {
+          if (seen[x.id]) return; seen[x.id] = 1;
+          x.s += 3; x.e += 3; walk(x.id, seen);
+        });
+        walk(p.sel, {});
+        return { tasks };
+      }),
+
+      childCount: selG ? this.kids(selG.id).length : 0,
+      childList: selG ? this.kids(selG.id).map(t => ({
+        name: t.name, owner: t.own,
+        dot: this.ownerColor(t.own),
+        onSelect: () => this.setState({ sel: t.id })
+      })) : [],
+
+      addChild: () => this.setState(p => {
+        const gid = isTask ? selT.g : p.sel;
+        const k = p.tasks.filter(t => t.g === gid);
+        const last = k.length ? k[k.length - 1] : null;
+        const seq = p.seq + 1;
+        const id = 'n' + seq;
+        const st0 = last ? last.e + 1 : 0;
+        const nt = { id, g: gid, name: '（中工程名を入力）', s: st0, e: st0 + 4, own: '未割当', sub: '—', pred: last ? last.id : null };
+        const idx = last ? p.tasks.indexOf(last) + 1 : p.tasks.length;
+        const tasks = p.tasks.slice();
+        tasks.splice(idx, 0, nt);
+        return { seq, tasks, sel: id };
+      }),
+      addGroup: () => this.setState(p => {
+        const seq = p.seq + 1;
+        const id = 'ng' + seq;
+        return { seq, groups: p.groups.concat([{ id, name: (p.groups.length + 1) + '. （大工程名を入力）' }]), sel: id };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

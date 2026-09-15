@@ -14,6 +14,18 @@
   --status-review-bg: #F5E6C8;     --status-review-text: #8A6215;
   --status-confirmed-bg: #DCEAE3;  --status-confirmed-text: #1F4D3D;
   --status-needhearing-bg: #F7E0DC; --status-needhearing-text: #A23B2E;
+
+  /* 進捗（15章）ガントの担当者カラー。担当者名のハッシュで決定論的に割り当てる
+     （src/lib/gantt/owner-color.ts）。既存の落ち着いた低彩度トーンに合わせた8色＋未割当。 */
+  --owner-color-1: #1F4D3D;
+  --owner-color-2: #A23B2E;
+  --owner-color-3: #3E5C76;
+  --owner-color-4: #8A6215;
+  --owner-color-5: #6B4C6B;
+  --owner-color-6: #2E6B67;
+  --owner-color-7: #56637A;
+  --owner-color-8: #7A5230;
+  --owner-color-unassigned: #8F8D82;
 }
 
 @theme inline {
