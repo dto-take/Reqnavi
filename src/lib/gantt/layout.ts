@@ -1,5 +1,6 @@
 // progress_ux_phase1.md：大工程/中工程の2階層のガント計算。進捗率・完了・締切の概念は持たない。
-// progress_ux_phase2.md：日/週/月のスケール切替・折りたたみに対応する。依存関係・ドラッグはフェーズ3以降。
+// progress_ux_phase2.md：日/週/月のスケール切替・折りたたみに対応する。
+// progress_ux_phase3.md：先行工程（predecessor_id）・コネクタ線・ドラッグでの期間変更に対応する。
 
 export type ProgressTask = {
   id: string;
@@ -10,6 +11,7 @@ export type ProgressTask = {
   week_start: string | null; // ISO date。中工程は必須、大工程は自動集計のためnull
   week_end: string | null;
   order_index: number;
+  predecessor_id: string | null; // 中工程のみ設定可能。大工程には適用しない
 };
 
 export const ROW_HEIGHT = 36;
@@ -66,6 +68,42 @@ function addDaysDate(d: Date, days: number): Date {
   const r = new Date(d);
   r.setDate(r.getDate() + days);
   return r;
+}
+
+function toIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// フェーズ3：日付の加算・引き算はISO文字列のまま行いたい場面が多い（Server Action・
+// ドラッグのプレビュー計算の両方から使うため、layout.tsに集約してロジックの重複を避ける）。
+export function addDaysIso(iso: string, days: number): string {
+  return toIso(addDaysDate(toDate(iso), days));
+}
+
+export function dayDiffIso(startIso: string, endIso: string): number {
+  return dayDiff(toDate(startIso), toDate(endIso));
+}
+
+// candidatePredecessorId をtaskId の先行工程として設定した場合に循環参照になるかを判定する。
+// candidatePredecessorId から predecessor_id を遡り、taskId 自身に戻ってくるかを確認する
+// （戻ってくる＝taskIdは既にcandidatePredecessorIdの祖先であり、循環になる）。
+export function wouldCreateCycle(nodes: ProgressTask[], taskId: string, candidatePredecessorId: string): boolean {
+  if (taskId === candidatePredecessorId) return true;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  let cursor: string | null = candidatePredecessorId;
+  const seen = new Set<string>();
+  while (cursor) {
+    if (cursor === taskId) return true;
+    if (seen.has(cursor)) break; // 既に壊れた循環データへの防御（無限ループ防止）
+    seen.add(cursor);
+    cursor = byId.get(cursor)?.predecessor_id ?? null;
+  }
+  return false;
+}
+
+// taskId を先行工程とする中工程（直接の後続）一覧。
+export function directSuccessorsOf(nodes: ProgressTask[], taskId: string): ProgressTask[] {
+  return nodes.filter((n) => n.predecessor_id === taskId);
 }
 
 function addMonthsDate(d: Date, months: number): Date {
@@ -159,11 +197,9 @@ export function computeGanttWindow(nodes: ProgressTask[], rows: ProgressTask[], 
 
 // 窓に対する百分率で位置・幅を返す（スケールによらず同じ計算式が使える）。
 // 窓の範囲外にはみ出す場合は窓の内側にクランプし、完全に窓外なら描画しない。
-export function barFor(nodes: ProgressTask[], node: ProgressTask, win: GanttWindow): { leftPct: number; widthPct: number } | null {
-  const range = effectiveRange(nodes, node);
-  if (!range) return null;
-  const startOffset = dayDiff(win.windowStart, toDate(range.start));
-  const endOffset = dayDiff(win.windowStart, toDate(range.end)) + 1; // 終了日を含む排他的な終端
+export function barForRange(start: string, end: string, win: GanttWindow): { leftPct: number; widthPct: number } | null {
+  const startOffset = dayDiff(win.windowStart, toDate(start));
+  const endOffset = dayDiff(win.windowStart, toDate(end)) + 1; // 終了日を含む排他的な終端
   const clampedStart = Math.max(0, startOffset);
   const clampedEnd = Math.min(win.totalDays, endOffset);
   if (clampedEnd <= clampedStart) return null;
@@ -171,6 +207,12 @@ export function barFor(nodes: ProgressTask[], node: ProgressTask, win: GanttWind
     leftPct: (clampedStart / win.totalDays) * 100,
     widthPct: ((clampedEnd - clampedStart) / win.totalDays) * 100,
   };
+}
+
+export function barFor(nodes: ProgressTask[], node: ProgressTask, win: GanttWindow): { leftPct: number; widthPct: number } | null {
+  const range = effectiveRange(nodes, node);
+  if (!range) return null;
+  return barForRange(range.start, range.end, win);
 }
 
 export function todayOffsetPct(win: GanttWindow): number | null {

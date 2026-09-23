@@ -4,13 +4,13 @@ import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { revalidatePath } from "next/cache";
-import type { ProgressTask } from "@/lib/gantt/layout";
+import { wouldCreateCycle, addDaysIso, dayDiffIso, type ProgressTask } from "@/lib/gantt/layout";
 
 export async function listProgressTasks(projectId: string): Promise<ProgressTask[]> {
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
     .from("progress_tasks")
-    .select("id, parent_id, task_name, owner_primary, owner_secondary, week_start, week_end, order_index")
+    .select("id, parent_id, task_name, owner_primary, owner_secondary, week_start, week_end, order_index, predecessor_id")
     .eq("project_id", projectId)
     .order("order_index")
     .order("created_at");
@@ -157,5 +157,102 @@ export async function deleteProgressTask(taskId: string, projectId: string) {
 
   const { error } = await supabase.from("progress_tasks").delete().eq("id", taskId);
   if (error) throw new UserFacingError(errorMessage(error));
+  revalidatePath(`/projects/${projectId}/chapters/15`);
+}
+
+// progress_ux_phase3.md Step2：先行工程を設定する。中工程にのみ設定可能で、循環参照になる
+// 設定は拒否する（対象タスクの祖先方向にpredecessorIdを遡り、自分自身に戻ってこないか確認する）。
+export async function setPredecessor(taskId: string, projectId: string, predecessorId: string | null) {
+  const supabase = await createServerActionClient();
+  const { data: currentData, error: fetchError } = await supabase
+    .from("progress_tasks")
+    .select("id, parent_id")
+    .eq("id", taskId)
+    .single();
+  if (fetchError || !currentData) throw new UserFacingError(fetchError ? errorMessage(fetchError) : "項目が見つかりません");
+  const current = currentData as unknown as { id: string; parent_id: string | null };
+  if (current.parent_id === null) throw new UserFacingError("大工程には先行工程を設定できません");
+
+  if (predecessorId !== null) {
+    if (predecessorId === taskId) throw new UserFacingError("自分自身を先行工程には設定できません");
+
+    const { data: predData, error: predError } = await supabase
+      .from("progress_tasks")
+      .select("id, project_id, parent_id")
+      .eq("id", predecessorId)
+      .single();
+    if (predError || !predData) throw new UserFacingError(predError ? errorMessage(predError) : "先行工程が見つかりません");
+    const pred = predData as unknown as { id: string; project_id: string; parent_id: string | null };
+    if (pred.project_id !== projectId) throw new UserFacingError("同じ案件内の中工程のみ先行工程に設定できます");
+    if (pred.parent_id === null) throw new UserFacingError("大工程は先行工程に設定できません");
+
+    const { data: allData, error: allError } = await supabase
+      .from("progress_tasks")
+      .select("id, parent_id, task_name, owner_primary, owner_secondary, week_start, week_end, order_index, predecessor_id")
+      .eq("project_id", projectId);
+    if (allError) throw new UserFacingError(errorMessage(allError));
+    const nodes = allData as unknown as ProgressTask[];
+    if (wouldCreateCycle(nodes, taskId, predecessorId)) {
+      throw new UserFacingError("この設定では先行工程の循環参照が発生するため、設定できません。");
+    }
+  }
+
+  const { error } = await supabase.from("progress_tasks").update({ predecessor_id: predecessorId }).eq("id", taskId);
+  if (error) throw new UserFacingError(errorMessage(error));
+  revalidatePath(`/projects/${projectId}/chapters/15`);
+}
+
+// progress_ux_phase3.md Step5：ドラッグ（移動・端の伸縮）で中工程の期間を変更する。
+// 変更後の終了日が後続工程（このタスクをpredecessor_idとする中工程）の開始日を追い越す場合、
+// 後続の開始日を「終了日の翌日」に繰り下げ、期間の長さを保ったまま終了日も同じ日数だけ後ろへずらす。
+// 後続の後続へも同じ判定を再帰的に適用する（カスケード）。
+export async function shiftTaskDates(taskId: string, projectId: string, newStart: string, newEnd: string) {
+  if (newEnd < newStart) throw new UserFacingError("終了日は開始日以降にしてください");
+
+  const supabase = await createServerActionClient();
+  const { data: currentData, error: fetchError } = await supabase
+    .from("progress_tasks")
+    .select("id, parent_id")
+    .eq("id", taskId)
+    .single();
+  if (fetchError || !currentData) throw new UserFacingError(fetchError ? errorMessage(fetchError) : "項目が見つかりません");
+  if ((currentData as unknown as { parent_id: string | null }).parent_id === null) {
+    throw new UserFacingError("大工程の期間は中工程から自動集計されるため、直接編集できません");
+  }
+
+  const { data: allTasksData, error: allTasksError } = await supabase
+    .from("progress_tasks")
+    .select("id, week_start, week_end, predecessor_id")
+    .eq("project_id", projectId)
+    .not("parent_id", "is", null);
+  if (allTasksError) throw new UserFacingError(errorMessage(allTasksError));
+  type TaskRow = { id: string; week_start: string | null; week_end: string | null; predecessor_id: string | null };
+  const tasks = allTasksData as unknown as TaskRow[];
+
+  const updates = new Map<string, { week_start: string; week_end: string }>();
+  updates.set(taskId, { week_start: newStart, week_end: newEnd });
+
+  function cascade(id: string) {
+    const applied = updates.get(id)!;
+    const successors = tasks.filter((t) => t.predecessor_id === id);
+    for (const succ of successors) {
+      if (updates.has(succ.id)) continue; // 循環は書き込み時点で防止済みだが念のため多重処理を避ける
+      const succStart = succ.week_start;
+      const succEnd = succ.week_end;
+      if (!succStart || !succEnd) continue;
+      if (applied.week_end >= succStart) {
+        const requiredStart = addDaysIso(applied.week_end, 1);
+        const delta = dayDiffIso(succStart, requiredStart);
+        updates.set(succ.id, { week_start: requiredStart, week_end: addDaysIso(succEnd, delta) });
+        cascade(succ.id);
+      }
+    }
+  }
+  cascade(taskId);
+
+  for (const [id, values] of updates) {
+    const { error } = await supabase.from("progress_tasks").update(values).eq("id", id);
+    if (error) throw new UserFacingError(errorMessage(error));
+  }
   revalidatePath(`/projects/${projectId}/chapters/15`);
 }

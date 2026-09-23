@@ -1,8 +1,8 @@
 "use client";
 
 import { useTransition } from "react";
-import { updateProgressTaskField, deleteProgressTask, type ProgressTaskField } from "@/actions/progress-tasks";
-import { childrenOf, rollupRange, type ProgressTask } from "@/lib/gantt/layout";
+import { updateProgressTaskField, deleteProgressTask, setPredecessor, type ProgressTaskField } from "@/actions/progress-tasks";
+import { childrenOf, rollupRange, wouldCreateCycle, type ProgressTask } from "@/lib/gantt/layout";
 import { ownerColor } from "@/lib/gantt/owner-color";
 import { Input, Select } from "@/components/ui/input";
 import { Menu, MenuItem } from "@/components/ui/menu";
@@ -41,10 +41,29 @@ export function ProgressDetailPanel({
   const kids = isPhase ? childrenOf(nodes, selectedNode.id) : [];
   const rollup = isPhase ? rollupRange(nodes, selectedNode.id) : null;
 
+  // progress_ux_phase3.md Step3：先行工程の候補は同じ案件内の他の中工程のうち、
+  // 選択すると循環参照になるもの（自身の後続チェーンに含まれる工程）を除いたもの。
+  const predecessorCandidates = !isPhase
+    ? nodes.filter(
+        (n) => n.parent_id !== null && n.id !== selectedNode.id && !wouldCreateCycle(nodes, selectedNode.id, n.id)
+      )
+    : [];
+  const predecessorNode = selectedNode.predecessor_id ? nodes.find((n) => n.id === selectedNode.predecessor_id) ?? null : null;
+
   function handleField(field: ProgressTaskField, value: string) {
     startTransition(async () => {
       try {
         await updateProgressTaskField(selectedNode!.id, projectId, field, value);
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
+  function handlePredecessorChange(value: string) {
+    startTransition(async () => {
+      try {
+        await setPredecessor(selectedNode!.id, projectId, value || null);
       } catch (e) {
         show(errorMessage(e), "error");
       }
@@ -108,14 +127,19 @@ export function ProgressDetailPanel({
         ) : (
           <div className="flex items-center gap-2">
             <Input
-              key={`${selectedNode.id}-start`}
+              // フェーズ3：keyに日付そのものも含める。ガントのバードラッグ（または後続工程の
+              // カスケード）によって、この項目を選択したまま週_start/週_endが外部から変わることが
+              // あるため、ノードIDだけをkeyにすると（defaultValueのuncontrolled inputのため）
+              // 古い値がDOMに残ったままになり、後でこのフィールドがblurした際に古い値で
+              // 上書き保存してしまう不具合があった。値もkeyに含めて変更時に強制的に再マウントする。
+              key={`${selectedNode.id}-start-${selectedNode.week_start}`}
               type="date"
               defaultValue={selectedNode.week_start ?? ""}
               onBlur={(e) => handleField("week_start", e.target.value)}
             />
             <span className="text-faint">→</span>
             <Input
-              key={`${selectedNode.id}-end`}
+              key={`${selectedNode.id}-end-${selectedNode.week_end}`}
               type="date"
               defaultValue={selectedNode.week_end ?? ""}
               onBlur={(e) => handleField("week_end", e.target.value)}
@@ -161,6 +185,30 @@ export function ProgressDetailPanel({
               ))}
             </Select>
           </div>
+        </div>
+      )}
+
+      {/* 先行工程（中工程のみ） */}
+      {!isPhase && (
+        <div className="flex flex-col gap-1.5">
+          <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">先行工程</label>
+          <Select
+            key={`${selectedNode.id}-predecessor`}
+            defaultValue={selectedNode.predecessor_id ?? ""}
+            onChange={(e) => handlePredecessorChange(e.target.value)}
+          >
+            <option value="">なし</option>
+            {predecessorCandidates.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.task_name || "（未入力）"}
+              </option>
+            ))}
+          </Select>
+          {predecessorNode && (
+            <p className="text-[11px] text-faint">
+              「{predecessorNode.task_name || "（未入力）"}」の完了後に開始する想定です。ドラッグ・日付変更で先行工程の期間が延びると、この工程の開始日も自動的に繰り下がります。
+            </p>
+          )}
         </div>
       )}
 

@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   childrenOf,
   barFor,
+  barForRange,
   todayOffsetPct,
+  addDaysIso,
   ROW_HEIGHT,
   HEADER_HEIGHT,
   type GanttWindow,
@@ -15,6 +17,25 @@ import { ownerColor } from "@/lib/gantt/owner-color";
 
 const WBS_WIDTH = 220;
 const SCALE_LABELS: Record<GanttScale, string> = { day: "日", week: "週", month: "月" };
+const TASK_BAR_TOP = 9;
+const TASK_BAR_HEIGHT = 18;
+const EDGE_HANDLE_WIDTH = 7;
+
+// progress_ux_phase3.md Step5：ドラッグ操作。「やってはいけないこと」の簡略化の余地に従い、
+// 全スケールで同精度のドラッグを無理に実現しようとせず、ドラッグでの期間変更は日スケール
+// （1日=固定ピクセル幅）でのみ許可する。週/月スケールでは詳細パネルからの日付編集のみ行う
+// （既存のupdateProgressTaskFieldがそのまま使える）。
+type DragMode = "move" | "resize-start" | "resize-end";
+type DragState = {
+  taskId: string;
+  mode: DragMode;
+  pxPerDay: number;
+  startClientX: number;
+  originalStart: string;
+  originalEnd: string;
+  previewStart: string;
+  previewEnd: string;
+};
 
 export function WbsGanttPane({
   nodes,
@@ -30,6 +51,7 @@ export function WbsGanttPane({
   onToggleCollapse,
   ownerFocus,
   onToggleOwnerFocus,
+  onShiftTask,
 }: {
   nodes: ProgressTask[];
   rows: ProgressTask[];
@@ -44,10 +66,12 @@ export function WbsGanttPane({
   onToggleCollapse: (phaseId: string) => void;
   ownerFocus: string | null;
   onToggleOwnerFocus: (name: string) => void;
+  onShiftTask: (taskId: string, newStart: string, newEnd: string) => void;
 }) {
   const todayPct = todayOffsetPct(win);
   const todayMarkerRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
 
   // フェーズ2 Step3：現在使われている主担当ごとのチップ（担当色・担当名・工程数）。
   // 折りたたみ状態に関わらず、章内の全中工程から集計する（開閉でチップが出たり消えたりしないように）。
@@ -62,6 +86,33 @@ export function WbsGanttPane({
     return Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
   }, [nodes]);
 
+  // フェーズ3 Step4：先行工程を持つ中工程ごとのコネクタ座標（表示中の行にのみ描画。
+  // 折りたたみで先行/後続のどちらかが非表示になっている場合は描画しない）。
+  const rowIndexById = useMemo(() => new Map(rows.map((r, i) => [r.id, i])), [rows]);
+  const connectors = useMemo(() => {
+    const result: { key: string; x1Pct: number; x2Pct: number; y1: number; y2: number; highlighted: boolean }[] = [];
+    for (const row of rows) {
+      if (!row.predecessor_id) continue;
+      const predIndex = rowIndexById.get(row.predecessor_id);
+      const succIndex = rowIndexById.get(row.id);
+      if (predIndex === undefined || succIndex === undefined) continue;
+      const predNode = nodes.find((n) => n.id === row.predecessor_id);
+      if (!predNode) continue;
+      const predBar = barFor(nodes, predNode, win);
+      const succBar = barFor(nodes, row, win);
+      if (!predBar || !succBar) continue;
+      result.push({
+        key: row.id,
+        x1Pct: predBar.leftPct + predBar.widthPct,
+        x2Pct: succBar.leftPct,
+        y1: predIndex * ROW_HEIGHT + TASK_BAR_TOP + TASK_BAR_HEIGHT / 2,
+        y2: succIndex * ROW_HEIGHT + TASK_BAR_TOP + TASK_BAR_HEIGHT / 2,
+        highlighted: selectedId === row.id || selectedId === row.predecessor_id,
+      });
+    }
+    return result;
+  }, [rows, rowIndexById, nodes, win, selectedId]);
+
   function handleJumpToday() {
     onJumpToday();
     // スケール切替の再描画後にスクロールさせるため、次フレームで実行する
@@ -69,6 +120,64 @@ export function WbsGanttPane({
       todayMarkerRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
     });
   }
+
+  function beginDrag(e: React.PointerEvent, task: ProgressTask, mode: DragMode) {
+    if (scale !== "day" || !task.week_start || !task.week_end) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const trackWidth = trackRef.current?.getBoundingClientRect().width ?? 0;
+    const pxPerDay = trackWidth / win.totalDays;
+    if (!(pxPerDay > 0)) return;
+    setDrag({
+      taskId: task.id,
+      mode,
+      pxPerDay,
+      startClientX: e.clientX,
+      originalStart: task.week_start,
+      originalEnd: task.week_end,
+      previewStart: task.week_start,
+      previewEnd: task.week_end,
+    });
+  }
+
+  useEffect(() => {
+    if (!drag) return;
+
+    function handleMove(e: PointerEvent) {
+      if (!drag) return;
+      const deltaDays = Math.round((e.clientX - drag.startClientX) / drag.pxPerDay);
+      let previewStart = drag.originalStart;
+      let previewEnd = drag.originalEnd;
+      if (drag.mode === "move") {
+        previewStart = addDaysIso(drag.originalStart, deltaDays);
+        previewEnd = addDaysIso(drag.originalEnd, deltaDays);
+      } else if (drag.mode === "resize-start") {
+        previewStart = addDaysIso(drag.originalStart, deltaDays);
+        if (previewStart > drag.originalEnd) previewStart = drag.originalEnd;
+      } else {
+        previewEnd = addDaysIso(drag.originalEnd, deltaDays);
+        if (previewEnd < drag.originalStart) previewEnd = drag.originalStart;
+      }
+      if (previewStart !== drag.previewStart || previewEnd !== drag.previewEnd) {
+        setDrag({ ...drag, previewStart, previewEnd });
+      }
+    }
+
+    function handleUp() {
+      if (!drag) return;
+      if (drag.previewStart !== drag.originalStart || drag.previewEnd !== drag.originalEnd) {
+        onShiftTask(drag.taskId, drag.previewStart, drag.previewEnd);
+      }
+      setDrag(null);
+    }
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    return () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+    };
+  }, [drag, onShiftTask]);
 
   const trackStyle = win.minTrackWidth === "100%" ? { width: "100%" } : { width: win.minTrackWidth, minWidth: win.minTrackWidth };
 
@@ -142,6 +251,7 @@ export function WbsGanttPane({
               </button>
             );
           })}
+          {scale === "day" && <span className="ml-auto text-[11px] text-faint">バーのドラッグで期間変更・端をつかんで伸縮</span>}
         </div>
       )}
 
@@ -207,8 +317,8 @@ export function WbsGanttPane({
           </div>
 
           {/* タイムライン：横スクロール可。日/週は固定最小幅、月は100%幅に列を按分する */}
-          <div className="overflow-x-auto flex-1" ref={scrollRef}>
-            <div style={trackStyle} className="relative">
+          <div className="overflow-x-auto flex-1">
+            <div style={trackStyle} className="relative" ref={trackRef}>
               <div
                 className="flex border-b border-border"
                 style={{ height: HEADER_HEIGHT, background: "var(--bg-sidebar)", position: "sticky", top: 0, zIndex: 1 }}
@@ -242,9 +352,11 @@ export function WbsGanttPane({
 
                 {rows.map((row) => {
                   const isPhaseRow = row.parent_id === null;
-                  const bar = barFor(nodes, row, win);
+                  const isDraggingThis = drag?.taskId === row.id;
+                  const bar = isDraggingThis ? barForRange(drag!.previewStart, drag!.previewEnd, win) : barFor(nodes, row, win);
                   const selected = row.id === selectedId;
                   const dimmed = !isPhaseRow && ownerFocus !== null && row.owner_primary !== ownerFocus;
+                  const draggable = !isPhaseRow && scale === "day";
                   return (
                     <div
                       key={row.id}
@@ -254,18 +366,69 @@ export function WbsGanttPane({
                     >
                       {bar && (
                         <div
+                          data-progress-bar={row.id}
                           className="absolute rounded"
                           style={{
                             left: `${bar.leftPct}%`,
-                            width: `${bar.widthPct}%`,
-                            top: isPhaseRow ? 12 : 9,
-                            height: isPhaseRow ? 12 : 18,
+                            width: `${Math.max(bar.widthPct, 0.5)}%`,
+                            top: isPhaseRow ? 12 : TASK_BAR_TOP,
+                            height: isPhaseRow ? 12 : TASK_BAR_HEIGHT,
                             background: isPhaseRow ? "var(--text-primary)" : ownerColor(row.owner_primary),
                             boxShadow: selected ? "0 0 0 2px rgba(43,42,39,.22)" : undefined,
                             opacity: dimmed ? 0.22 : 1,
                           }}
-                        />
+                        >
+                          {draggable && (
+                            <>
+                              <div
+                                onPointerDown={(e) => beginDrag(e, row, "move")}
+                                className="absolute inset-0"
+                                style={{ cursor: isDraggingThis ? "grabbing" : "grab" }}
+                              />
+                              <div
+                                onPointerDown={(e) => beginDrag(e, row, "resize-start")}
+                                className="absolute top-0 bottom-0 left-0"
+                                style={{ width: EDGE_HANDLE_WIDTH, cursor: "ew-resize" }}
+                              />
+                              <div
+                                onPointerDown={(e) => beginDrag(e, row, "resize-end")}
+                                className="absolute top-0 bottom-0 right-0"
+                                style={{ width: EDGE_HANDLE_WIDTH, cursor: "ew-resize" }}
+                              />
+                            </>
+                          )}
+                        </div>
                       )}
+                    </div>
+                  );
+                })}
+
+                {/* フェーズ3 Step4：先行工程のコネクタ線（縦線＋横線＋矢頭のL字。CSS境界線で描画し、
+                    バーと同じ%座標系をそのまま使う） */}
+                {connectors.map((c) => {
+                  const color = c.highlighted ? "var(--status-needhearing-text)" : "var(--text-faint)";
+                  const top = Math.min(c.y1, c.y2);
+                  const height = Math.abs(c.y2 - c.y1);
+                  const left = Math.min(c.x1Pct, c.x2Pct);
+                  const width = Math.abs(c.x2Pct - c.x1Pct);
+                  const goingRight = c.x2Pct >= c.x1Pct;
+                  return (
+                    <div key={c.key} className="pointer-events-none">
+                      <div className="absolute" style={{ left: `${c.x1Pct}%`, top, height, borderLeft: `1.5px solid ${color}` }} />
+                      <div className="absolute" style={{ left: `${left}%`, width: `${width}%`, top: c.y2, borderTop: `1.5px solid ${color}` }} />
+                      <div
+                        className="absolute"
+                        style={{
+                          left: `${c.x2Pct}%`,
+                          top: c.y2 - 3.5,
+                          marginLeft: goingRight ? 0 : -5,
+                          width: 0,
+                          height: 0,
+                          borderTop: "3.5px solid transparent",
+                          borderBottom: "3.5px solid transparent",
+                          ...(goingRight ? { borderLeft: `5px solid ${color}` } : { borderRight: `5px solid ${color}` }),
+                        }}
+                      />
                     </div>
                   );
                 })}

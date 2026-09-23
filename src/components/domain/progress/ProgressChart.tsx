@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useReducer, useState, useSyncExternalStore } from "react";
-import { createPhase, createTask } from "@/actions/progress-tasks";
+import { createPhase, createTask, shiftTaskDates } from "@/actions/progress-tasks";
 import { visibleRows, computeGanttWindow, type ProgressTask, type GanttScale } from "@/lib/gantt/layout";
 import { WbsGanttPane } from "@/components/domain/progress/WbsGanttPane";
 import { ProgressDetailPanel } from "@/components/domain/progress/ProgressDetailPanel";
@@ -96,6 +96,14 @@ export function ProgressChart({
     setOwnerFocus((prev) => (prev === name ? null : name));
   }
 
+  async function handleShiftTask(taskId: string, newStart: string, newEnd: string) {
+    try {
+      await shiftTaskDates(taskId, projectId, newStart, newEnd);
+    } catch (e) {
+      show(errorMessage(e), "error");
+    }
+  }
+
   return (
     <div
       className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] gap-0 border border-border rounded-lg overflow-hidden items-stretch"
@@ -115,6 +123,7 @@ export function ProgressChart({
         onToggleCollapse={toggleCollapse}
         ownerFocus={ownerFocus}
         onToggleOwnerFocus={handleToggleOwnerFocus}
+        onShiftTask={handleShiftTask}
       />
       <ProgressDetailPanel
         projectId={projectId}
