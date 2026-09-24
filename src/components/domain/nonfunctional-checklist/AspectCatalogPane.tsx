@@ -6,9 +6,14 @@ import type { AspectMaster, NonfunctionalNode } from "@/actions/nonfunctional";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+type DropTarget = { id: string; position: "before" | "after" };
+
 // nonfunctional_ux_phase1.md Step4：観点カタログ（左ペイン）。「採用中」「未採用」の
 // 2セクションに分け、観点追加の入口をこのペインへ一元化する（右の詳細ペインには
-// 観点追加の手段を置かない）。並べ替え（⠿ドラッグ）・一括操作はフェーズ2の対象外。
+// 観点追加の手段を置かない）。
+// nonfunctional_ux_phase2.md Step3：「採用中」リストの行をドラッグして並べ替えられるようにする。
+// requirement-table/RequirementCard.tsxと同じパターン（⠿ハンドルがdraggable、行ルートが
+// ドロップターゲット、マウスYと行の中点の比較でbefore/afterを決める）を流用する。
 export function AspectCatalogPane({
   master,
   nodes,
@@ -17,6 +22,7 @@ export function AspectCatalogPane({
   onAdoptMaster,
   onReactivate,
   onCreateCustom,
+  onReorder,
   isPending,
 }: {
   master: AspectMaster[];
@@ -26,10 +32,13 @@ export function AspectCatalogPane({
   onAdoptMaster: (masterId: string, name: string) => void;
   onReactivate: (aspectId: string) => void;
   onCreateCustom: (name: string) => void;
+  onReorder: (aspectId: string, insertBeforeAspectId: string | null) => void;
   isPending: boolean;
 }) {
   const [creatingCustom, setCreatingCustom] = useState(false);
   const [customName, setCustomName] = useState("");
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 
   const adopted = adoptedAspects(nodes);
   const pool = poolItems(nodes, master);
@@ -45,6 +54,37 @@ export function AspectCatalogPane({
     onCreateCustom(trimmed);
     setCustomName("");
     setCreatingCustom(false);
+  }
+
+  function handleDragStart(e: React.DragEvent, id: string) {
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedId(id);
+  }
+  function handleDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    setDropTarget({ id, position: e.clientY < midpoint ? "before" : "after" });
+  }
+  function handleDragEnd() {
+    setDraggedId(null);
+    setDropTarget(null);
+  }
+  function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData("text/plain");
+    const position = dropTarget?.position ?? "before";
+    setDraggedId(null);
+    setDropTarget(null);
+    if (!sourceId || sourceId === targetId) return;
+
+    const ids = adopted.map((a) => a.id);
+    const targetIndex = ids.indexOf(targetId);
+    if (targetIndex === -1) return;
+    const insertBeforeId = position === "before" ? targetId : (ids[targetIndex + 1] ?? null);
+    if (insertBeforeId === sourceId) return;
+    onReorder(sourceId, insertBeforeId);
   }
 
   return (
@@ -67,6 +107,7 @@ export function AspectCatalogPane({
         <div className="px-3.5 pt-3 pb-1.5 flex items-center gap-2">
           <span className="font-mono text-[10.5px] tracking-wide text-faint uppercase">採用中</span>
           <span className="font-mono text-[10.5px] text-faint">{adopted.length}</span>
+          {adopted.length > 1 && <span className="ml-auto text-[10.5px] text-faint">⠿ で並べ替え</span>}
         </div>
         <div className="flex flex-col px-1.5">
           {adopted.map((a) => {
@@ -78,20 +119,43 @@ export function AspectCatalogPane({
                 : stats.unknown > 0
                   ? "var(--status-review-text)"
                   : "var(--text-faint)";
+            const isDragging = draggedId === a.id;
+            const dropPosition = dropTarget?.id === a.id ? dropTarget.position : null;
             return (
               <div
                 key={a.id}
                 data-aspect-row={a.id}
                 onClick={() => onSelect(a.id)}
+                onDragOver={(e) => handleDragOver(e, a.id)}
+                onDrop={(e) => handleDrop(e, a.id)}
                 role="treeitem"
                 aria-selected={selected}
                 tabIndex={0}
-                className="flex items-center gap-2 px-2.5 py-2.5 rounded-md cursor-pointer text-[12.5px] hover:bg-hover focus:outline-2 focus:-outline-offset-2"
+                className={`relative flex items-center gap-2 px-2.5 py-2.5 rounded-md cursor-pointer text-[12.5px] hover:bg-hover focus:outline-2 focus:-outline-offset-2 ${isDragging ? "opacity-40" : ""}`}
                 style={{
                   background: selected ? "var(--bg-page)" : "transparent",
                   borderLeft: `3px solid ${selected ? "var(--text-primary)" : "transparent"}`,
                 }}
               >
+                {dropPosition && (
+                  <div
+                    className={`absolute left-0 right-0 h-0.5 pointer-events-none ${dropPosition === "before" ? "top-0" : "bottom-0"}`}
+                    style={{ background: "var(--brand)" }}
+                  />
+                )}
+                <span
+                  draggable
+                  onDragStart={(e) => {
+                    e.stopPropagation();
+                    handleDragStart(e, a.id);
+                  }}
+                  onDragEnd={handleDragEnd}
+                  onClick={(e) => e.stopPropagation()}
+                  className="font-mono text-xs text-faint cursor-grab flex-none"
+                  title="ドラッグして並び替え"
+                >
+                  ⠿
+                </span>
                 <span className="w-1.75 h-1.75 rounded-full flex-none" style={{ background: dot }} />
                 <span className={`flex-1 min-w-0 truncate ${selected ? "font-bold" : ""}`}>{aspectContent(a).name || "（未入力）"}</span>
                 <span className="font-mono text-[10px] text-faint flex-none">

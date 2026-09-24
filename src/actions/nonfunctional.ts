@@ -305,3 +305,146 @@ export async function deleteCheckItem(itemId: string, projectId: string) {
   if (error) throw new UserFacingError(errorMessage(error));
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
+
+// nonfunctional_ux_phase2.md：「新しいステータス概念は作らない」＝確定は既存status列の
+// confirmedをそのまま使う。確認ダイアログ（未判定N件が残っています…）はクライアント側
+// （AspectDetailPane）で行い、ここでは同意後の確定処理のみを行う。
+export async function confirmAspect(aspectId: string, projectId: string) {
+  const supabase = await createServerActionClient();
+  const { error } = await supabase
+    .from("requirement_items")
+    .update({ status: "confirmed" })
+    .eq("id", aspectId)
+    .is("parent_id", null);
+  if (error) throw new UserFacingError(errorMessage(error));
+  revalidatePath(`/projects/${projectId}/chapters/10`);
+}
+
+// Step2：選択中観点のjudgement:'unknown'を全て'no'へ一括更新する。対象件数の確認は
+// クライアント側（AspectDetailPane）で行う。
+export async function bulkSetUnknownToNo(aspectId: string, projectId: string) {
+  const supabase = await createServerActionClient();
+  await assertAspectEditable(supabase, aspectId);
+
+  const { data: items, error: fetchError } = await supabase
+    .from("requirement_items")
+    .select("id, content")
+    .eq("parent_id", aspectId);
+  if (fetchError) throw new UserFacingError(errorMessage(fetchError));
+
+  const unknownItems = ((items ?? []) as { id: string; content: CheckItemContent }[]).filter(
+    (i) => i.content.judgement === "unknown"
+  );
+  for (const item of unknownItems) {
+    const { error } = await supabase
+      .from("requirement_items")
+      .update({ content: { ...item.content, judgement: "no" } })
+      .eq("id", item.id);
+    if (error) throw new UserFacingError(errorMessage(error));
+  }
+  revalidatePath(`/projects/${projectId}/chapters/10`);
+}
+
+// requirement-table/requirement-items.tsのmoveItemToGroup/applyOrderと同じ「兄弟グループを
+// 一旦フラットに取得し、moveした配列を0..n-1で振り直す」考え方をこの章専用にも適用する
+// （非公開ヘルパーのため、あちらの実装を直接importはせずここに専用コピーを持つ）。
+async function applyOrder(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  orderedIds: string[]
+) {
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase.from("requirement_items").update({ order_index: i }).eq("id", orderedIds[i]);
+    if (error) throw new UserFacingError(errorMessage(error));
+  }
+}
+
+async function fetchOrderedAdoptedAspectIds(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  projectId: string
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("requirement_items")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("chapter_no", 10)
+    .eq("template_type", "E")
+    .is("parent_id", null)
+    .neq("status", "rejected")
+    .order("order_index")
+    .order("created_at");
+  if (error) throw new UserFacingError(errorMessage(error));
+  return (data ?? []).map((r) => (r as { id: string }).id);
+}
+
+async function fetchOrderedCheckItemIds(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  aspectId: string
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("requirement_items")
+    .select("id")
+    .eq("parent_id", aspectId)
+    .order("order_index")
+    .order("created_at");
+  if (error) throw new UserFacingError(errorMessage(error));
+  return (data ?? []).map((r) => (r as { id: string }).id);
+}
+
+// Step3：左カタログ「採用中」リストのドラッグ並べ替え。未採用（rejected）の観点は表示されて
+// いないため並べ替えの対象に含めない（採用中の中でのみ順序を振り直す）。
+export async function reorderAspect(projectId: string, aspectId: string, insertBeforeAspectId: string | null) {
+  const supabase = await createServerActionClient();
+  const ids = await fetchOrderedAdoptedAspectIds(supabase, projectId);
+  const without = ids.filter((id) => id !== aspectId);
+  const insertAt = insertBeforeAspectId ? without.indexOf(insertBeforeAspectId) : -1;
+  const at = insertAt === -1 ? without.length : insertAt;
+  const reordered = [...without];
+  reordered.splice(at, 0, aspectId);
+  await applyOrder(supabase, reordered);
+  revalidatePath(`/projects/${projectId}/chapters/10`);
+}
+
+// Step3：観点内でのチェック項目のドラッグ並べ替え。確定済み観点配下の並べ替えも
+// 「編集」の一種としてassertAspectEditableで拒否する。
+export async function reorderCheckItem(
+  aspectId: string,
+  projectId: string,
+  itemId: string,
+  insertBeforeItemId: string | null
+) {
+  const supabase = await createServerActionClient();
+  await assertAspectEditable(supabase, aspectId);
+  const ids = await fetchOrderedCheckItemIds(supabase, aspectId);
+  const without = ids.filter((id) => id !== itemId);
+  const insertAt = insertBeforeItemId ? without.indexOf(insertBeforeItemId) : -1;
+  const at = insertAt === -1 ? without.length : insertAt;
+  const reordered = [...without];
+  reordered.splice(at, 0, itemId);
+  await applyOrder(supabase, reordered);
+  revalidatePath(`/projects/${projectId}/chapters/10`);
+}
+
+// Step4：チェック項目を別の観点へ移動する。isItemLockedは'rejected'も含むため、確定済み・
+// 未採用のどちらへも移動できない（assertAspectEditableの再利用でこの制約が自動的に付く）。
+export async function moveCheckItem(itemId: string, projectId: string, toAspectId: string) {
+  const supabase = await createServerActionClient();
+  const { data: current, error: fetchError } = await supabase
+    .from("requirement_items")
+    .select("parent_id")
+    .eq("id", itemId)
+    .single();
+  if (fetchError || !current || !current.parent_id) {
+    throw new UserFacingError(fetchError ? errorMessage(fetchError) : "項目が見つかりません");
+  }
+  if (current.parent_id === toAspectId) return;
+  await assertAspectEditable(supabase, current.parent_id);
+  await assertAspectEditable(supabase, toAspectId);
+
+  const targetIds = await fetchOrderedCheckItemIds(supabase, toAspectId);
+  const { error } = await supabase
+    .from("requirement_items")
+    .update({ parent_id: toAspectId, order_index: targetIds.length })
+    .eq("id", itemId);
+  if (error) throw new UserFacingError(errorMessage(error));
+  revalidatePath(`/projects/${projectId}/chapters/10`);
+}

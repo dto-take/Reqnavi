@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { adoptMasterAspect, createCustomAspect, reactivateAspect, type AspectMaster, type NonfunctionalNode } from "@/actions/nonfunctional";
+import { adoptMasterAspect, createCustomAspect, reactivateAspect, reorderAspect, type AspectMaster, type NonfunctionalNode } from "@/actions/nonfunctional";
 import { adoptedAspects } from "@/lib/nonfunctional/derive";
 import { AspectCatalogPane } from "@/components/domain/nonfunctional-checklist/AspectCatalogPane";
 import { AspectDetailPane } from "@/components/domain/nonfunctional-checklist/AspectDetailPane";
@@ -65,6 +65,16 @@ export function NonfunctionalScreen({
     });
   }
 
+  function handleReorderAspect(aspectId: string, insertBeforeAspectId: string | null) {
+    startTransition(async () => {
+      try {
+        await reorderAspect(projectId, aspectId, insertBeforeAspectId);
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
   return (
     <div
       className="grid grid-cols-1 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] gap-0 border border-border rounded-lg overflow-hidden items-stretch"
@@ -78,6 +88,7 @@ export function NonfunctionalScreen({
         onAdoptMaster={handleAdoptMaster}
         onReactivate={handleReactivate}
         onCreateCustom={handleCreateCustom}
+        onReorder={handleReorderAspect}
         isPending={isPending}
       />
       <AspectDetailPane

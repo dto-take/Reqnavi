@@ -3,8 +3,12 @@
 import { useState, useTransition } from "react";
 import {
   addCheckItem,
+  bulkSetUnknownToNo,
+  confirmAspect,
   deleteCheckItem,
   importMasterCheckItems,
+  moveCheckItem,
+  reorderCheckItem,
   setCheckItemJudgement,
   unadoptAspect,
   updateAspectPolicy,
@@ -12,12 +16,13 @@ import {
   type CheckItemContent,
   type NonfunctionalNode,
 } from "@/actions/nonfunctional";
-import { aspectContent, aspectStats, checkItemContent, checkItemsOf, type AspectStats } from "@/lib/nonfunctional/derive";
-import { Input, Textarea } from "@/components/ui/input";
+import { adoptedAspects, aspectContent, aspectStats, checkItemContent, checkItemsOf, type AspectStats } from "@/lib/nonfunctional/derive";
+import { Input, Select, Textarea } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/error-message";
+import { isItemLocked } from "@/lib/item-lock";
 
 const JUDGEMENT_LABEL: Record<CheckItemContent["judgement"], string> = { yes: "該当", no: "非該当", unknown: "未判定" };
 
@@ -56,11 +61,17 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString("ja-JP");
 }
 
-// nonfunctional_ux_phase1.md Step4：詳細（右ペイン）。確定ワークフロー・一括操作・
-// 並べ替え・AI候補生成はフェーズ2/3の対象外のため、「⋯」メニューは採用解除の1項目のみ
-// （Step5の指定通り「簡易な形」）。呼び出し元でkey={selectedAspect.id}を付けて観点切替時に
-// このコンポーネントごと再マウントさせ、方針編集中フラグ・追加項目の入力途中値・
-// 標準項目パネルの開閉状態が別の観点に持ち越されないようにする（規約58と同じ考え方）。
+type DropTarget = { id: string; position: "before" | "after" };
+
+// nonfunctional_ux_phase1.md Step4：詳細（右ペイン）。
+// nonfunctional_ux_phase2.md：確定ワークフロー（Step1）・一括操作（Step2）・チェック項目の
+// ドラッグ並べ替え（Step3）・観点間移動（Step4）を追加する。「新しいステータス概念は
+// 作らない」の指示通り、確定は既存status列のconfirmedをそのまま使い、確定済み観点配下の
+// チェック項目編集不可はサーバー側のisItemLocked（各Server Actionのassert Aspect Editable）に
+// 揃える形でクライアント側にも同じ判定（locked）を持たせ、編集導線ごと隠す。
+// 呼び出し元でkey={selectedAspect.id}を付けて観点切替時にこのコンポーネントごと再マウントさせ、
+// 方針編集中フラグ・追加項目の入力途中値・標準項目パネルの開閉状態・ドラッグ状態が
+// 別の観点に持ち越されないようにする（規約58と同じ考え方）。
 export function AspectDetailPane({
   projectId,
   tenantId,
@@ -81,6 +92,9 @@ export function AspectDetailPane({
   const [newItemText, setNewItemText] = useState("");
   const [standardOpen, setStandardOpen] = useState(false);
   const [selectedStandard, setSelectedStandard] = useState<Set<string>>(new Set());
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [itemDropTarget, setItemDropTarget] = useState<DropTarget | null>(null);
+  const [movingItemId, setMovingItemId] = useState<string | null>(null);
   const { show } = useToast();
 
   if (!selectedAspect) {
@@ -95,9 +109,12 @@ export function AspectDetailPane({
   const items = checkItemsOf(nodes, selectedAspect.id);
   const stats = aspectStats(nodes, selectedAspect.id);
   const pill = statusPill(selectedAspect, stats);
+  const locked = isItemLocked(selectedAspect.status);
+  const isConfirmed = selectedAspect.status === "confirmed" || selectedAspect.status === "exception_approved";
   const masterEntry = content.master_id ? master.find((m) => m.id === content.master_id) ?? null : null;
   const existingTexts = new Set(items.map((i) => checkItemContent(i).text));
   const availableStandardItems = (masterEntry?.default_items ?? []).filter((t) => !existingTexts.has(t));
+  const otherAdoptedAspects = adoptedAspects(nodes).filter((a) => a.id !== selectedAspect.id);
 
   function savePolicy(policy: string) {
     startTransition(async () => {
@@ -179,6 +196,83 @@ export function AspectDetailPane({
     });
   }
 
+  // Step1：未判定が1件でも残っている場合は確認ダイアログを出し、同意した場合のみ確定する。
+  function handleConfirm() {
+    if (stats.unknown > 0 && !confirm(`未判定 ${stats.unknown}件が残っていますが確定しますか？`)) return;
+    startTransition(async () => {
+      try {
+        await confirmAspect(selectedAspect!.id, projectId);
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
+  // Step2：対象件数を示した上で確認し、選択中観点の未判定を全て非該当へ一括更新する。
+  function handleBulkUnknownToNo() {
+    if (stats.unknown === 0) return;
+    if (!confirm(`未判定 ${stats.unknown}件を非該当に変更します。よろしいですか？`)) return;
+    startTransition(async () => {
+      try {
+        await bulkSetUnknownToNo(selectedAspect!.id, projectId);
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
+  function handleMoveItem(itemId: string, toAspectId: string) {
+    startTransition(async () => {
+      try {
+        await moveCheckItem(itemId, projectId, toAspectId);
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
+  // Step3：requirement-table/RequirementCard.tsxと同じ「ドラッグハンドルがdraggable、
+  // 行ルートがドロップターゲット、マウスYと中点の比較でbefore/afterを決める」パターンをそのまま
+  // この章のチェック項目一覧に適用する。並べ替え自体はitemId＋挿入先の直前IDをサーバーへ渡し、
+  // 全体の順序振り直しはサーバー側（reorderCheckItem）に任せる。
+  function handleItemDragStart(e: React.DragEvent, itemId: string) {
+    e.dataTransfer.setData("text/plain", itemId);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedItemId(itemId);
+  }
+  function handleItemDragOver(e: React.DragEvent, itemId: string) {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    setItemDropTarget({ id: itemId, position: e.clientY < midpoint ? "before" : "after" });
+  }
+  function handleItemDragEnd() {
+    setDraggedItemId(null);
+    setItemDropTarget(null);
+  }
+  function handleItemDrop(e: React.DragEvent, targetItemId: string) {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData("text/plain");
+    const position = itemDropTarget?.position ?? "before";
+    setDraggedItemId(null);
+    setItemDropTarget(null);
+    if (!sourceId || sourceId === targetItemId) return;
+
+    const ids = items.map((i) => i.id);
+    const targetIndex = ids.indexOf(targetItemId);
+    if (targetIndex === -1) return;
+    const insertBeforeId = position === "before" ? targetItemId : (ids[targetIndex + 1] ?? null);
+    if (insertBeforeId === sourceId) return;
+
+    startTransition(async () => {
+      try {
+        await reorderCheckItem(selectedAspect!.id, projectId, sourceId, insertBeforeId);
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+
   return (
     <div className="flex flex-col" style={{ background: "var(--bg-page)" }} data-aspect-detail={selectedAspect.id}>
       <div className="px-6 py-4 border-b border-border flex items-center gap-2.5 flex-wrap" style={{ background: "var(--bg-sidebar)" }}>
@@ -236,28 +330,40 @@ export function AspectDetailPane({
             />
           ) : (
             <div
-              onClick={() => setEditingPolicy(true)}
-              className="cursor-text rounded-[10px] border px-4 py-3.5 text-[15px] leading-[1.75]"
+              onClick={() => !locked && setEditingPolicy(true)}
+              className={locked ? "rounded-[10px] border px-4 py-3.5 text-[15px] leading-[1.75]" : "cursor-text rounded-[10px] border px-4 py-3.5 text-[15px] leading-[1.75]"}
               style={{ borderColor: "var(--border)", background: "var(--bg-sidebar)" }}
             >
               {content.policy || <span className="text-faint">（この観点の方針を入力）</span>}
             </div>
           )}
-          <span className="text-[11px] text-faint">クリックで編集できます（空のテキストボックスは常設しません）。</span>
+          {!locked && <span className="text-[11px] text-faint">クリックで編集できます（空のテキストボックスは常設しません）。</span>}
         </div>
 
         <div className="flex flex-col gap-2.5 pb-6">
           <div className="flex items-center gap-2.5 flex-wrap">
             <label className="font-mono text-[10.5px] font-semibold tracking-wider text-faint uppercase">チェック項目</label>
             <span className="font-mono text-[10.5px] text-faint">{items.length}</span>
-            {availableStandardItems.length > 0 && !standardOpen && (
-              <button
-                type="button"
-                onClick={() => setStandardOpen(true)}
-                className="ml-auto text-[11.5px] font-medium px-3 py-2 rounded-md border border-border bg-page cursor-pointer hover:bg-hover whitespace-nowrap"
-              >
-                標準項目から選ぶ
-              </button>
+            {!locked && (
+              <div className="ml-auto flex gap-1.5 flex-wrap">
+                {availableStandardItems.length > 0 && !standardOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setStandardOpen(true)}
+                    className="text-[11.5px] font-medium px-3 py-2 rounded-md border border-border bg-page cursor-pointer hover:bg-hover whitespace-nowrap"
+                  >
+                    標準項目から選ぶ
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={stats.unknown === 0 || isPending}
+                  onClick={handleBulkUnknownToNo}
+                  className="text-[11.5px] font-medium px-3 py-2 rounded-md border border-border bg-page cursor-pointer hover:bg-hover whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  未判定をまとめて非該当に
+                </button>
+              </div>
             )}
           </div>
 
@@ -295,11 +401,15 @@ export function AspectDetailPane({
 
           {items.map((item) => {
             const ic = checkItemContent(item);
+            const isDragging = draggedItemId === item.id;
+            const dropPosition = itemDropTarget?.id === item.id ? itemDropTarget.position : null;
             return (
               <div
                 key={item.id}
                 data-checkitem-row={item.id}
-                className="flex items-center gap-3 px-3.5 py-3 rounded-[10px] flex-wrap"
+                onDragOver={locked ? undefined : (e) => handleItemDragOver(e, item.id)}
+                onDrop={locked ? undefined : (e) => handleItemDrop(e, item.id)}
+                className={`relative flex items-center gap-3 px-3.5 py-3 rounded-[10px] flex-wrap ${isDragging ? "opacity-40" : ""}`}
                 style={{
                   borderTop: "1px solid var(--border)",
                   borderRight: "1px solid var(--border)",
@@ -308,6 +418,23 @@ export function AspectDetailPane({
                   background: ic.judgement === "unknown" ? "var(--bg-page)" : "var(--bg-sidebar)",
                 }}
               >
+                {dropPosition && (
+                  <div
+                    className={`absolute left-0 right-0 h-0.5 pointer-events-none ${dropPosition === "before" ? "top-0" : "bottom-0"}`}
+                    style={{ background: "var(--brand)" }}
+                  />
+                )}
+                {!locked && (
+                  <span
+                    draggable
+                    onDragStart={(e) => handleItemDragStart(e, item.id)}
+                    onDragEnd={handleItemDragEnd}
+                    className="font-mono text-xs text-faint cursor-grab flex-none"
+                    title="ドラッグして並び替え"
+                  >
+                    ⠿
+                  </span>
+                )}
                 <span
                   className="flex-1 min-w-0 text-[13.5px] leading-[1.7]"
                   style={{ textDecoration: ic.judgement === "no" ? "line-through" : "none" }}
@@ -324,9 +451,9 @@ export function AspectDetailPane({
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        disabled={isPending}
+                        disabled={isPending || locked}
                         onClick={() => handleJudgement(item.id, kind)}
-                        className="text-[11px] font-medium px-2.5 py-1.5 cursor-pointer whitespace-nowrap"
+                        className="text-[11px] font-medium px-2.5 py-1.5 cursor-pointer whitespace-nowrap disabled:cursor-not-allowed"
                         style={{
                           background: style.background,
                           color: style.color,
@@ -345,36 +472,85 @@ export function AspectDetailPane({
                     );
                   })}
                 </div>
-                <Menu
-                  trigger={({ onClick }) => (
-                    <button
-                      type="button"
-                      onClick={onClick}
-                      disabled={isPending}
-                      className="font-mono text-xs px-2 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover flex-none"
+                {!locked && (
+                  <>
+                    <Menu
+                      trigger={({ onClick }) => (
+                        <button
+                          type="button"
+                          onClick={onClick}
+                          disabled={isPending}
+                          className="font-mono text-xs px-2 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover flex-none"
+                        >
+                          ⋯
+                        </button>
+                      )}
                     >
-                      ⋯
-                    </button>
-                  )}
-                >
-                  <MenuItem onClick={() => handleDeleteItem(item.id)} danger>
-                    削除
-                  </MenuItem>
-                </Menu>
+                      {otherAdoptedAspects.length > 0 && (
+                        <MenuItem onClick={() => setMovingItemId(item.id)}>別の観点へ移動</MenuItem>
+                      )}
+                      <MenuItem onClick={() => handleDeleteItem(item.id)} danger>
+                        削除
+                      </MenuItem>
+                    </Menu>
+                    {movingItemId === item.id && (
+                      <Select
+                        autoFocus
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) handleMoveItem(item.id, e.target.value);
+                          setMovingItemId(null);
+                        }}
+                        onBlur={() => setMovingItemId(null)}
+                        className="text-xs h-8 flex-none"
+                      >
+                        <option value="">移動先の観点を選択</option>
+                        {otherAdoptedAspects.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {aspectContent(a).name || "（未入力）"}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </>
+                )}
               </div>
             );
           })}
 
-          <Input
-            value={newItemText}
-            onChange={(e) => setNewItemText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitNewItem();
-            }}
-            placeholder="＋ チェック項目を追加（Enterで連続入力）"
-            variant="bare"
-            className="rounded-[10px] border border-dashed border-border text-faint hover:text-brand"
-          />
+          {!locked && (
+            <Input
+              value={newItemText}
+              onChange={(e) => setNewItemText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitNewItem();
+              }}
+              placeholder="＋ チェック項目を追加（Enterで連続入力）"
+              variant="bare"
+              className="rounded-[10px] border border-dashed border-border text-faint hover:text-brand"
+            />
+          )}
+        </div>
+
+        <div className="mt-auto pt-4 pb-5 border-t border-border flex items-center gap-2 -mx-6 px-6">
+          {isConfirmed ? (
+            <span
+              className="text-[13px] font-medium px-4 py-2.5 rounded-md whitespace-nowrap"
+              style={{ background: "var(--status-confirmed-bg)", color: "var(--status-confirmed-text)", border: "1px solid var(--status-confirmed-text)" }}
+            >
+              ✓ 確定済
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={handleConfirm}
+              className="text-[13px] font-medium px-4 py-2.5 rounded-md text-white cursor-pointer whitespace-nowrap disabled:opacity-50"
+              style={{ background: "var(--brand)" }}
+            >
+              この観点を確定
+            </button>
+          )}
         </div>
       </div>
     </div>
