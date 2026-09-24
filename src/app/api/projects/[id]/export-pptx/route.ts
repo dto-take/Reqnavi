@@ -27,13 +27,18 @@ type ProjectExportRow = {
 type ColumnRow = { column_key: string; label: string; applicable_chapters: number[] | null };
 type ItemRow = { content: Record<string, string | null> };
 type KpiNodeRow = { id: string; parent_id: string | null; content: { level: string; text: string } };
+// nonfunctional_ux_phase1.md：観点行（parent_id null）＋チェック項目行（parent_id=観点id）の
+// 親子階層。旧{category,overview,checklist[]}形式の1行完結シェイプはこの移行で廃止された。
 type ChecklistRow = {
-  content: {
-    category: string;
-    overview: string | null;
-    checklist: { item: string; status: string }[];
-  };
+  id: string;
+  parent_id: string | null;
+  status: string;
+  content:
+    | { name: string; policy: string | null; master_id: string | null }
+    | { text: string; judgement: "yes" | "no" | "unknown"; source: string };
 };
+
+const JUDGEMENT_LABEL: Record<string, string> = { yes: "該当", no: "非該当", unknown: "未判定" };
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = await params;
@@ -220,30 +225,37 @@ async function addKpiSlide(pres: PptxGenJS, projectId: string, chapterNo: number
   });
 }
 
+// nonfunctional_ux_phase1.md：「採用した観点だけが提案書に出力されます」（ハンドオフ footer
+// の注記通り）。未採用（status:'rejected'）の観点は方針・チェック項目ごとスライド化しない。
 async function addChecklistSlides(pres: PptxGenJS, projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
   const { data: rowsData } = await supabase
     .from("requirement_items")
-    .select("content")
+    .select("id, parent_id, content, status")
     .eq("project_id", projectId)
     .eq("chapter_no", chapterNo);
   const rows = (rowsData as unknown as ChecklistRow[] | null) ?? [];
+  const aspects = rows.filter((r) => r.parent_id === null && r.status !== "rejected");
 
-  if (rows.length === 0) {
+  if (aspects.length === 0) {
     const slide = pres.addSlide();
     addChapterTitle(slide, chapterNo);
-    slide.addText("（この章にはまだ項目がありません）", { x: 0.7, y: 1.5, w: 11.5, h: 1, fontSize: 12, color: GRAY });
+    slide.addText("（この章にはまだ採用された観点がありません）", { x: 0.7, y: 1.5, w: 11.5, h: 1, fontSize: 12, color: GRAY });
     return;
   }
 
-  for (const row of rows) {
-    const content = row.content;
+  for (const aspect of aspects) {
+    const content = aspect.content as { name: string; policy: string | null };
     const slide = pres.addSlide();
-    slide.addText(`${chapterNo}. ${CHAPTER_NAMES[chapterNo]} － ${content.category}`, {
+    slide.addText(`${chapterNo}. ${CHAPTER_NAMES[chapterNo]} － ${content.name}`, {
       x: 0.5, y: 0.4, w: 12.3, h: 0.8, fontSize: 20, bold: true, color: NAVY,
     });
-    slide.addText(content.overview ?? "", { x: 0.7, y: 1.3, w: 11.9, h: 1, fontSize: 12, color: GRAY });
-    const checklistLines = (content.checklist ?? []).map((c) => `${c.item}　（${c.status}）`).join("\n");
+    slide.addText(content.policy ?? "", { x: 0.7, y: 1.3, w: 11.9, h: 1, fontSize: 12, color: GRAY });
+    const checklistLines = rows
+      .filter((r) => r.parent_id === aspect.id)
+      .map((r) => r.content as { text: string; judgement: string })
+      .map((c) => `${c.text}　（${JUDGEMENT_LABEL[c.judgement] ?? c.judgement}）`)
+      .join("\n");
     slide.addText(checklistLines, {
       x: 0.7, y: 2.4, w: 11.9, h: 4.6, fontSize: 13, color: TEXT_COLOR, breakLine: true, valign: "top",
     });

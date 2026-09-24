@@ -92,7 +92,14 @@ export async function getSimpleChapterStatuses(projectId: string): Promise<Recor
   const { count: kpiCount } = await supabase.from("requirement_items").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("chapter_no", 4);
   results[4] = (kpiCount ?? 0) > 0 ? "in_progress" : "not_started";
 
-  const { count: nonFuncCount } = await supabase.from("requirement_items").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("chapter_no", 10);
+  // nonfunctional_ux_phase1.md：未採用（status:'rejected'）の観点行は「検討したが採用しなかった」
+  // 記録に過ぎず、着手中とは言えないため、行数カウントから除外する。
+  const { count: nonFuncCount } = await supabase
+    .from("requirement_items")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId)
+    .eq("chapter_no", 10)
+    .neq("status", "rejected");
   results[10] = (nonFuncCount ?? 0) > 0 ? "in_progress" : "not_started";
 
   const { count: progressCount } = await supabase.from("progress_tasks").select("id", { count: "exact", head: true }).eq("project_id", projectId);

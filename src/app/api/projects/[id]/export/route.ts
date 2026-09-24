@@ -25,13 +25,18 @@ type ProjectExportRow = {
 type ColumnRow = { column_key: string; label: string; applicable_chapters: number[] | null };
 type ItemRow = { content: Record<string, string | null> };
 type KpiNodeRow = { id: string; parent_id: string | null; content: { level: string; text: string } };
+// nonfunctional_ux_phase1.md：観点行（parent_id null）＋チェック項目行（parent_id=観点id）の
+// 親子階層。旧{category,overview,checklist[]}形式の1行完結シェイプはこの移行で廃止された。
 type ChecklistRow = {
-  content: {
-    category: string;
-    overview: string | null;
-    checklist: { item: string; status: string }[];
-  };
+  id: string;
+  parent_id: string | null;
+  status: string;
+  content:
+    | { name: string; policy: string | null; master_id: string | null }
+    | { text: string; judgement: "yes" | "no" | "unknown"; source: string };
 };
+
+const JUDGEMENT_LABEL: Record<string, string> = { yes: "該当", no: "非該当", unknown: "未判定" };
 
 function h1(text: string) {
   return new Paragraph({
@@ -103,7 +108,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (templateType === "E") {
       const { data: rowsData } = await supabase
         .from("requirement_items")
-        .select("content")
+        .select("id, parent_id, content, status")
         .eq("project_id", projectId)
         .eq("chapter_no", chapterNo);
       const rows = (rowsData as unknown as ChecklistRow[] | null) ?? [];
@@ -187,22 +192,27 @@ function renderKpiTree(nodes: KpiNodeRow[]): Paragraph[] {
   return result.length > 0 ? result : [p("（この章にはまだ項目がありません）")];
 }
 
+// nonfunctional_ux_phase1.md：「採用した観点だけが提案書に出力されます」（ハンドオフ footer
+// の注記通り）。未採用（status:'rejected'）の観点は方針・チェック項目ごと出力対象から除く。
 function renderChecklist(rows: ChecklistRow[]): Paragraph[] {
-  if (rows.length === 0) return [p("（この章にはまだ項目がありません）")];
+  const aspects = rows.filter((r) => r.parent_id === null && r.status !== "rejected");
+  if (aspects.length === 0) return [p("（この章にはまだ採用された観点がありません）")];
   const result: Paragraph[] = [];
-  for (const row of rows) {
+  for (const aspect of aspects) {
+    const content = aspect.content as { name: string; policy: string | null };
     result.push(
       new Paragraph({
         spacing: { before: 150, after: 60 },
-        children: [new TextRun({ text: row.content.category, bold: true, size: 22 })],
+        children: [new TextRun({ text: content.name, bold: true, size: 22 })],
       })
     );
-    result.push(p(row.content.overview ?? ""));
-    for (const c of row.content.checklist ?? []) {
+    result.push(p(content.policy ?? ""));
+    for (const item of rows.filter((r) => r.parent_id === aspect.id)) {
+      const ic = item.content as { text: string; judgement: string };
       result.push(
         new Paragraph({
           bullet: { level: 0 },
-          children: [new TextRun({ text: `${c.item}　（${c.status}）`, size: 20 })],
+          children: [new TextRun({ text: `${ic.text}　（${JUDGEMENT_LABEL[ic.judgement] ?? ic.judgement}）`, size: 20 })],
         })
       );
     }
