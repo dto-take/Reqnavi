@@ -87,6 +87,34 @@ export function AspectCatalogPane({
     onReorder(sourceId, insertBeforeId);
   }
 
+  // nonfunctional_ux_phase4.md Step2：↑↓キーで「採用中」「未採用」を通した表示順で
+  // フォーカスを移動する。採用中の行に着地した場合はそのまま選択状態にする（既存のクリック選択
+  // と同じ経路）。未採用の行には対応する詳細ペインが無いため、フォーカスリングでの
+  // 位置表示のみ行う（Step3のフォーカスリング確認とも整合する）。入力欄にフォーカスがある
+  // 間は矢印キーを本来のカーソル移動に任せる（progress_ux_phase4.md ProgressChart.tsxと同じ方針）。
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const target = e.target as HTMLElement;
+    const isFormField = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
+    if ((e.key !== "ArrowUp" && e.key !== "ArrowDown") || isFormField) return;
+
+    const rows = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("[data-aspect-row], [data-pool-item]"));
+    if (rows.length === 0) return;
+    const currentIndex = rows.indexOf(document.activeElement as HTMLElement);
+    if (currentIndex === -1) {
+      e.preventDefault();
+      rows[0].focus();
+      const aspectId = rows[0].getAttribute("data-aspect-row");
+      if (aspectId) onSelect(aspectId);
+      return;
+    }
+    const nextIndex = e.key === "ArrowUp" ? currentIndex - 1 : currentIndex + 1;
+    if (nextIndex < 0 || nextIndex >= rows.length) return;
+    e.preventDefault();
+    rows[nextIndex].focus();
+    const aspectId = rows[nextIndex].getAttribute("data-aspect-row");
+    if (aspectId) onSelect(aspectId);
+  }
+
   return (
     <div className="flex flex-col border-r border-border" style={{ background: "var(--bg-sidebar)" }}>
       <div className="px-4 py-3.5 border-b border-border flex flex-col gap-2.5">
@@ -103,7 +131,7 @@ export function AspectCatalogPane({
         <span className="text-[11px] text-faint">判定済のチェック項目 / 採用観点の全項目</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto" style={{ maxHeight: 560 }}>
+      <div className="flex-1 overflow-y-auto" style={{ maxHeight: 560 }} onKeyDown={handleKeyDown}>
         <div className="px-3.5 pt-3 pb-1.5 flex items-center gap-2">
           <span className="font-mono text-[10.5px] tracking-wide text-faint uppercase">採用中</span>
           <span className="font-mono text-[10.5px] text-faint">{adopted.length}</span>
@@ -230,7 +258,11 @@ function PoolRow({
   onReactivate: (aspectId: string) => void;
 }) {
   return (
-    <div data-pool-item={poolKey(item)} className="flex items-center gap-2 px-2.5 py-2 rounded-md">
+    <div
+      data-pool-item={poolKey(item)}
+      tabIndex={0}
+      className="flex items-center gap-2 px-2.5 py-2 rounded-md focus:outline-2 focus:-outline-offset-2"
+    >
       <span className="flex-1 min-w-0 truncate text-[12.5px] text-faint">{item.name || "（未入力）"}</span>
       <Button
         variant="secondary"

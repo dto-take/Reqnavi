@@ -8,7 +8,6 @@ import {
   deleteCheckItem,
   importMasterCheckItems,
   moveCheckItem,
-  reorderCheckItem,
   setCheckItemJudgement,
   unadoptAspect,
   updateAspectPolicy,
@@ -79,14 +78,18 @@ export function AspectDetailPane({
   master,
   nodes,
   selectedAspect,
+  onSelect,
   onUnadopted,
+  onReorderCheckItem,
 }: {
   projectId: string;
   tenantId: string;
   master: AspectMaster[];
   nodes: NonfunctionalNode[];
   selectedAspect: NonfunctionalNode | null;
+  onSelect: (id: string) => void;
   onUnadopted: () => void;
+  onReorderCheckItem: (aspectId: string, itemId: string, insertBeforeItemId: string | null) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [editingPolicy, setEditingPolicy] = useState(false);
@@ -265,13 +268,18 @@ export function AspectDetailPane({
     const insertBeforeId = position === "before" ? targetItemId : (ids[targetIndex + 1] ?? null);
     if (insertBeforeId === sourceId) return;
 
-    startTransition(async () => {
-      try {
-        await reorderCheckItem(selectedAspect!.id, projectId, sourceId, insertBeforeId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
-    });
+    onReorderCheckItem(selectedAspect!.id, sourceId, insertBeforeId);
+  }
+
+  // Step1：採用中の観点一覧（左カタログの表示順）の中で次の観点を選択する。最後の観点では
+  // 先頭へ戻る（自然な挙動としてお任せされた範囲での判断）。採用中が1件のみの場合は無意味な
+  // 操作になるため、呼び出し側でボタン自体を無効化する。
+  function handleNextAspect() {
+    const all = adoptedAspects(nodes);
+    if (all.length <= 1) return;
+    const idx = all.findIndex((a) => a.id === selectedAspect!.id);
+    const next = all[(idx + 1) % all.length];
+    onSelect(next.id);
   }
 
   return (
@@ -556,6 +564,14 @@ export function AspectDetailPane({
               この観点を確定
             </button>
           )}
+          <button
+            type="button"
+            disabled={otherAdoptedAspects.length === 0}
+            onClick={handleNextAspect}
+            className="ml-auto text-[13px] font-medium px-4 py-2.5 rounded-md border border-border bg-page cursor-pointer whitespace-nowrap hover:bg-hover disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            次の観点へ →
+          </button>
         </div>
       </div>
     </div>
