@@ -2,7 +2,11 @@ import { InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, Ref 
 
 type FieldVariant = "default" | "bare";
 
-const FIELD_BASE = "text-sm outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+// outline-noneでブラウザ標準のフォーカスリングを消しているため、キーボード操作時に
+// フォーカス位置が見えなくならないよう、focus-visibleで代替のリングを必ず表示する
+// （progress_ux_phase4.md Step3）。
+const FIELD_BASE =
+  "text-sm outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1";
 
 // bare: 枠線を持たないテーブルセル内編集欄向け（RequirementTable等）。
 // 通常のInput/Textareaと共通のdisabled表現・transitionだけを引き継ぐ

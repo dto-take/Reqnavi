@@ -280,7 +280,8 @@ export function WbsGanttPane({
                   onClick={() => onSelect(row.id)}
                   role="treeitem"
                   aria-selected={selected}
-                  className="flex items-center gap-1.5 cursor-pointer border-b border-border text-[12.5px] hover:bg-hover"
+                  tabIndex={0}
+                  className="flex items-center gap-1.5 cursor-pointer border-b border-border text-[12.5px] hover:bg-hover focus:outline-2 focus:-outline-offset-2"
                   style={{
                     height: ROW_HEIGHT,
                     paddingLeft: isPhaseRow ? 4 : 26,
