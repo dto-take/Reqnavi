@@ -17,6 +17,7 @@ import {
   type NonfunctionalNode,
 } from "@/actions/nonfunctional";
 import { adoptedAspects, aspectContent, aspectStats, checkItemContent, checkItemsOf, type AspectStats } from "@/lib/nonfunctional/derive";
+import { AspectCandidatePanel } from "@/components/domain/nonfunctional-checklist/AspectCandidatePanel";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Menu, MenuItem } from "@/components/ui/menu";
@@ -517,6 +518,10 @@ export function AspectDetailPane({
               </div>
             );
           })}
+
+          {/* nonfunctional_ux_phase3.md Step4：確定済み観点を選択中はAI候補パネル自体を
+              表示しない（編集導線を残さないという規約と同じ考え方）。 */}
+          {!locked && <AspectCandidatePanel projectId={projectId} tenantId={tenantId} aspectId={selectedAspect.id} />}
 
           {!locked && (
             <Input

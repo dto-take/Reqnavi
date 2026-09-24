@@ -4,7 +4,11 @@ import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { isItemLocked } from "@/lib/item-lock";
+import { getActivePrompt } from "@/lib/ai/prompts";
+import { callGeminiSafely } from "@/lib/ai/gemini-error";
+import { fetchOtherChapterConfirmedContext } from "@/lib/ai/other-chapter-context";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 // nonfunctional_ux_phase1.md：観点（Aspect）・チェック項目（CheckItem）は、KPIツリーで
 // 確立済みのparent_id/order_indexの親子階層パターンをそのまま流用する。観点＝parent_idが
@@ -197,11 +201,14 @@ async function assertAspectEditable(
   if (isItemLocked(aspect.status)) throw new UserFacingError("この観点は編集できません");
 }
 
+// nonfunctional_ux_phase3.md Step3：AI候補の採用もこの関数を再利用する
+// （source: 'ai'・judgement: 'unknown'のチェック項目として追加する）。
 export async function addCheckItem(
   aspectId: string,
   projectId: string,
   tenantId: string,
-  text: string
+  text: string,
+  source: CheckItemContent["source"] = "human"
 ): Promise<string> {
   const trimmed = text.trim();
   if (!trimmed) throw new UserFacingError("チェック項目の内容を入力してください");
@@ -223,7 +230,7 @@ export async function addCheckItem(
       template_type: "E",
       parent_id: aspectId,
       order_index: count ?? 0,
-      content: { text: trimmed, judgement: "unknown", source: "human" } satisfies CheckItemContent,
+      content: { text: trimmed, judgement: "unknown", source } satisfies CheckItemContent,
       status: "se_reviewing",
     })
     .select("id")
@@ -447,4 +454,57 @@ export async function moveCheckItem(itemId: string, projectId: string, toAspectI
     .eq("id", itemId);
   if (error) throw new UserFacingError(errorMessage(error));
   revalidatePath(`/projects/${projectId}/chapters/10`);
+}
+
+const CandidateSchema = z.object({ candidates: z.array(z.object({ text: z.string(), why: z.string() })) });
+
+// nonfunctional_ux_phase3.md Step2：kpi-tree.tsのsuggestKpiCandidatesと同じ構成
+// （対象の文脈取得→他章確定済み内容の取得→プロンプト組み立て→Gemini呼び出し→
+// Zodバリデーション→ai_interactionsへの記録）。候補はDBに永続化しない（新しいテーブルは
+// 作らない）。「見送り」も画面（AspectCandidatePanel）側でリストから消すだけで済み、
+// ここには対応する処理を作らない。
+export async function suggestNonfunctionalCandidates(
+  aspectId: string,
+  projectId: string,
+  excludeTexts: string[]
+): Promise<{ text: string; why: string }[]> {
+  const supabase = await createServerActionClient();
+
+  const { data: aspect, error: aspectError } = await supabase
+    .from("requirement_items")
+    .select("content, parent_id")
+    .eq("id", aspectId)
+    .single();
+  if (aspectError || !aspect || aspect.parent_id !== null) {
+    throw new UserFacingError(aspectError ? errorMessage(aspectError) : "観点が見つかりません");
+  }
+  const aspectData = aspect.content as AspectContent;
+
+  const otherChapterContext = await fetchOtherChapterConfirmedContext(supabase, projectId, 10);
+
+  const { id: promptId, body: promptBody } = await getActivePrompt("suggest_nonfunctional_checkitems");
+  const filledPrompt = promptBody
+    .replace("{aspect_name}", aspectData.name)
+    .replace("{policy}", aspectData.policy || "（方針は未設定）")
+    .replace("{other_chapter_context}", otherChapterContext || "（特になし）")
+    .replace("{exclude_texts}", excludeTexts.join("\n") || "（なし）");
+
+  const { GoogleGenAI } = await import("@google/genai");
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const response = await callGeminiSafely(() =>
+    ai.models.generateContent({ model: "gemini-3.6-flash", contents: filledPrompt })
+  );
+
+  const cleaned = (response.text ?? "{}").replace(/```json|```/g, "").trim();
+  const parsed = CandidateSchema.safeParse(JSON.parse(cleaned));
+
+  await supabase.from("ai_interactions").insert({
+    project_id: projectId,
+    prompt_id: promptId,
+    input_summary: { aspect_id: aspectId },
+    output: parsed.success ? parsed.data : { error: "validation_failed" },
+  });
+
+  if (!parsed.success) throw new UserFacingError("AIの出力形式が不正でした。");
+  return parsed.data.candidates;
 }

@@ -6,6 +6,7 @@ import { errorMessage } from "@/lib/error-message";
 import { isItemLocked } from "@/lib/item-lock";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
+import { fetchOtherChapterConfirmedContext } from "@/lib/ai/other-chapter-context";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { KPI_LEVELS, type KpiLevel } from "@/lib/kpi-levels";
@@ -220,23 +221,9 @@ export async function suggestKpiCandidates(
     .filter((s) => (s.content as KpiNodeContent).level === currentLevel)
     .map((s) => (s.content as KpiNodeContent).text);
 
-  // 他章の確定済み内容を参考文脈として渡す。本文列の優先順位はfix_card_body_field.mdの
-  // pickBodyColumnKeyと同じ考え方（内容のある列を優先）に揃える。nameは見出し用の列であり
-  // fix_card_title_body_order.md以降は本文候補から除外しているため、ここでも含めない。
-  const { data: otherChapterItems } = await supabase
-    .from("requirement_items")
-    .select("content")
-    .eq("project_id", projectId)
-    .eq("status", "confirmed")
-    .neq("chapter_no", 4)
-    .limit(10);
-  const otherChapterContext = (otherChapterItems ?? [])
-    .map((i) => {
-      const c = i.content as Record<string, string>;
-      return c.detail ?? c.issue ?? c.why ?? "";
-    })
-    .filter(Boolean)
-    .join("\n");
+  // 他章の確定済み内容を参考文脈として渡す（nonfunctional_ux_phase3.md以降、
+  // src/lib/ai/other-chapter-context.tsへ切り出し、非機能要件章のAI候補生成とも共有する）。
+  const otherChapterContext = await fetchOtherChapterConfirmedContext(supabase, projectId, 4);
 
   const { id: promptId, body: promptBody } = await getActivePrompt("suggest_kpi_children");
   const filledPrompt = promptBody
