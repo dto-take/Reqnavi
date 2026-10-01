@@ -334,6 +334,18 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
+# google_login.md Step2：ローカルでGoogleログインの往復（本物のGoogleアカウントでの
+# リダイレクト）を試す場合は、Google Cloud ConsoleでOAuthクライアントを作成し、enabled=true
+# にした上でclient_id/secretを.env.local（下記の環境変数名）に設定する。資格情報が無い状態で
+# enabled=trueのままにするとローカルのSupabase起動に支障が出るため、コミット時点では
+# 既定でfalseにしておく（Staging側はダッシュボード操作で別途有効化する。Step2参照）。
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]
