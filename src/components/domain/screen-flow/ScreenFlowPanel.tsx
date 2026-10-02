@@ -14,6 +14,13 @@ import {
   type ScreenEdge,
   type ScreenNode,
 } from "@/actions/screen-transition";
+import {
+  adoptScreenSuggestion,
+  rejectScreenSuggestion,
+  type NodeSuggestion,
+  type ScreenSuggestions,
+  type TransitionSuggestion,
+} from "@/actions/screen-flow-suggestions";
 import { ScreenWireframe } from "@/components/domain/screen-wireframe/ScreenWireframe";
 import type { FlowSelection } from "@/components/domain/screen-flow/ScreenFlowCanvas";
 import { unplacedFunctions, type FlowWarning, type FunctionItem } from "@/lib/screen-flow/derive";
@@ -36,6 +43,9 @@ export function ScreenFlowPanel({
   nodes,
   edges,
   functions,
+  suggestions,
+  onAdopted,
+  bulkBusy,
   warnings,
   selection,
   focusEdgeId,
@@ -45,6 +55,9 @@ export function ScreenFlowPanel({
   nodes: ScreenNode[];
   edges: ScreenEdge[];
   functions: FunctionItem[];
+  suggestions: ScreenSuggestions;
+  onAdopted: (kind: "node" | "transition", id: string) => void;
+  bulkBusy: boolean;
   warnings: FlowWarning[];
   selection: FlowSelection;
   focusEdgeId: string | null;
@@ -66,11 +79,32 @@ export function ScreenFlowPanel({
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const node = selection?.type === "node" ? nodeById.get(selection.id) ?? null : null;
   const edge = selection?.type === "edge" ? edges.find((e) => e.id === selection.id) ?? null : null;
+  const sNode = selection?.type === "snode" ? suggestions.nodes.find((n) => n.id === selection.id) ?? null : null;
+  const sEdge = selection?.type === "sedge" ? suggestions.transitions.find((t) => t.id === selection.id) ?? null : null;
+  // 採用・見送りは楽観的更新をしない。操作中（自分のtransition・一括操作・生成）は無効化して連打を防ぐ
+  const busy = isPending || bulkBusy;
+  const suggestionActions: SuggestionActions = {
+    adopt: (s) =>
+      run(async () => {
+        const r = await adoptScreenSuggestion(s.id, projectId);
+        onAdopted(r.kind, r.resultId);
+      }),
+    reject: (s) =>
+      run(async () => {
+        await rejectScreenSuggestion(s.id, projectId);
+        onSelect(null);
+      }),
+    busy,
+  };
 
   return (
     <div className="flex flex-col gap-4 p-4 border-l border-border" style={{ background: "var(--bg-sidebar)" }} data-screen-flow-panel>
-      {node ? (
-        <NodeMode key={node.id} node={node} nodes={nodes} edges={edges} functions={functions} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
+      {sNode ? (
+        <SuggestedNodeMode key={sNode.id} suggestion={sNode} functions={functions} projectId={projectId} actions={suggestionActions} />
+      ) : sEdge ? (
+        <SuggestedEdgeMode key={sEdge.id} suggestion={sEdge} nodeById={nodeById} suggestions={suggestions} onSelect={onSelect} actions={suggestionActions} />
+      ) : node ? (
+        <NodeMode key={node.id} node={node} nodes={nodes} edges={edges} functions={functions} suggestedOut={suggestions.transitions.filter((t) => t.from.ref === "node" && t.from.id === node.id)} suggestionActions={suggestionActions} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
       ) : edge ? (
         <EdgeMode key={edge.id} autoEdit={focusEdgeId === edge.id} edge={edge} edges={edges} nodeById={nodeById} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
       ) : (
@@ -81,6 +115,173 @@ export function ScreenFlowPanel({
 }
 
 type RunFn = (fn: () => Promise<void>) => void;
+
+type SuggestionActions = {
+  adopt: (s: NodeSuggestion | TransitionSuggestion) => void;
+  reject: (s: NodeSuggestion | TransitionSuggestion) => void;
+  busy: boolean;
+};
+
+function SuggestionButtons({
+  suggestion,
+  actions,
+  adoptDisabled,
+}: {
+  suggestion: NodeSuggestion | TransitionSuggestion;
+  actions: SuggestionActions;
+  adoptDisabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        data-suggestion-adopt={suggestion.id}
+        disabled={actions.busy || adoptDisabled}
+        onClick={() => actions.adopt(suggestion)}
+        className="text-[11.5px] font-medium px-3 py-1.5 rounded-md text-white cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ background: "var(--brand)" }}
+      >
+        採用
+      </button>
+      <button
+        type="button"
+        data-suggestion-reject={suggestion.id}
+        disabled={actions.busy}
+        onClick={() => actions.reject(suggestion)}
+        className="text-[11.5px] font-medium px-3 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover whitespace-nowrap disabled:opacity-50"
+      >
+        見送り
+      </button>
+    </div>
+  );
+}
+
+function SuggestionPill() {
+  return (
+    <span
+      className="text-[11px] font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"
+      style={{ color: "var(--brand)", borderColor: "var(--brand)", background: "var(--bg-page)", borderStyle: "dashed" }}
+    >
+      AI提案
+    </span>
+  );
+}
+
+function WhyBlock({ why }: { why: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className={SECTION_LABEL}>根拠</span>
+      <p data-suggestion-why className="text-[12px] text-secondary rounded-md border px-3 py-2" style={{ borderColor: "var(--border)", background: "var(--bg-page)" }}>
+        {why}
+      </p>
+    </div>
+  );
+}
+
+// 提案ノードの選択モード：読み取り専用。確定ボタンは出さない（採用後に通常の画面として扱う）。
+function SuggestedNodeMode({
+  suggestion,
+  functions,
+  projectId,
+  actions,
+}: {
+  suggestion: NodeSuggestion;
+  functions: FunctionItem[];
+  projectId: string;
+  actions: SuggestionActions;
+}) {
+  const linked = suggestion.function_item_id ? functions.find((f) => f.id === suggestion.function_item_id) ?? null : null;
+  return (
+    <>
+      <div className="flex items-center gap-2 flex-wrap">
+        <SuggestionPill />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className={SECTION_LABEL}>画面名</span>
+        <div data-screen-name className="rounded-md border px-3 py-2 text-[14px] font-bold text-primary" style={{ borderColor: "var(--border)", background: "var(--bg-page)" }}>
+          {suggestion.name}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <span className={SECTION_LABEL}>9章の画面情報</span>
+        {linked ? (
+          <>
+            <div className="text-[12.5px] text-primary">
+              <span className="font-mono text-[10px] text-faint mr-1.5">{linked.code}</span>
+              {linked.name}
+            </div>
+            <div className="rounded-md border overflow-hidden" style={{ height: 150, borderColor: "var(--border)", background: "var(--bg-page)" }}>
+              <div style={{ transform: "scale(0.5)", transformOrigin: "top left", width: "200%", pointerEvents: "none" }}>
+                <ScreenWireframe screenName={linked.name} pattern={linked.pattern} fields={linked.fields} actions={linked.actions} />
+              </div>
+            </div>
+            <Link href={`/projects/${projectId}/chapters/9/screens`} className="text-[11.5px] underline text-secondary hover:text-primary">
+              画面イメージを開く
+            </Link>
+          </>
+        ) : (
+          <p className="text-xs text-secondary">紐付けなしの提案です。</p>
+        )}
+      </div>
+      <WhyBlock why={suggestion.why} />
+      <SuggestionButtons suggestion={suggestion} actions={actions} />
+    </>
+  );
+}
+
+// 提案遷移の選択モード。端点が未採用の提案ノードのときは採用できない。
+function SuggestedEdgeMode({
+  suggestion,
+  nodeById,
+  suggestions,
+  onSelect,
+  actions,
+}: {
+  suggestion: TransitionSuggestion;
+  nodeById: Map<string, ScreenNode>;
+  suggestions: ScreenSuggestions;
+  onSelect: (s: FlowSelection) => void;
+  actions: SuggestionActions;
+}) {
+  const endpoint = (e: TransitionSuggestion["from"]) => {
+    const label = e.ref === "node" ? nodeById.get(e.id)?.label ?? e.name : suggestions.nodes.find((n) => n.id === e.id)?.name ?? e.name;
+    const sel: FlowSelection = e.ref === "node" ? { type: "node", id: e.id } : { type: "snode", id: e.id };
+    return { label, sel };
+  };
+  const from = endpoint(suggestion.from);
+  const to = endpoint(suggestion.to);
+  const needsAdopt = suggestion.from.ref === "suggestion" || suggestion.to.ref === "suggestion";
+  return (
+    <>
+      <div className="flex items-center gap-2 flex-wrap">
+        <SuggestionPill />
+        <span className={SECTION_LABEL}>遷移</span>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={() => onSelect(from.sel)} className="text-[12px] font-bold px-2.5 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover">
+          {from.label}
+        </button>
+        <span className="text-faint">→</span>
+        <button type="button" onClick={() => onSelect(to.sel)} className="text-[12px] font-bold px-2.5 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover">
+          {to.label}
+        </button>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className={SECTION_LABEL}>遷移のきっかけ（操作名）</span>
+        <div data-edge-label-field className="rounded-md border px-3 py-2 text-[13px]" style={{ borderColor: "var(--border)", background: "var(--bg-page)" }}>
+          {suggestion.label || <span className="text-faint">（操作名なし）</span>}
+        </div>
+      </div>
+      <WhyBlock why={suggestion.why} />
+      {needsAdopt && (
+        <p data-suggestion-needs-adopt className="text-[11.5px]" style={{ color: "var(--status-review-text)" }}>
+          先に画面を採用してください。
+        </p>
+      )}
+      <SuggestionButtons suggestion={suggestion} actions={actions} adoptDisabled={needsAdopt} />
+    </>
+  );
+}
 
 function OverviewMode({
   nodes,
@@ -166,6 +367,8 @@ function NodeMode({
   nodes,
   edges,
   functions,
+  suggestedOut,
+  suggestionActions,
   projectId,
   onSelect,
   run,
@@ -175,6 +378,8 @@ function NodeMode({
   nodes: ScreenNode[];
   edges: ScreenEdge[];
   functions: FunctionItem[];
+  suggestedOut: TransitionSuggestion[];
+  suggestionActions: SuggestionActions;
   projectId: string;
   onSelect: (s: FlowSelection) => void;
   run: RunFn;
@@ -322,6 +527,26 @@ function NodeMode({
             </button>
           </div>
         ))}
+        {suggestedOut.map((t) => {
+          const toIsSuggestion = t.to.ref === "suggestion";
+          return (
+            <div
+              key={t.id}
+              data-suggested-outgoing={t.id}
+              className="flex flex-col gap-1.5 rounded-md px-3 py-2"
+              style={{ border: "1.5px dashed var(--brand)", background: "var(--bg-page)" }}
+            >
+              <button type="button" onClick={() => onSelect({ type: "sedge", id: t.id })} className="text-left cursor-pointer">
+                <div className="text-[12.5px] font-bold text-primary truncate">
+                  <span className="text-[10px] font-medium mr-1.5" style={{ color: "var(--brand)" }}>AI提案</span>→ {t.to.name}
+                </div>
+                <div className="text-[11px] text-faint truncate">{t.label || "（操作名なし）"}</div>
+              </button>
+              {toIsSuggestion && <p className="text-[11px]" style={{ color: "var(--status-review-text)" }}>先に画面を採用してください。</p>}
+              <SuggestionButtons suggestion={t} actions={suggestionActions} adoptDisabled={toIsSuggestion} />
+            </div>
+          );
+        })}
         {locked ? null : addingTarget ? (
           <div className="flex flex-wrap gap-1.5">
             {addableTargets.length === 0 ? (

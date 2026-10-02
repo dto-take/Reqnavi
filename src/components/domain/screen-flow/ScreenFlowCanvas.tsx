@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ScreenEdge, ScreenNode } from "@/actions/screen-transition";
+import type { ScreenSuggestions } from "@/actions/screen-flow-suggestions";
 import {
   NODE_H,
   NODE_W,
@@ -16,7 +17,8 @@ import {
 } from "@/lib/screen-flow/derive";
 import { isItemLocked } from "@/lib/item-lock";
 
-export type FlowSelection = { type: "node" | "edge"; id: string } | null;
+// snode/sedge：AI提案のノード/遷移（screen_flow_suggestionsの行id）
+export type FlowSelection = { type: "node" | "edge" | "snode" | "sedge"; id: string } | null;
 
 const DOT_COLOR: Record<ScreenNode["status"], string> = {
   confirmed: "var(--status-confirmed-text)",
@@ -44,6 +46,7 @@ export function ScreenFlowCanvas({
   nodes,
   edges,
   functions,
+  suggestions,
   degrees,
   selection,
   onSelect,
@@ -53,6 +56,7 @@ export function ScreenFlowCanvas({
   nodes: ScreenNode[];
   edges: ScreenEdge[];
   functions: FunctionItem[];
+  suggestions: ScreenSuggestions;
   degrees: Map<string, { in: number; out: number }>;
   selection: FlowSelection;
   onSelect: (selection: FlowSelection) => void;
@@ -67,6 +71,8 @@ export function ScreenFlowCanvas({
 
   const positions = new Map<string, { x: number; y: number }>();
   nodes.forEach((n, i) => positions.set(n.id, dragPos?.id === n.id ? { x: dragPos.x, y: dragPos.y } : nodePosition(n, i)));
+  // 提案ノードも座標表に入れる（遷移の端点・ステージサイズ用）。ドラッグ対象にはしない。
+  for (const s of suggestions.nodes) positions.set(s.id, { x: s.x, y: s.y });
   const functionById = new Map(functions.map((f) => [f.id, f]));
   // ステージの論理サイズは内容（全ノードの外接矩形＋余白）に合わせて描画ごとに算出する
   const stage = stageSizeFor([...positions.values()]);
@@ -153,6 +159,8 @@ export function ScreenFlowCanvas({
 
   const selectedNodeId = selection?.type === "node" ? selection.id : null;
   const selectedEdgeId = selection?.type === "edge" ? selection.id : null;
+  const selectedSNodeId = selection?.type === "snode" ? selection.id : null;
+  const selectedSEdgeId = selection?.type === "sedge" ? selection.id : null;
 
   const geoms = edges.flatMap((e) => {
     const a = positions.get(e.from_node);
@@ -161,6 +169,19 @@ export function ScreenFlowCanvas({
     const isSel = e.id === selectedEdgeId;
     const hot = isSel || (selectedNodeId !== null && (e.from_node === selectedNodeId || e.to_node === selectedNodeId));
     return [{ edge: e, geom: edgeGeometry(a, b, hasReverseEdge(e, edges)), isSel, hot }];
+  });
+
+  // 提案遷移：実遷移と同じgeom()で、提案ノードも端点として扱う
+  const allPairs = [
+    ...edges.map((e) => ({ from_node: e.from_node, to_node: e.to_node })),
+    ...suggestions.transitions.map((t) => ({ from_node: t.from.id, to_node: t.to.id })),
+  ];
+  const sgeoms = suggestions.transitions.flatMap((t) => {
+    const a = positions.get(t.from.id);
+    const b = positions.get(t.to.id);
+    if (!a || !b) return [];
+    const paired = allPairs.some((p) => p.from_node === t.to.id && p.to_node === t.from.id);
+    return [{ s: t, geom: edgeGeometry(a, b, paired), isSel: t.id === selectedSEdgeId }];
   });
 
   const connFrom = conn ? positions.get(conn.from) : null;
@@ -206,6 +227,29 @@ export function ScreenFlowCanvas({
                 return (
                   <g key={edge.id} style={{ pointerEvents: "none" }}>
                     <path d={geom.d} fill="none" stroke={color} strokeWidth={hot ? 2 : 1.5} />
+                    <path d={geom.arrow} fill={color} stroke="none" />
+                  </g>
+                );
+              })}
+              {sgeoms.map(({ s, geom }) => (
+                <path
+                  key={`shit-${s.id}`}
+                  d={geom.d}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={14}
+                  style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                  onPointerDown={(ev) => {
+                    ev.stopPropagation();
+                    onSelect({ type: "sedge", id: s.id });
+                  }}
+                />
+              ))}
+              {sgeoms.map(({ s, geom, isSel }) => {
+                const color = isSel ? "var(--text-primary)" : "var(--brand)";
+                return (
+                  <g key={`s-${s.id}`} data-screen-suggestion-edge={s.id} style={{ pointerEvents: "none" }} opacity={isSel ? 1 : 0.6}>
+                    <path d={geom.d} fill="none" stroke={color} strokeWidth={1.5} strokeDasharray="5 4" />
                     <path d={geom.arrow} fill={color} stroke="none" />
                   </g>
                 );
@@ -291,6 +335,48 @@ export function ScreenFlowCanvas({
               );
             })}
 
+            {suggestions.nodes.map((sn) => {
+              const selected = sn.id === selectedSNodeId;
+              const fn = sn.function_item_id ? functionById.get(sn.function_item_id) : undefined;
+              return (
+                <div
+                  key={sn.id}
+                  data-screen-suggestion-node={sn.id}
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    e.stopPropagation();
+                    onSelect({ type: "snode", id: sn.id });
+                  }}
+                  className="absolute flex flex-col gap-1 rounded-xl select-none"
+                  style={{
+                    left: sn.x,
+                    top: sn.y,
+                    width: NODE_W,
+                    height: NODE_H,
+                    boxSizing: "border-box",
+                    padding: selected ? "9px 11px" : "10px 12px",
+                    background: "var(--bg-sidebar)",
+                    border: selected ? "2px dashed var(--text-primary)" : "1.5px dashed var(--brand)",
+                    cursor: "pointer",
+                    zIndex: 2,
+                  }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="text-[9.5px] font-medium px-1.5 rounded-full"
+                      style={{ color: "var(--brand)", border: "1px solid var(--brand)" }}
+                    >
+                      AI提案
+                    </span>
+                  </div>
+                  <div className="text-[12.5px] font-bold leading-snug text-primary truncate">{sn.name}</div>
+                  <div className="text-[10.5px] truncate" style={{ color: sn.function_item_id ? "var(--brand)" : "var(--text-faint)" }}>
+                    {sn.function_item_id ? `9章 ${fn ? `${fn.code}：${fn.name}` : "紐付け済み"}` : "9章 紐付けなし"}
+                  </div>
+                </div>
+              );
+            })}
+
             {/* ラベルはノードより前面（指示書Step3）。クリックで遷移を選択する */}
             {geoms.map(({ edge, geom, isSel, hot }) => {
               const color = isSel ? "var(--text-primary)" : "var(--brand)";
@@ -319,7 +405,32 @@ export function ScreenFlowCanvas({
               );
             })}
 
-            {nodes.length === 0 && (
+            {sgeoms.map(({ s, geom, isSel }) => (
+              <div
+                key={`slabel-${s.id}`}
+                data-screen-suggestion-label={s.id}
+                onPointerDown={(ev) => {
+                  ev.stopPropagation();
+                  onSelect({ type: "sedge", id: s.id });
+                }}
+                className="absolute text-[10.5px] font-medium whitespace-nowrap rounded-full cursor-pointer"
+                style={{
+                  left: geom.lx,
+                  top: geom.ly,
+                  transform: "translate(-50%, -50%)",
+                  padding: "4px 8px",
+                  zIndex: 3,
+                  color: "var(--brand)",
+                  background: "var(--bg-page)",
+                  border: `1px dashed ${isSel ? "var(--text-primary)" : "var(--brand)"}`,
+                  opacity: isSel ? 1 : 0.8,
+                }}
+              >
+                {s.label || "（操作名なし）"}
+              </div>
+            ))}
+
+            {nodes.length === 0 && suggestions.nodes.length === 0 && (
               <p className="absolute inset-0 flex items-center justify-center text-sm text-faint">
                 まだ画面がありません。右のパネルから9章の画面を図に追加してください。
               </p>

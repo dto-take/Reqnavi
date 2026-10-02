@@ -5,10 +5,10 @@
 export type LayoutNode = { id: string; screen_code: string | null; order_index: number };
 export type LayoutEdge = { from_node: string; to_node: string };
 
-const ORIGIN_X = 40;
-const ORIGIN_Y = 30;
-const COL_GAP = 270;
-const ROW_GAP = 120;
+export const ORIGIN_X = 40;
+export const ORIGIN_Y = 30;
+export const COL_GAP = 270;
+export const ROW_GAP = 120;
 
 // screen_code昇順（S-01, S-02…は桁数が揃うため文字列比較で良い）。無ければorder_index、最後にid。
 function compareNodes(a: LayoutNode, b: LayoutNode): number {

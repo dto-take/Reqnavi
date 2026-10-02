@@ -143,6 +143,19 @@ create table flow_edges (
   label     text
 );
 
+-- 画面遷移図のAI差分提案（flow_nodes/flow_edgesには混ぜない）。RLSは案件メンバーのみ
+create table screen_flow_suggestions (
+  id         uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  tenant_id  uuid,
+  kind       text not null check (kind in ('node', 'transition')),
+  payload    jsonb not null, -- node: {name, function_item_id, x, y} / transition: {from:{ref,id,name}, to:{ref,id,name}, label}
+  why        text not null,
+  state      text not null default 'open' check (state in ('open', 'adopted', 'rejected')),
+  result_id  uuid,           -- 採用で作られた実ノード/実遷移のid
+  created_at timestamptz not null default now()
+);
+
 create table progress_tasks (
   id               uuid primary key default gen_random_uuid(),
   project_id       uuid not null references projects(id),

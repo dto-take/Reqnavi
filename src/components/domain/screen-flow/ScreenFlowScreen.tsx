@@ -2,6 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { addScreenTransition, moveScreenNode, moveScreenNodes, type ScreenEdge, type ScreenNode } from "@/actions/screen-transition";
+import {
+  adoptAllScreenSuggestions,
+  generateScreenFlowSuggestions,
+  rejectAllScreenSuggestions,
+  type ScreenSuggestions,
+} from "@/actions/screen-flow-suggestions";
+import { Spinner } from "@/components/ui/spinner";
 import { ScreenFlowCanvas, type FlowSelection } from "@/components/domain/screen-flow/ScreenFlowCanvas";
 import { ScreenFlowPanel } from "@/components/domain/screen-flow/ScreenFlowPanel";
 import { degrees, flowWarnings, nodePosition, type FunctionItem } from "@/lib/screen-flow/derive";
@@ -16,19 +23,26 @@ export function ScreenFlowScreen({
   nodes,
   edges,
   functions,
+  suggestions,
 }: {
   projectId: string;
   nodes: ScreenNode[];
   edges: ScreenEdge[];
   functions: FunctionItem[];
+  suggestions: ScreenSuggestions;
 }) {
   const [selection, setSelection] = useState<FlowSelection>(null);
-  // ポートから作成した直後の遷移id。再取得データに現れるまで選択を解除しない（作成直後に
-  // 選択・フォーカスが消えないようにする）。別の対象を選んだ時点で破棄する。
+  // ポートから作成した直後の遷移id、またはAI提案の採用で作られた実ノード/実遷移のid。
+  // 再取得データに現れるまで選択を解除しない（作成直後に選択・フォーカスが消えないようにする）。
+  // 別の対象を選んだ時点で破棄する。
   const [pendingEdgeId, setPendingEdgeId] = useState<string | null>(null);
   const [focusEdgeId, setFocusEdgeId] = useState<string | null>(null);
   const [posOverrides, setPosOverrides] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [, startTransition] = useTransition();
+  // AI提案の生成・一括採用・一括見送り。操作中は他の提案操作ボタンを無効にして連打を防ぐ。
+  // 採用・見送りは楽観的更新をしない（提案と実ノード/遷移は同じ再取得で同時に切り替わる）。
+  const [bulkPending, startBulk] = useTransition();
+  const [generating, setGenerating] = useState(false);
   const { show } = useToast();
 
   // 規約59：ドロップ/整列直後からサーバーの再取得データが届くまで、座標の上書き値を保持して
@@ -49,13 +63,54 @@ export function ScreenFlowScreen({
   const warnings = useMemo(() => flowWarnings(displayNodes, edges), [displayNodes, edges]);
   const confirmedCount = displayNodes.filter((n) => n.status === "confirmed").length;
 
-  // 選択対象が削除等で存在しなくなった場合は未選択として扱う（作成直後の遷移は除く）
-  const effectiveSelection: FlowSelection =
-    selection?.type === "node" && !nodes.some((n) => n.id === selection.id)
-      ? null
-      : selection?.type === "edge" && !edges.some((e) => e.id === selection.id) && selection.id !== pendingEdgeId
-        ? null
-        : selection;
+  // 選択対象が削除・見送り・置き換え等で存在しなくなった場合は未選択として扱う
+  // （採用直後の実ノード/実遷移は、再取得データに現れるまで除く）
+  const exists =
+    !selection ||
+    (selection.type === "node" && (nodes.some((n) => n.id === selection.id) || selection.id === pendingEdgeId)) ||
+    (selection.type === "edge" && (edges.some((e) => e.id === selection.id) || selection.id === pendingEdgeId)) ||
+    (selection.type === "snode" && suggestions.nodes.some((n) => n.id === selection.id)) ||
+    (selection.type === "sedge" && suggestions.transitions.some((t) => t.id === selection.id));
+  const effectiveSelection: FlowSelection = exists ? selection : null;
+  const suggestionCount = suggestions.nodes.length + suggestions.transitions.length;
+
+  // 提案の採用で作られた実ノード/実遷移を選択する
+  function handleAdopted(kind: "node" | "transition", id: string) {
+    setSelection({ type: kind === "node" ? "node" : "edge", id });
+    setPendingEdgeId(id);
+    setFocusEdgeId(null);
+  }
+
+  async function handleGenerate() {
+    setGenerating(true);
+    try {
+      const r = await generateScreenFlowSuggestions(projectId);
+      show(r.nodes + r.transitions === 0 ? "追加の提案はありませんでした" : `画面${r.nodes}件・遷移${r.transitions}件を提案しました`);
+    } catch (e) {
+      show(errorMessage(e), "error");
+    } finally {
+      setGenerating(false);
+    }
+  }
+  function handleAdoptAll() {
+    startBulk(async () => {
+      try {
+        const r = await adoptAllScreenSuggestions(projectId);
+        show(r.failed > 0 ? `${r.adopted}件を採用しました（${r.failed}件は採用できませんでした）` : `${r.adopted}件を採用しました`, r.adopted === 0 ? "error" : "success");
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
+  function handleRejectAll() {
+    startBulk(async () => {
+      try {
+        await rejectAllScreenSuggestions(projectId);
+      } catch (e) {
+        show(errorMessage(e), "error");
+      }
+    });
+  }
 
   function handleSelect(next: FlowSelection) {
     setSelection(next);
@@ -148,11 +203,56 @@ export function ScreenFlowScreen({
         >
           要確認 {warnings.length}
         </span>
+        {suggestionCount > 0 && (
+          <div
+            data-screen-flow-suggestion-bar
+            className="flex items-center gap-2 rounded-md px-2.5 py-1"
+            style={{ border: "1.5px dashed var(--brand)" }}
+          >
+            <span className="text-[11.5px] font-medium" style={{ color: "var(--brand)" }}>
+              AI提案 {suggestionCount} 件
+            </span>
+            <button
+              type="button"
+              data-suggestion-adopt-all
+              disabled={bulkPending || generating}
+              onClick={handleAdoptAll}
+              className="text-[11.5px] font-medium px-2.5 py-1 rounded-md text-white cursor-pointer disabled:opacity-50"
+              style={{ background: "var(--brand)" }}
+            >
+              すべて採用
+            </button>
+            <button
+              type="button"
+              data-suggestion-reject-all
+              disabled={bulkPending || generating}
+              onClick={handleRejectAll}
+              className="text-[11.5px] font-medium px-2.5 py-1 rounded-md border border-border bg-page cursor-pointer hover:bg-hover disabled:opacity-50"
+            >
+              すべて見送り
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          data-suggest-generate
+          onClick={handleGenerate}
+          disabled={generating || bulkPending}
+          className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-md border border-border bg-page cursor-pointer hover:bg-hover whitespace-nowrap disabled:opacity-50"
+        >
+          {generating ? (
+            <>
+              <Spinner /> 生成中…
+            </>
+          ) : (
+            "AI素案（差分で提案）"
+          )}
+        </button>
         <button
           type="button"
           onClick={handleAutoLayout}
           disabled={displayNodes.length === 0}
-          className="ml-auto text-[12px] font-medium px-3 py-2 rounded-md border border-border bg-page cursor-pointer hover:bg-hover whitespace-nowrap disabled:opacity-50"
+          className="text-[12px] font-medium px-3 py-2 rounded-md border border-border bg-page cursor-pointer hover:bg-hover whitespace-nowrap disabled:opacity-50"
         >
           自動で整列
         </button>
@@ -163,6 +263,7 @@ export function ScreenFlowScreen({
           nodes={displayNodes}
           edges={edges}
           functions={functions}
+          suggestions={suggestions}
           degrees={deg}
           selection={effectiveSelection}
           onSelect={handleSelect}
@@ -174,6 +275,9 @@ export function ScreenFlowScreen({
           nodes={displayNodes}
           edges={edges}
           functions={functions}
+          suggestions={suggestions}
+          onAdopted={handleAdopted}
+          bulkBusy={bulkPending || generating}
           warnings={warnings}
           selection={effectiveSelection}
           focusEdgeId={focusEdgeId}
