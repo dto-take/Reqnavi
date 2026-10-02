@@ -67,3 +67,14 @@ body {
 .animate-rise {
   animation: rise 0.18s ease both;
 }
+
+/* 画面遷移図：キーボードフォーカス時だけ視認できるリング（マウス操作では出ない） */
+[data-screen-flow-root] button:focus-visible,
+[data-screen-flow-root] a:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+[data-screen-flow-scroll]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}

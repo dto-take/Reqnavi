@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ScreenEdge, ScreenNode } from "@/actions/screen-transition";
 import type { ScreenSuggestions } from "@/actions/screen-flow-suggestions";
 import {
@@ -28,6 +28,13 @@ const DOT_COLOR: Record<ScreenNode["status"], string> = {
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 1.6;
+const clampScale = (v: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, v));
+
+// キー操作を横取りしない対象（入力欄・セレクト・ボタン・contenteditable）
+function isFormTarget(t: EventTarget | null): boolean {
+  if (!(t instanceof HTMLElement)) return false;
+  return ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(t.tagName) || t.isContentEditable;
+}
 
 type DragState = {
   id: string;
@@ -52,6 +59,9 @@ export function ScreenFlowCanvas({
   onSelect,
   onMove,
   onConnect,
+  onDelete,
+  onNudge,
+  onFlush,
 }: {
   nodes: ScreenNode[];
   edges: ScreenEdge[];
@@ -62,8 +72,20 @@ export function ScreenFlowCanvas({
   onSelect: (selection: FlowSelection) => void;
   onMove: (nodeId: string, x: number, y: number) => void;
   onConnect: (fromNodeId: string, toNodeId: string) => void;
+  // キー操作（screen_flow_ux_phase4.md）。削除は右パネルのボタンと同じ処理を親が呼ぶ。
+  onDelete: () => void;
+  onNudge: (nodeId: string, dx: number, dy: number) => void;
+  onFlush: () => void;
 }) {
   const [scale, setScale] = useState(1);
+  const [panMode, setPanMode] = useState(false);
+  const [panning, setPanning] = useState(false);
+  const scaleRef = useRef(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // ズーム後にスクロール位置を補正するための基準（論理座標とコンテナ内の表示位置）
+  const anchorRef = useRef<{ lx: number; ly: number; cx: number; cy: number } | null>(null);
+  const panRef = useRef(false);
+  const connCancelRef = useRef<(() => void) | null>(null);
   const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null);
   const [conn, setConn] = useState<{ from: string; x: number; y: number } | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -84,10 +106,135 @@ export function ScreenFlowCanvas({
     return { x: (clientX - rect.left) / currentScale, y: (clientY - rect.top) / currentScale };
   }
 
+  function focusCanvas() {
+    scrollRef.current?.focus({ preventScroll: true });
+  }
+
+  // 倍率を変え、anchor（コンテナ内の表示位置cx,cy）の下にある論理座標が動かないよう
+  // useLayoutEffectでスクロール位置を補正する（規約61：座標はgetBoundingClientRectから算出）
+  function zoomTo(next: number, cx: number, cy: number) {
+    const el = scrollRef.current;
+    const stageEl = stageRef.current;
+    if (!el || !stageEl) return;
+    const target = clampScale(next);
+    if (target === scaleRef.current) return;
+    const rect = stageEl.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    anchorRef.current = {
+      lx: (box.left + cx - rect.left) / scaleRef.current,
+      ly: (box.top + cy - rect.top) / scaleRef.current,
+      cx,
+      cy,
+    };
+    scaleRef.current = target;
+    setScale(target);
+  }
+
+  useLayoutEffect(() => {
+    const a = anchorRef.current;
+    const el = scrollRef.current;
+    if (!a || !el) return;
+    anchorRef.current = null;
+    el.scrollLeft = a.lx * scale - a.cx;
+    el.scrollTop = a.ly * scale - a.cy;
+  }, [scale]);
+
+  // wheelはReactのonWheel（受動リスナー）ではpreventDefaultが効かずブラウザ全体のズームが
+  // 走るため、passive:falseでネイティブに登録する。Ctrl/⌘が付いたときだけズームする。
+  const zoomToRef = useRef(zoomTo);
+  useLayoutEffect(() => {
+    zoomToRef.current = zoomTo;
+  });
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    function handleWheel(ev: WheelEvent) {
+      if (!ev.ctrlKey && !ev.metaKey) return;
+      ev.preventDefault();
+      const box = el!.getBoundingClientRect();
+      zoomToRef.current(scaleRef.current * Math.exp(-ev.deltaY * 0.0015), ev.clientX - box.left, ev.clientY - box.top);
+    }
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  // パンモードはSpaceを離す・コンテナのblur・ウィンドウのblurで必ず解除する
+  function endPanMode() {
+    panRef.current = false;
+    setPanMode(false);
+  }
+  useEffect(() => {
+    function onBlur() {
+      panRef.current = false;
+      setPanMode(false);
+    }
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, []);
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (isFormTarget(e.target)) return;
+    if (e.key === " ") {
+      e.preventDefault();
+      if (!e.repeat) {
+        panRef.current = true;
+        setPanMode(true);
+      }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "Escape") {
+      if (connCancelRef.current) connCancelRef.current();
+      else onSelect(null);
+      return;
+    }
+    if (e.key === "Delete" || e.key === "Backspace") {
+      if (!selection) return;
+      e.preventDefault();
+      onDelete();
+      return;
+    }
+    const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    const d = arrows[e.key];
+    if (d && selection?.type === "node") {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      onNudge(selection.id, d[0] * step, d[1] * step);
+    }
+  }
+
+  // パンモード中のポインタはキャプチャ段階で奪い、ノードのドラッグ・選択・背景クリック・
+  // ポート接続のいずれも開始させない。
+  function handlePanStart(e: React.PointerEvent) {
+    if (!panRef.current || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = scrollRef.current!;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const sl = el.scrollLeft;
+    const st = el.scrollTop;
+    setPanning(true);
+    function move(ev: PointerEvent) {
+      el.scrollLeft = sl - (ev.clientX - sx);
+      el.scrollTop = st - (ev.clientY - sy);
+    }
+    function up() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setPanning(false);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  const cur = (def: string) => (panMode ? (panning ? "grabbing" : "grab") : conn ? "crosshair" : def);
+
   function handlePointerDown(e: React.PointerEvent, node: ScreenNode) {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
+    focusCanvas();
     const pos = positions.get(node.id)!;
     const s = scale;
     const start = toLogical(e.clientX, e.clientY, s);
@@ -129,6 +276,7 @@ export function ScreenFlowCanvas({
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
+    focusCanvas();
     const s = scale;
     const p0 = toLogical(e.clientX, e.clientY, s);
     setConn({ from: node.id, x: p0.x, y: p0.y });
@@ -137,9 +285,17 @@ export function ScreenFlowCanvas({
       const p = toLogical(ev.clientX, ev.clientY, s);
       setConn({ from: node.id, x: p.x, y: p.y });
     }
+    // Escでキャンセル：リスナーを外して破線を消す（遷移は作らない）
+    connCancelRef.current = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      connCancelRef.current = null;
+      setConn(null);
+    };
     function handleUp(ev: PointerEvent) {
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
+      connCancelRef.current = null;
       setConn(null);
       const p = toLogical(ev.clientX, ev.clientY, s);
       // 論理座標での矩形ヒットテスト（DOMの要素判定に頼らない）
@@ -153,8 +309,10 @@ export function ScreenFlowCanvas({
     window.addEventListener("pointerup", handleUp);
   }
 
+  // ツールバー操作は表示領域の中央を基準に拡縮する（0.1刻み）
   function changeScale(next: number) {
-    setScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(next * 10) / 10)));
+    const el = scrollRef.current;
+    zoomTo(Math.round(next * 10) / 10, el ? el.clientWidth / 2 : 0, el ? el.clientHeight / 2 : 0);
   }
 
   const selectedNodeId = selection?.type === "node" ? selection.id : null;
@@ -190,9 +348,22 @@ export function ScreenFlowCanvas({
     // ツールバーはスクロールコンテナの外側に重ねる（スクロールしても右下に固定される）
     <div className="relative">
       <div
-        className="overflow-auto rounded-lg border border-border"
+        ref={scrollRef}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        onKeyUp={(e) => {
+          if (e.key === " ") endPanMode();
+        }}
+        onBlur={() => {
+          endPanMode();
+          onFlush();
+        }}
+        onPointerDownCapture={handlePanStart}
+        className={`overflow-auto rounded-lg border border-border${panMode || panning || conn ? " select-none" : ""}`}
         data-screen-flow-scroll
+        data-pan-mode={panMode ? "1" : undefined}
         style={{
+          cursor: panMode ? (panning ? "grabbing" : "grab") : conn ? "crosshair" : undefined,
           maxHeight: 720,
           backgroundColor: "var(--bg-sidebar)",
           backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)",
@@ -204,7 +375,10 @@ export function ScreenFlowCanvas({
             ref={stageRef}
             className="relative"
             style={{ width: stage.w, height: stage.h, transform: `scale(${scale})`, transformOrigin: "top left" }}
-            onPointerDown={() => onSelect(null)}
+            onPointerDown={() => {
+              focusCanvas();
+              onSelect(null);
+            }}
             data-screen-flow-stage
           >
             <svg width={stage.w} height={stage.h} className="absolute inset-0" style={{ overflow: "visible" }}>
@@ -218,6 +392,7 @@ export function ScreenFlowCanvas({
                   style={{ pointerEvents: "stroke", cursor: "pointer" }}
                   onPointerDown={(ev) => {
                     ev.stopPropagation();
+                    focusCanvas();
                     onSelect({ type: "edge", id: edge.id });
                   }}
                 />
@@ -241,6 +416,7 @@ export function ScreenFlowCanvas({
                   style={{ pointerEvents: "stroke", cursor: "pointer" }}
                   onPointerDown={(ev) => {
                     ev.stopPropagation();
+                    focusCanvas();
                     onSelect({ type: "sedge", id: s.id });
                   }}
                 />
@@ -291,7 +467,7 @@ export function ScreenFlowCanvas({
                     background: "var(--bg-page)",
                     border: selected ? "2px solid var(--text-primary)" : "1px solid var(--border)",
                     boxShadow: selected ? "0 6px 18px rgba(27,26,23,.14)" : "0 1px 2px rgba(27,26,23,.06)",
-                    cursor: dragPos?.id === node.id ? "grabbing" : "grab",
+                    cursor: cur(dragPos?.id === node.id ? "grabbing" : "grab"),
                     zIndex: 2,
                     touchAction: "none",
                   }}
@@ -326,7 +502,7 @@ export function ScreenFlowCanvas({
                         height: 16,
                         background: "var(--bg-page)",
                         border: "2px solid var(--brand)",
-                        cursor: "crosshair",
+                        cursor: cur("crosshair"),
                         touchAction: "none",
                       }}
                     />
@@ -345,6 +521,7 @@ export function ScreenFlowCanvas({
                   onPointerDown={(e) => {
                     if (e.button !== 0) return;
                     e.stopPropagation();
+                    focusCanvas();
                     onSelect({ type: "snode", id: sn.id });
                   }}
                   className="absolute flex flex-col gap-1 rounded-xl select-none"
@@ -357,7 +534,7 @@ export function ScreenFlowCanvas({
                     padding: selected ? "9px 11px" : "10px 12px",
                     background: "var(--bg-sidebar)",
                     border: selected ? "2px dashed var(--text-primary)" : "1.5px dashed var(--brand)",
-                    cursor: "pointer",
+                    cursor: cur("pointer"),
                     zIndex: 2,
                   }}
                 >
@@ -386,6 +563,7 @@ export function ScreenFlowCanvas({
                   data-screen-edge-label={edge.id}
                   onPointerDown={(ev) => {
                     ev.stopPropagation();
+                    focusCanvas();
                     onSelect({ type: "edge", id: edge.id });
                   }}
                   className="absolute text-[10.5px] font-medium whitespace-nowrap rounded-full cursor-pointer"
@@ -411,6 +589,7 @@ export function ScreenFlowCanvas({
                 data-screen-suggestion-label={s.id}
                 onPointerDown={(ev) => {
                   ev.stopPropagation();
+                  focusCanvas();
                   onSelect({ type: "sedge", id: s.id });
                 }}
                 className="absolute text-[10.5px] font-medium whitespace-nowrap rounded-full cursor-pointer"
@@ -432,7 +611,7 @@ export function ScreenFlowCanvas({
 
             {nodes.length === 0 && suggestions.nodes.length === 0 && (
               <p className="absolute inset-0 flex items-center justify-center text-sm text-faint">
-                まだ画面がありません。右のパネルから9章の画面を図に追加してください。
+                画面がありません。右パネルの「図に追加」か「AI素案（差分で提案）」から始めます。
               </p>
             )}
           </div>
@@ -453,7 +632,7 @@ export function ScreenFlowCanvas({
         <button type="button" aria-label="拡大" onClick={() => changeScale(scale + 0.1)} className="font-mono text-xs px-2.25 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover">
           ＋
         </button>
-        <button type="button" onClick={() => setScale(1)} className="text-[11px] px-2.25 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover">
+        <button type="button" aria-label="100%に戻す" onClick={() => changeScale(1)} className="text-[11px] px-2.25 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover">
           100%
         </button>
       </div>

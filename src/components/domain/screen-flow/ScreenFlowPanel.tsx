@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   addScreenNode,
   confirmScreenNode,
   addScreenTransition,
   linkScreenFunction,
-  removeScreenNode,
   removeScreenTransition,
   renameScreenNode,
   updateScreenTransitionLabel,
@@ -16,7 +16,6 @@ import {
 } from "@/actions/screen-transition";
 import {
   adoptScreenSuggestion,
-  rejectScreenSuggestion,
   type NodeSuggestion,
   type ScreenSuggestions,
   type TransitionSuggestion,
@@ -46,6 +45,9 @@ export function ScreenFlowPanel({
   suggestions,
   onAdopted,
   bulkBusy,
+  onDeleteNode,
+  onDeleteEdge,
+  onRejectSuggestion,
   warnings,
   selection,
   focusEdgeId,
@@ -58,6 +60,10 @@ export function ScreenFlowPanel({
   suggestions: ScreenSuggestions;
   onAdopted: (kind: "node" | "transition", id: string) => void;
   bulkBusy: boolean;
+  // 削除・見送りはキー操作と同じ処理（ScreenFlowScreen側）を呼ぶ
+  onDeleteNode: (nodeId: string) => void;
+  onDeleteEdge: (edgeId: string) => void;
+  onRejectSuggestion: (suggestionId: string) => void;
   warnings: FlowWarning[];
   selection: FlowSelection;
   focusEdgeId: string | null;
@@ -65,13 +71,16 @@ export function ScreenFlowPanel({
 }) {
   const [isPending, startTransition] = useTransition();
   const { show } = useToast();
+  const router = useRouter();
 
+  // 失敗時はトーストのあと再取得して、画面をDBの実際の状態に揃える（確定済みになっていた等）
   function run(fn: () => Promise<void>) {
     startTransition(async () => {
       try {
         await fn();
       } catch (e) {
         show(errorMessage(e), "error");
+        router.refresh();
       }
     });
   }
@@ -89,11 +98,7 @@ export function ScreenFlowPanel({
         const r = await adoptScreenSuggestion(s.id, projectId);
         onAdopted(r.kind, r.resultId);
       }),
-    reject: (s) =>
-      run(async () => {
-        await rejectScreenSuggestion(s.id, projectId);
-        onSelect(null);
-      }),
+    reject: (s) => onRejectSuggestion(s.id),
     busy,
   };
 
@@ -104,11 +109,11 @@ export function ScreenFlowPanel({
       ) : sEdge ? (
         <SuggestedEdgeMode key={sEdge.id} suggestion={sEdge} nodeById={nodeById} suggestions={suggestions} onSelect={onSelect} actions={suggestionActions} />
       ) : node ? (
-        <NodeMode key={node.id} node={node} nodes={nodes} edges={edges} functions={functions} suggestedOut={suggestions.transitions.filter((t) => t.from.ref === "node" && t.from.id === node.id)} suggestionActions={suggestionActions} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
+        <NodeMode key={node.id} node={node} nodes={nodes} edges={edges} functions={functions} suggestedOut={suggestions.transitions.filter((t) => t.from.ref === "node" && t.from.id === node.id)} suggestionActions={suggestionActions} onDeleteNode={onDeleteNode} projectId={projectId} onSelect={onSelect} run={run} isPending={busy} />
       ) : edge ? (
-        <EdgeMode key={edge.id} autoEdit={focusEdgeId === edge.id} edge={edge} edges={edges} nodeById={nodeById} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
+        <EdgeMode key={edge.id} onDeleteEdge={onDeleteEdge} autoEdit={focusEdgeId === edge.id} edge={edge} edges={edges} nodeById={nodeById} projectId={projectId} onSelect={onSelect} run={run} isPending={busy} />
       ) : (
-        <OverviewMode nodes={nodes} functions={functions} warnings={warnings} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
+        <OverviewMode nodes={nodes} functions={functions} warnings={warnings} projectId={projectId} onSelect={onSelect} run={run} isPending={busy} />
       )}
     </div>
   );
@@ -369,11 +374,13 @@ function NodeMode({
   functions,
   suggestedOut,
   suggestionActions,
+  onDeleteNode,
   projectId,
   onSelect,
   run,
   isPending,
 }: {
+  onDeleteNode: (nodeId: string) => void;
   node: ScreenNode;
   nodes: ScreenNode[];
   edges: ScreenEdge[];
@@ -631,15 +638,7 @@ function NodeMode({
         <button
           type="button"
           disabled={isPending}
-          onClick={() => {
-            const n = outgoing.length + incoming.length;
-            const head = locked ? "確定済みの画面です。" : "";
-            if (!confirm(`${head}「${node.label}」を削除しますか？接続する遷移（${n}件）も一緒に削除されます。`)) return;
-            run(async () => {
-              await removeScreenNode(node.id, projectId);
-              onSelect(null);
-            });
-          }}
+          onClick={() => onDeleteNode(node.id)}
           className="ml-auto text-[12px] font-medium px-3 py-2 rounded-md border cursor-pointer hover:bg-hover disabled:opacity-50"
           style={{ borderColor: "var(--status-needhearing-text)", color: "var(--status-needhearing-text)" }}
         >
@@ -651,6 +650,7 @@ function NodeMode({
 }
 
 function EdgeMode({
+  onDeleteEdge,
   autoEdit,
   edge,
   edges,
@@ -660,6 +660,7 @@ function EdgeMode({
   run,
   isPending,
 }: {
+  onDeleteEdge: (edgeId: string) => void;
   autoEdit: boolean;
   edge: ScreenEdge;
   edges: ScreenEdge[];
@@ -749,12 +750,7 @@ function EdgeMode({
         <button
           type="button"
           disabled={isPending}
-          onClick={() =>
-            run(async () => {
-              await removeScreenTransition(edge.id, projectId);
-              onSelect(null);
-            })
-          }
+          onClick={() => onDeleteEdge(edge.id)}
           className="text-[12px] font-medium px-3 py-2 rounded-md border cursor-pointer hover:bg-hover disabled:opacity-50"
           style={{ borderColor: "var(--status-needhearing-text)", color: "var(--status-needhearing-text)" }}
         >

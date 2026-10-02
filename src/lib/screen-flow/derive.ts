@@ -103,6 +103,7 @@ export function edgeGeometry(a: { x: number; y: number }, b: { x: number; y: num
   const W = NODE_W;
   const H = NODE_H;
   let sx: number, sy: number, tx: number, ty: number, c1x: number, c1y: number, c2x: number, c2y: number;
+  let labelShift = 0;
   if (b.x >= a.x + W - 10) {
     const off = paired ? -14 : 0;
     sx = a.x + W;
@@ -129,6 +130,8 @@ export function edgeGeometry(a: { x: number; y: number }, b: { x: number; y: num
     // 縦方向（横に重なる配置）は原典に往復オフセットが無く、往復ペアが重なるため、
     // 往復の場合は左右にずらす（行きは+18、戻りは-18）。
     const xo = paired ? (down ? 18 : -18) : 18;
+    // 往復の2本は横に36pxしか離れず、ラベル同士が重なるため、ラベルを上下にずらす
+    if (paired) labelShift = down ? -18 : 18;
     sx = a.x + W / 2 + xo;
     sy = down ? a.y + H : a.y;
     tx = b.x + W / 2 + xo;
@@ -140,7 +143,7 @@ export function edgeGeometry(a: { x: number; y: number }, b: { x: number; y: num
     c2y = ty - dy;
   }
   const lx = (sx + 3 * c1x + 3 * c2x + tx) / 8;
-  const ly = (sy + 3 * c1y + 3 * c2y + ty) / 8;
+  const ly = (sy + 3 * c1y + 3 * c2y + ty) / 8 + labelShift;
   const ang = Math.atan2(ty - c2y, tx - c2x);
   const L = 9;
   const Wd = 4.5;
