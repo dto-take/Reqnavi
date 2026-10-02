@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;background:#f2efe7;color:#1b1a17;font-family:"Zen Kaku Gothic New",system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:#2f5d45;text-decoration:none}a:hover{color:#20422f}@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}</style></helmet>
+
+<div style="display:grid;grid-template-columns:56px minmax(0,1fr) minmax(280px,316px);height:100vh;background:#f2efe7">
+
+  <aside style="background:#1b1a17;color:#efeae0;display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px 0">
+    <span style="font:500 13px/1 'IBM Plex Mono',monospace;color:#efeae0;background:rgba(239,234,224,.1);border-radius:7px;padding:9px 10px;cursor:pointer">☰</span>
+    <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8d8778">08</span>
+    <span style="font:700 11px/1 'IBM Plex Mono',monospace;color:#fff;background:#2b2924;border-radius:6px;padding:7px 6px">09</span>
+    <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8d8778">10</span>
+    <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#8d8778">15</span>
+  </aside>
+
+  <main style="min-width:0;display:flex;flex-direction:column;background:#fff;min-height:0">
+    <header style="padding:16px 22px 13px;border-bottom:1px solid #e3ded2;background:#faf8f3;display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <a href="#" style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f">← 9. 機能要件に戻る</a>
+          <h1 style="margin:0;font:600 23px/1.25 'Shippori Mincho',serif">画面遷移図</h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap">
+          <button onClick="{{ autoLayout }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:8px;padding:10px 13px;cursor:pointer;white-space:nowrap" style-hover="background:#f4f1e9">自動で整列</button>
+          <button onClick="{{ addNode }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:8px;padding:10px 13px;cursor:pointer;white-space:nowrap" style-hover="background:#f4f1e9">＋ 画面を追加</button>
+          <button onClick="{{ generate }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#fff;background:#2f5d45;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;white-space:nowrap" style-hover="background:#254a37">AI素案（差分で提案）</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+        <span style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #e3ded2;border-radius:20px;padding:6px 12px;white-space:nowrap">画面 <span style="font-family:'IBM Plex Mono',monospace">{{ nodeCount }}</span> ・遷移 <span style="font-family:'IBM Plex Mono',monospace">{{ edgeCount }}</span></span>
+        <span style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#2f5d45;background:#eaf1ec;border:1px solid #cfd9d2;border-radius:20px;padding:6px 12px;white-space:nowrap">確定 <span style="font-family:'IBM Plex Mono',monospace">{{ confirmedCount }}/{{ nodeCount }}</span></span>
+        <sc-if value="{{ hasWarn }}" hint-placeholder-val="{{ true }}">
+          <span style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#8a5a18;background:#fbf1de;border:1px solid #ebd7b0;border-radius:20px;padding:6px 12px;white-space:nowrap">要確認 <span style="font-family:'IBM Plex Mono',monospace">{{ warnCount }}</span></span>
+        </sc-if>
+        <sc-if value="{{ hasAi }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 4px 4px 12px;border:1px dashed #cdc6b6;border-radius:20px;background:#fff;animation:rise .18s ease both">
+            <span style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;white-space:nowrap">AI提案 <span style="font-family:'IBM Plex Mono',monospace">{{ aiCount }}</span> 件（破線）</span>
+            <button onClick="{{ adoptAllAi }}" style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#fff;background:#2f5d45;border:none;border-radius:20px;padding:6px 11px;cursor:pointer;white-space:nowrap">すべて採用</button>
+            <button onClick="{{ rejectAllAi }}" style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;background:#fff;border:1px solid #d8d2c4;border-radius:20px;padding:6px 11px;cursor:pointer;white-space:nowrap">すべて見送り</button>
+          </div>
+        </sc-if>
+        <span style="margin-left:auto;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;white-space:nowrap">ノードをドラッグで移動・右端の ● から別の画面へドラッグで遷移を作成</span>
+      </div>
+    </header>
+
+    <div style="flex:1;min-height:0;position:relative;display:flex">
+    <div onMouseDown="{{ clearSel }}" style="flex:1;min-width:0;overflow:auto;background-color:#faf8f3;background-image:radial-gradient(#e3ded2 1px,transparent 1px);background-size:18px 18px">
+      <div style="position:relative;width:{{ stageW }};height:{{ stageH }}">
+        <div ref="{{ canvasRef }}" style="position:absolute;left:0;top:0;width:1080px;height:660px;transform-origin:0 0;transform:{{ scaleCss }}">
+          <svg width="1080" height="660" style="position:absolute;left:0;top:0;overflow:visible">
+            <sc-for list="{{ edges }}" as="e" hint-placeholder-count="4">
+              <path d="{{ e.d }}" style="fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke;cursor:pointer" onMouseDown="{{ e.onSelect }}"></path>
+            </sc-for>
+            <sc-for list="{{ edges }}" as="e" hint-placeholder-count="4">
+              <path d="{{ e.d }}" style="fill:none;pointer-events:none;stroke:{{ e.color }};stroke-width:{{ e.w }};stroke-dasharray:{{ e.dash }}"></path>
+            </sc-for>
+            <sc-for list="{{ edges }}" as="e" hint-placeholder-count="4">
+              <path d="{{ e.arrow }}" style="pointer-events:none;stroke:none;fill:{{ e.color }}"></path>
+            </sc-for>
+            <sc-if value="{{ connecting }}" hint-placeholder-val="{{ false }}">
+              <path d="{{ tempD }}" style="fill:none;stroke:#2f5d45;stroke-width:2;stroke-dasharray:5 4;pointer-events:none"></path>
+            </sc-if>
+          </svg>
+
+          <sc-for list="{{ edges }}" as="e" hint-placeholder-count="4">
+            <div onMouseDown="{{ e.onSelect }}" style="position:absolute;transform:translate(-50%,-50%);font:500 10.5px/1 'Zen Kaku Gothic New',sans-serif;padding:4px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;z-index:1;left:{{ e.lx }};top:{{ e.ly }};color:{{ e.labelFg }};background:{{ e.labelBg }};border:1px {{ e.labelBorderStyle }} {{ e.labelBd }}">{{ e.label }}</div>
+          </sc-for>
+
+          <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="5">
+            <div onMouseDown="{{ n.onDown }}" style="position:absolute;width:176px;height:72px;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;cursor:grab;user-select:none;z-index:2;left:{{ n.x }};top:{{ n.y }};background:{{ n.bg }};border:{{ n.border }};box-shadow:{{ n.shadow }}">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ n.dot }}"></span>
+                <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#7a7466">{{ n.code }}</span>
+                <span style="margin-left:auto;font:500 9.5px/1 'Zen Kaku Gothic New',sans-serif;white-space:nowrap;color:{{ n.tagFg }}">{{ n.tag }}</span>
+              </div>
+              <span style="font:700 12.5px/1.35 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.name }}</span>
+              <span style="font:400 10.5px/1 'Zen Kaku Gothic New',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ n.linkFg }}">{{ n.link }}</span>
+              <div onMouseDown="{{ n.onPortDown }}" title="ドラッグして遷移を作成" style="position:absolute;right:-8px;top:27px;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #2f5d45;cursor:crosshair" style-hover="background:#2f5d45"></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+    </div>
+      <div style="position:absolute;right:14px;bottom:14px;display:flex;gap:6px;padding:5px;background:#fff;border:1px solid #e3ded2;border-radius:9px;box-shadow:0 2px 8px rgba(27,26,23,.1);z-index:5">
+        <button onClick="{{ zoomOut }}" style="font:500 12px/1 'IBM Plex Mono',monospace;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:6px;padding:6px 9px;cursor:pointer">−</button>
+        <span style="font:500 11px/1 'IBM Plex Mono',monospace;color:#3c382f;padding:7px 4px;min-width:40px;text-align:center">{{ zoomLabel }}</span>
+        <button onClick="{{ zoomIn }}" style="font:500 12px/1 'IBM Plex Mono',monospace;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:6px;padding:6px 9px;cursor:pointer">＋</button>
+        <button onClick="{{ zoomReset }}" style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:6px;padding:6px 9px;cursor:pointer">100%</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== 右パネル ===== -->
+  <aside style="background:#faf8f3;border-left:1px solid #e3ded2;display:flex;flex-direction:column;min-height:0;overflow:auto">
+
+    <sc-if value="{{ modeNone }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px;display:flex;flex-direction:column;gap:16px">
+        <span style="font:600 16px/1.4 'Shippori Mincho',serif">全体の確認</span>
+        <span style="font:400 12px/1.7 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;text-wrap:pretty">画面または遷移をクリックすると、ここで編集できます。</span>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">要確認</span>
+          <sc-for list="{{ warnings }}" as="w" hint-placeholder-count="2">
+            <div onClick="{{ w.onSelect }}" style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid #ebd7b0;border-left:3px solid #d9a341;border-radius:9px;background:#fff;cursor:pointer" style-hover="background:#fdf8ee">
+              <span style="font:500 12.5px/1.4 'Zen Kaku Gothic New',sans-serif">{{ w.name }}</span>
+              <span style="font:400 11px/1.5 'Zen Kaku Gothic New',sans-serif;color:#8a5a18">{{ w.reason }}</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noWarn }}" hint-placeholder-val="{{ false }}">
+            <span style="font:400 12px/1.6 'Zen Kaku Gothic New',sans-serif;color:#2f5d45">問題はありません。</span>
+          </sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">9章にあって図にない画面</span>
+          <sc-for list="{{ unplaced }}" as="f" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #e3ded2;border-radius:9px;background:#fff">
+              <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#7a7466;flex:none">{{ f.code }}</span>
+              <span style="flex:1;min-width:0;font:400 12px/1.5 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">{{ f.name }}</span>
+              <button onClick="{{ f.add }}" style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#2f5d45;background:#fff;border:1px solid #cfd9d2;border-radius:6px;padding:6px 10px;cursor:pointer;flex:none" style-hover="background:#f0f5f1">図に追加</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ modeNode }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;flex:1">
+        <div style="padding:18px 18px 0;display:flex;flex-direction:column;gap:15px;flex:1">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font:500 11px/1 'IBM Plex Mono',monospace;color:#7a7466">{{ sn.code }}</span>
+            <span style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;border-radius:20px;padding:5px 11px;white-space:nowrap;color:{{ sn.stFg }};background:{{ sn.stBg }};border:1px solid {{ sn.stBd }}">{{ sn.stLabel }}</span>
+            <sc-if value="{{ sn.ai }}" hint-placeholder-val="{{ false }}">
+              <span style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;border:1px dashed #cdc6b6;border-radius:20px;padding:5px 11px;white-space:nowrap">AI提案</span>
+            </sc-if>
+          </div>
+          <div style="font:600 17px/1.5 'Shippori Mincho',serif;padding:10px 12px;border:1px solid #d8d2c4;border-radius:9px;background:#fff;cursor:text;text-wrap:pretty" style-hover="border-color:#b3ac9c">{{ sn.name }}</div>
+
+          <sc-if value="{{ sn.ai }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px;padding:11px 12px;border:1px dashed #cdc6b6;border-radius:10px;background:#fff;flex-wrap:wrap;align-items:center">
+              <span style="flex:1;min-width:140px;font:400 11.5px/1.6 'Zen Kaku Gothic New',sans-serif;color:#3c382f;text-wrap:pretty">根拠：{{ sn.why }}</span>
+              <button onClick="{{ sn.adopt }}" style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#fff;background:#2f5d45;border:none;border-radius:7px;padding:8px 12px;cursor:pointer;white-space:nowrap">採用</button>
+              <button onClick="{{ sn.reject }}" style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;background:#fff;border:1px solid #d8d2c4;border-radius:7px;padding:8px 12px;cursor:pointer;white-space:nowrap">見送り</button>
+            </div>
+          </sc-if>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">9章の画面情報</span>
+            <sc-if value="{{ sn.linked }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid #cfd9d2;border-radius:10px;background:#fff">
+                <div style="display:flex;align-items:baseline;gap:8px">
+                  <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#2f5d45">{{ sn.fCode }}</span>
+                  <span style="font:500 12.5px/1.5 'Zen Kaku Gothic New',sans-serif;text-wrap:pretty">{{ sn.fName }}</span>
+                </div>
+                <div style="height:92px;border-radius:7px;background:#f4f1e9;border:1px solid #e3ded2;display:flex;align-items:center;justify-content:center;font:400 11px/1.5 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;text-align:center;padding:8px">画面イメージ（9章の画面イメージ機能と同じデータ）</div>
+                <div style="display:flex;gap:7px;flex-wrap:wrap">
+                  <button style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:7px;padding:8px 11px;cursor:pointer;white-space:nowrap" style-hover="background:#f4f1e9">画面イメージを開く</button>
+                  <button onClick="{{ sn.unlink }}" style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;background:#fff;border:1px solid #d8d2c4;border-radius:7px;padding:8px 11px;cursor:pointer;white-space:nowrap" style-hover="background:#f4f1e9">紐付けを外す</button>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ sn.unlinked }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid #ebd7b0;border-radius:10px;background:#fdf8ee">
+                <span style="font:500 12px/1.6 'Zen Kaku Gothic New',sans-serif;color:#8a5a18">9章の画面に紐付いていません。該当する画面を選んでください。</span>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <sc-for list="{{ linkCands }}" as="f" hint-placeholder-count="3">
+                    <button onClick="{{ f.link }}" style="display:flex;align-items:center;gap:8px;text-align:left;font:400 12px/1.5 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;background:#fff;border:1px solid #e3ded2;border-radius:8px;padding:8px 10px;cursor:pointer" style-hover="border-color:#a9c3b4">
+                      <span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#7a7466;flex:none">{{ f.code }}</span>{{ f.name }}
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">遷移先</span>
+              <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#7a7466">{{ outCount }}</span>
+              <span style="margin-left:auto;font:400 10.5px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">並列に存在できます</span>
+            </div>
+            <sc-for list="{{ outs }}" as="o" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;background:#fff;border:1px {{ o.bs }} {{ o.bd }}">
+                <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#7a7466;flex:none">→</span>
+                <div onClick="{{ o.onSelect }}" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;cursor:pointer">
+                  <span style="font:500 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ o.name }}</span>
+                  <span style="font:400 11px/1.3 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">{{ o.label }}</span>
+                </div>
+                <sc-if value="{{ o.ai }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ o.adopt }}" style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#fff;background:#2f5d45;border:none;border-radius:6px;padding:6px 9px;cursor:pointer;flex:none">採用</button>
+                </sc-if>
+                <button onClick="{{ o.remove }}" title="遷移を削除" style="font:500 12px/1 'IBM Plex Mono',monospace;color:#6f6a5e;background:#fff;border:1px solid #d8d2c4;border-radius:6px;padding:5px 8px;cursor:pointer;flex:none" style-hover="color:#8f3a22;border-color:#efcbc0">×</button>
+              </div>
+            </sc-for>
+            <button onClick="{{ togglePicker }}" style="font:400 12px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;background:transparent;border:1px dashed #cdc6b6;border-radius:9px;padding:10px;cursor:pointer;text-align:left;padding-left:13px" style-hover="background:#fff;color:#2f5d45;border-color:#a9c3b4">{{ pickerLabel }}</button>
+            <sc-if value="{{ picker }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:6px;animation:rise .18s ease both">
+                <sc-for list="{{ targets }}" as="t" hint-placeholder-count="3">
+                  <button onClick="{{ t.add }}" style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;background:#fff;border:1px solid #d8d2c4;border-radius:20px;padding:7px 11px;cursor:pointer" style-hover="border-color:#2f5d45;color:#2f5d45">{{ t.name }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:7px;padding-bottom:10px">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">遷移元</span>
+              <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#7a7466">{{ inCount }}</span>
+            </div>
+            <sc-for list="{{ ins }}" as="i" hint-placeholder-count="1">
+              <div onClick="{{ i.onSelect }}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e3ded2;border-radius:9px;background:#fff;cursor:pointer" style-hover="background:#f4f1e9">
+                <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#7a7466;flex:none">←</span>
+                <span style="flex:1;min-width:0;font:400 12px/1.4 'Zen Kaku Gothic New',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ i.name }}</span>
+                <span style="font:400 10.5px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;flex:none">{{ i.label }}</span>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noIns }}" hint-placeholder-val="{{ false }}">
+              <span style="font:400 11.5px/1.6 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">なし（起点の画面として扱います）</span>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="position:sticky;bottom:0;border-top:1px solid #e3ded2;background:#fff;padding:12px 18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <sc-if value="{{ sn.canConfirm }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ sn.confirm }}" style="font:500 13px/1 'Zen Kaku Gothic New',sans-serif;color:#fff;background:#2f5d45;border:none;border-radius:8px;padding:11px 16px;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(27,26,23,.14)" style-hover="background:#254a37">この画面を確定</button>
+          </sc-if>
+          <sc-if value="{{ sn.isConfirmed }}" hint-placeholder-val="{{ false }}">
+            <span style="font:500 13px/1 'Zen Kaku Gothic New',sans-serif;color:#2f5d45;background:#eaf1ec;border:1px solid #cfd9d2;border-radius:8px;padding:11px 15px;white-space:nowrap">✓ 確定済</span>
+          </sc-if>
+          <button onClick="{{ sn.remove }}" style="margin-left:auto;font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#8f3a22;background:#fff;border:1px solid #efcbc0;border-radius:8px;padding:10px 12px;cursor:pointer;white-space:nowrap" style-hover="background:#fbeae5">画面を削除</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ modeEdge }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px;display:flex;flex-direction:column;gap:15px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;border:1px solid #1b1a17;border-radius:20px;padding:5px 11px">遷移</span>
+          <sc-if value="{{ se.ai }}" hint-placeholder-val="{{ false }}">
+            <span style="font:500 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;border:1px dashed #cdc6b6;border-radius:20px;padding:5px 11px">AI提案</span>
+          </sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button onClick="{{ se.goFrom }}" style="text-align:left;font:500 13px/1.5 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;background:#fff;border:1px solid #e3ded2;border-radius:9px;padding:10px 12px;cursor:pointer" style-hover="background:#f4f1e9">{{ se.from }}</button>
+          <span style="font:400 12px/1 'IBM Plex Mono',monospace;color:#7a7466;padding-left:14px">↓</span>
+          <button onClick="{{ se.goTo }}" style="text-align:left;font:500 13px/1.5 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;background:#fff;border:1px solid #e3ded2;border-radius:9px;padding:10px 12px;cursor:pointer" style-hover="background:#f4f1e9">{{ se.to }}</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6f6a5e">遷移のきっかけ（操作）</span>
+          <div style="font:500 13.5px/1.5 'Zen Kaku Gothic New',sans-serif;padding:10px 12px;border:1px solid #d8d2c4;border-radius:9px;background:#fff;cursor:text" style-hover="border-color:#b3ac9c">{{ se.label }}</div>
+          <span style="font:400 11px/1.6 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;text-wrap:pretty">例：「行を選択」「保存」「キャンセル」。条件分岐は持たず、1画面から複数の遷移を並列に定義します。</span>
+        </div>
+        <sc-if value="{{ se.ai }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:8px;padding:11px 12px;border:1px dashed #cdc6b6;border-radius:10px;background:#fff;flex-wrap:wrap;align-items:center">
+            <span style="flex:1;min-width:140px;font:400 11.5px/1.6 'Zen Kaku Gothic New',sans-serif;color:#3c382f;text-wrap:pretty">根拠：{{ se.why }}</span>
+            <button onClick="{{ se.adopt }}" style="font:500 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#fff;background:#2f5d45;border:none;border-radius:7px;padding:8px 12px;cursor:pointer;white-space:nowrap">採用</button>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <sc-if value="{{ se.canReverse }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ se.reverse }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:8px;padding:10px 12px;cursor:pointer;white-space:nowrap" style-hover="background:#f4f1e9">戻りの遷移を追加</button>
+          </sc-if>
+          <button onClick="{{ se.remove }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;color:#8f3a22;background:#fff;border:1px solid #efcbc0;border-radius:8px;padding:10px 12px;cursor:pointer;white-space:nowrap" style-hover="background:#fbeae5">遷移を削除</button>
+        </div>
+      </div>
+    </sc-if>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1360,&quot;height&quot;:860}}">
+const W = 176, H = 72;
+const FUNCS = [
+  { code: 'F-03', name: '商談一覧の検索・絞り込み' },
+  { code: 'F-04', name: '商談詳細の参照' },
+  { code: 'F-05', name: '商談情報の編集' },
+  { code: 'F-07', name: '見積書の作成' },
+  { code: 'F-08', name: '経営指標の可視化' },
+  { code: 'F-09', name: '見積の承認依頼' }
+];
+
+class Component extends DCLogic {
+  canvasRef = React.createRef();
+  state = {
+    nodes: [
+      { id: 'n1', code: 'S-01', name: '商談一覧画面', f: 'F-03', st: 'confirmed', x: 40, y: 90 },
+      { id: 'n2', code: 'S-02', name: '商談詳細画面', f: 'F-04', st: 'review', x: 300, y: 90 },
+      { id: 'n3', code: 'S-03', name: '見積作成画面（入力フォーム）', f: null, st: 'review', x: 580, y: 30 },
+      { id: 'n4', code: 'S-04', name: '商談編集画面', f: 'F-05', st: 'draft', x: 580, y: 170 },
+      { id: 'n5', code: 'S-05', name: '経営ダッシュボード画面', f: 'F-08', st: 'draft', x: 40, y: 340 }
+    ],
+    edges: [
+      { id: 'e1', from: 'n1', to: 'n2', label: '行を選択' },
+      { id: 'e2', from: 'n2', to: 'n3', label: '見積作成' },
+      { id: 'e3', from: 'n2', to: 'n4', label: '編集' },
+      { id: 'e4', from: 'n4', to: 'n2', label: '保存' }
+    ],
+    sel: { type: 'node', id: 'n2' },
+    scale: 1,
+    picker: false,
+    conn: null,
+    seq: 10,
+    aiRound: 0
+  };
+
+  componentWillUnmount() { this.unbind && this.unbind(); }
+
+  node(id) { return this.state.nodes.find(n => n.id === id); }
+
+  toCanvas(e) {
+    const el = this.canvasRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / this.state.scale, y: (e.clientY - r.top) / this.state.scale };
+  }
+
+  bind(move, up) {
+    const m = ev => move(ev);
+    const u = ev => { up(ev); window.removeEventListener('mousemove', m); window.removeEventListener('mouseup', u); this.unbind = null; };
+    window.addEventListener('mousemove', m);
+    window.addEventListener('mouseup', u);
+    this.unbind = () => { window.removeEventListener('mousemove', m); window.removeEventListener('mouseup', u); };
+  }
+
+  startDrag(id, e) {
+    e.stopPropagation();
+    const n = this.node(id);
+    const sx = e.clientX, sy = e.clientY, nx = n.x, ny = n.y;
+    let moved = false;
+    this.bind(ev => {
+      const dx = (ev.clientX - sx) / this.state.scale, dy = (ev.clientY - sy) / this.state.scale;
+      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+      if (!moved) return;
+      this.setState(p => ({ nodes: p.nodes.map(x => x.id === id ? { ...x, x: Math.max(0, Math.min(1080 - W, nx + dx)), y: Math.max(0, Math.min(660 - H, ny + dy)) } : x) }));
+    }, () => {
+      this.setState({ sel: { type: 'node', id }, picker: false });
+    });
+  }
+
+  startConnect(id, e) {
+    e.stopPropagation();
+    const p0 = this.toCanvas(e);
+    this.setState({ conn: { from: id, x: p0.x, y: p0.y } });
+    this.bind(ev => {
+      const p = this.toCanvas(ev);
+      this.setState(s => ({ conn: s.conn ? { ...s.conn, x: p.x, y: p.y } : null }));
+    }, ev => {
+      const p = this.toCanvas(ev);
+      const hit = this.state.nodes.find(n => p.x >= n.x && p.x <= n.x + W && p.y >= n.y && p.y <= n.y + H);
+      if (hit && hit.id !== id) this.addEdge(id, hit.id);
+      this.setState({ conn: null });
+    });
+  }
+
+  addEdge(from, to, label, ai, why) {
+    this.setState(p => {
+      if (p.edges.some(e => e.from === from && e.to === to)) return {};
+      const seq = p.seq + 1;
+      const id = 'e' + seq;
+      return { seq, edges: p.edges.concat([{ id, from, to, label: label || '（操作名を入力）', ai: !!ai, why }]), sel: ai ? p.sel : { type: 'edge', id }, picker: false };
+    });
+  }
+
+  geom(e) {
+    const a = this.node(e.from), b = this.node(e.to);
+    let sx, sy, tx, ty, c1x, c1y, c2x, c2y;
+    const paired = this.state.edges.some(x => x.from === e.to && x.to === e.from);
+    if (b.x >= a.x + W - 10) {
+      const off = paired ? -14 : 0;
+      sx = a.x + W; sy = a.y + H / 2 + off; tx = b.x; ty = b.y + H / 2 + off;
+      const dx = Math.max(40, (tx - sx) / 2);
+      c1x = sx + dx; c1y = sy; c2x = tx - dx; c2y = ty;
+    } else if (b.x + W <= a.x + 10) {
+      sx = a.x; sy = a.y + H / 2 + 14; tx = b.x + W; ty = b.y + H / 2 + 14;
+      const dx = Math.max(40, (sx - tx) / 2);
+      c1x = sx - dx; c1y = sy; c2x = tx + dx; c2y = ty;
+    } else {
+      const down = b.y > a.y;
+      sx = a.x + W / 2 + 18; sy = down ? a.y + H : a.y; tx = b.x + W / 2 + 18; ty = down ? b.y : b.y + H;
+      const dy = Math.max(30, Math.abs(ty - sy) / 2) * (down ? 1 : -1);
+      c1x = sx; c1y = sy + dy; c2x = tx; c2y = ty - dy;
+    }
+    const lx = (sx + 3 * c1x + 3 * c2x + tx) / 8, ly = (sy + 3 * c1y + 3 * c2y + ty) / 8;
+    const ang = Math.atan2(ty - c2y, tx - c2x);
+    const L = 9, Wd = 4.5;
+    const bx = tx - L * Math.cos(ang), by = ty - L * Math.sin(ang);
+    const px = -Math.sin(ang) * Wd, py = Math.cos(ang) * Wd;
+    return {
+      d: 'M' + sx + ',' + sy + ' C' + c1x + ',' + c1y + ' ' + c2x + ',' + c2y + ' ' + bx + ',' + by,
+      arrow: 'M' + tx + ',' + ty + ' L' + (bx + px) + ',' + (by + py) + ' L' + (bx - px) + ',' + (by - py) + ' Z',
+      lx, ly
+    };
+  }
+
+  autoLayout() {
+    const s = this.state;
+    const inc = {};
+    s.nodes.forEach(n => inc[n.id] = 0);
+    s.edges.forEach(e => inc[e.to]++);
+    const layer = {};
+    const roots = s.nodes.filter(n => !inc[n.id]);
+    const q = (roots.length ? roots : [s.nodes[0]]).map(n => n.id);
+    q.forEach(id => layer[id] = 0);
+    while (q.length) {
+      const id = q.shift();
+      s.edges.filter(e => e.from === id).forEach(e => {
+        if (layer[e.to] === undefined) { layer[e.to] = layer[id] + 1; q.push(e.to); }
+      });
+    }
+    const max = Math.max.apply(null, Object.values(layer).concat([0]));
+    s.nodes.forEach(n => { if (layer[n.id] === undefined) layer[n.id] = 0; });
+    const rows = {};
+    const nodes = s.nodes.map(n => {
+      const L = layer[n.id];
+      rows[L] = (rows[L] || 0) + 1;
+      return { ...n, x: 40 + L * 270, y: 30 + (rows[L] - 1) * 120 };
+    });
+    this.setState({ nodes });
+  }
+
+  aiSuggest() {
+    this.setState(p => {
+      const seq = p.seq + 1;
+      const nid = 'n' + seq;
+      const nodes = p.nodes.concat([{ id: nid, code: 'S-0' + (p.nodes.length + 1), name: '削除確認ダイアログ', f: null, st: 'draft', x: 580, y: 300, ai: true, why: '商談詳細から削除を実行する操作が9章 F-04 に記載されているため' }]);
+      const edges = p.edges.slice();
+      let s2 = seq;
+      const add = (from, to, label, why) => {
+        if (edges.some(e => e.from === from && e.to === to)) return;
+        edges.push({ id: 'e' + (++s2), from, to, label, ai: true, why });
+      };
+      add('n2', nid, '削除', '詳細画面に削除操作があるため');
+      add('n3', 'n2', '戻る', '入力フォームから元の画面へ戻る遷移が未定義のため');
+      add('n5', 'n1', '商談一覧へ', '経営ダッシュボードへの遷移元・遷移先がなく孤立しているため');
+      return { nodes, edges, seq: s2 + 1 };
+    });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const sel = s.sel;
+    const selNode = sel && sel.type === 'node' ? this.node(sel.id) : null;
+    const selEdge = sel && sel.type === 'edge' ? s.edges.find(e => e.id === sel.id) : null;
+    const hotIds = selNode ? [selNode.id] : selEdge ? [selEdge.from, selEdge.to] : [];
+
+    const degIn = id => s.edges.filter(e => e.to === id && !e.ai).length;
+    const degOut = id => s.edges.filter(e => e.from === id && !e.ai).length;
+    const stInfo = st => st === 'confirmed' ? { l: '✓ 確定済', fg: '#2f5d45', bg: '#eaf1ec', bd: '#cfd9d2', dot: '#2f5d45' }
+      : st === 'review' ? { l: '要レビュー', fg: '#8a5a18', bg: '#fbf1de', bd: '#ebd7b0', dot: '#d9a341' }
+        : { l: '下書き', fg: '#6f6a5e', bg: '#fff', bd: '#e3ded2', dot: '#cdc6b6' };
+    const fOf = code => FUNCS.find(f => f.code === code);
+
+    const warnings = [];
+    s.nodes.filter(n => !n.ai).forEach(n => {
+      const r = [];
+      if (!n.f) r.push('9章の画面に未紐付け');
+      if (!degIn(n.id) && !degOut(n.id)) r.push('遷移がない（孤立）');
+      if (r.length) warnings.push({ name: n.name, reason: r.join('・'), onSelect: () => this.setState({ sel: { type: 'node', id: n.id } }) });
+    });
+
+    const nodes = s.nodes.map(n => {
+      const isSel = selNode && selNode.id === n.id;
+      const st = stInfo(n.st);
+      const iso = !n.ai && !degIn(n.id) && !degOut(n.id);
+      const f = fOf(n.f);
+      return {
+        id: n.id, code: n.code, name: n.name, x: n.x + 'px', y: n.y + 'px',
+        dot: n.ai ? '#cdc6b6' : st.dot,
+        tag: n.ai ? 'AI提案' : iso ? '⚠ 孤立' : '',
+        tagFg: n.ai ? '#6f6a5e' : '#8f3a22',
+        link: f ? '9章 ' + f.code + '：' + f.name : '9章 未紐付け',
+        linkFg: f ? '#2f5d45' : '#8a5a18',
+        bg: n.ai ? '#fdfcf8' : '#fff',
+        border: n.ai ? '1.5px dashed #b3ac9c' : isSel ? '2px solid #1b1a17' : '1px solid #d8d2c4',
+        shadow: isSel ? '0 6px 18px rgba(27,26,23,.14)' : '0 1px 2px rgba(27,26,23,.06)',
+        onDown: e => this.startDrag(n.id, e),
+        onPortDown: e => this.startConnect(n.id, e)
+      };
+    });
+
+    const edges = s.edges.map(e => {
+      const g = this.geom(e);
+      const isSelE = selEdge && selEdge.id === e.id;
+      const hot = isSelE || (selNode && (e.from === selNode.id || e.to === selNode.id));
+      const color = isSelE ? '#1b1a17' : hot ? '#2f5d45' : e.ai ? '#b3ac9c' : '#a8a18f';
+      return {
+        d: g.d, arrow: g.arrow, lx: g.lx + 'px', ly: g.ly + 'px', label: e.label,
+        color, w: hot ? 2 : 1.5, dash: e.ai ? '5 4' : 'none',
+        labelFg: hot ? '#fff' : '#3c382f',
+        labelBg: hot ? color : '#fff',
+        labelBd: hot ? color : e.ai ? '#b3ac9c' : '#d8d2c4',
+        labelBorderStyle: e.ai ? 'dashed' : 'solid',
+        onSelect: ev => { ev.stopPropagation(); this.setState({ sel: { type: 'edge', id: e.id }, picker: false }); }
+      };
+    });
+
+    let tempD = '';
+    if (s.conn) {
+      const a = this.node(s.conn.from);
+      const sx = a.x + W, sy = a.y + H / 2;
+      tempD = 'M' + sx + ',' + sy + ' L' + s.conn.x + ',' + s.conn.y;
+    }
+
+    const usedF = s.nodes.map(n => n.f).filter(Boolean);
+    const aiCount = s.nodes.filter(n => n.ai).length + s.edges.filter(e => e.ai).length;
+
+    const base = {
+      canvasRef: this.canvasRef,
+      scaleCss: 'scale(' + s.scale + ')',
+      stageW: Math.round(1080 * s.scale) + 'px',
+      stageH: Math.round(660 * s.scale) + 'px',
+      zoomLabel: Math.round(s.scale * 100) + '%',
+      zoomIn: () => this.setState(p => ({ scale: Math.min(1.6, +(p.scale + 0.1).toFixed(2)) })),
+      zoomOut: () => this.setState(p => ({ scale: Math.max(0.5, +(p.scale - 0.1).toFixed(2)) })),
+      zoomReset: () => this.setState({ scale: 1 }),
+      nodes, edges, connecting: !!s.conn, tempD,
+      nodeCount: s.nodes.filter(n => !n.ai).length,
+      edgeCount: s.edges.filter(e => !e.ai).length,
+      confirmedCount: s.nodes.filter(n => n.st === 'confirmed' && !n.ai).length,
+      warnCount: warnings.length, hasWarn: warnings.length > 0, warnings, noWarn: warnings.length === 0,
+      aiCount, hasAi: aiCount > 0,
+      generate: () => this.aiSuggest(),
+      adoptAllAi: () => this.setState(p => ({ nodes: p.nodes.map(n => ({ ...n, ai: false })), edges: p.edges.map(e => ({ ...e, ai: false })) })),
+      rejectAllAi: () => this.setState(p => {
+        const gone = p.nodes.filter(n => n.ai).map(n => n.id);
+        const keepSel = p.sel && !(p.sel.type === 'node' && gone.includes(p.sel.id)) && !(p.sel.type === 'edge' && (p.edges.find(e => e.id === p.sel.id) || {}).ai);
+        return { nodes: p.nodes.filter(n => !n.ai), edges: p.edges.filter(e => !e.ai && !gone.includes(e.from) && !gone.includes(e.to)), sel: keepSel ? p.sel : null };
+      }),
+      autoLayout: () => this.autoLayout(),
+      addNode: () => this.setState(p => {
+        const seq = p.seq + 1;
+        const id = 'n' + seq;
+        const y = Math.min(660 - H, Math.max.apply(null, p.nodes.map(n => n.y)) + 110);
+        return { seq, nodes: p.nodes.concat([{ id, code: 'S-' + String(p.nodes.length + 1).padStart(2, '0'), name: '（画面名を入力）', f: null, st: 'draft', x: 320, y }]), sel: { type: 'node', id } };
+      }),
+      clearSel: () => this.setState({ sel: null, picker: false }),
+      modeNone: !selNode && !selEdge, modeNode: !!selNode, modeEdge: !!selEdge,
+      unplaced: FUNCS.filter(f => !usedF.includes(f.code)).map(f => ({
+        code: f.code, name: f.name,
+        add: () => this.setState(p => {
+          const seq = p.seq + 1;
+          const id = 'n' + seq;
+          const y = Math.min(660 - H, Math.max.apply(null, p.nodes.map(n => n.y)) + 110);
+          return { seq, nodes: p.nodes.concat([{ id, code: 'S-' + String(p.nodes.length + 1).padStart(2, '0'), name: f.name.replace(/の.*$/, '') + '画面', f: f.code, st: 'draft', x: 320, y }]), sel: { type: 'node', id } };
+        })
+      }))
+    };
+
+    if (selNode) {
+      const st = stInfo(selNode.st);
+      const f = fOf(selNode.f);
+      const outs = s.edges.filter(e => e.from === selNode.id);
+      const ins = s.edges.filter(e => e.to === selNode.id);
+      const outTo = outs.map(e => e.to);
+      Object.assign(base, {
+        sn: {
+          code: selNode.code, name: selNode.name, ai: !!selNode.ai, why: selNode.why || '',
+          stLabel: st.l, stFg: st.fg, stBg: st.bg, stBd: st.bd,
+          linked: !!f, unlinked: !f, fCode: f ? f.code : '', fName: f ? f.name : '',
+          unlink: () => this.setState(p => ({ nodes: p.nodes.map(n => n.id === selNode.id ? { ...n, f: null } : n) })),
+          adopt: () => this.setState(p => ({ nodes: p.nodes.map(n => n.id === selNode.id ? { ...n, ai: false } : n) })),
+          reject: () => this.setState(p => ({ nodes: p.nodes.filter(n => n.id !== selNode.id), edges: p.edges.filter(e => e.from !== selNode.id && e.to !== selNode.id), sel: null })),
+          canConfirm: selNode.st !== 'confirmed' && !selNode.ai, isConfirmed: selNode.st === 'confirmed',
+          confirm: () => this.setState(p => ({ nodes: p.nodes.map(n => n.id === selNode.id ? { ...n, st: 'confirmed' } : n) })),
+          remove: () => this.setState(p => ({ nodes: p.nodes.filter(n => n.id !== selNode.id), edges: p.edges.filter(e => e.from !== selNode.id && e.to !== selNode.id), sel: null }))
+        },
+        linkCands: FUNCS.filter(x => !usedF.includes(x.code)).map(x => ({
+          code: x.code, name: x.name,
+          link: () => this.setState(p => ({ nodes: p.nodes.map(n => n.id === selNode.id ? { ...n, f: x.code } : n) }))
+        })),
+        outCount: outs.length,
+        outs: outs.map(e => ({
+          name: (this.node(e.to) || {}).name, label: e.label, ai: !!e.ai,
+          bs: e.ai ? 'dashed' : 'solid', bd: e.ai ? '#b3ac9c' : '#e3ded2',
+          onSelect: () => this.setState({ sel: { type: 'edge', id: e.id } }),
+          adopt: () => this.setState(p => ({ edges: p.edges.map(x => x.id === e.id ? { ...x, ai: false } : x) })),
+          remove: () => this.setState(p => ({ edges: p.edges.filter(x => x.id !== e.id) }))
+        })),
+        inCount: ins.length, noIns: ins.length === 0,
+        ins: ins.map(e => ({ name: (this.node(e.from) || {}).name, label: e.label, onSelect: () => this.setState({ sel: { type: 'node', id: e.from } }) })),
+        picker: s.picker,
+        pickerLabel: s.picker ? '閉じる' : '＋ 遷移先を追加（画面を選ぶ）',
+        togglePicker: () => this.setState(p => ({ picker: !p.picker })),
+        targets: s.nodes.filter(n => n.id !== selNode.id && !outTo.includes(n.id) && !n.ai).map(n => ({ name: n.name, add: () => this.addEdge(selNode.id, n.id) }))
+      });
+    } else {
+      Object.assign(base, { sn: {}, linkCands: [], outs: [], ins: [], targets: [], outCount: 0, inCount: 0, noIns: false, picker: false, pickerLabel: '', togglePicker: () => {} });
+    }
+
+    if (selEdge) {
+      const rev = s.edges.some(e => e.from === selEdge.to && e.to === selEdge.from);
+      base.se = {
+        from: (this.node(selEdge.from) || {}).name, to: (this.node(selEdge.to) || {}).name,
+        label: selEdge.label, ai: !!selEdge.ai, why: selEdge.why || '',
+        goFrom: () => this.setState({ sel: { type: 'node', id: selEdge.from } }),
+        goTo: () => this.setState({ sel: { type: 'node', id: selEdge.to } }),
+        adopt: () => this.setState(p => ({ edges: p.edges.map(x => x.id === selEdge.id ? { ...x, ai: false } : x) })),
+        canReverse: !rev,
+        reverse: () => this.addEdge(selEdge.to, selEdge.from, '戻る'),
+        remove: () => this.setState(p => ({ edges: p.edges.filter(x => x.id !== selEdge.id), sel: null }))
+      };
+    } else base.se = {};
+
+    return base;
+  }
+}
+</script>
+</body>
+</html>

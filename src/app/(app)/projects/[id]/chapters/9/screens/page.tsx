@@ -2,12 +2,13 @@ import Link from "next/link";
 import { listRequirementItems } from "@/actions/requirement-items";
 import { ScreenWireframe } from "@/components/domain/screen-wireframe/ScreenWireframe";
 import { DownloadButton } from "@/components/ui/download-button";
+import { hasScreenInfo } from "@/lib/screen-flow/derive";
 
 export default async function ScreenPreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const items = await listRequirementItems(id, 9);
 
-  const screenItems = items.filter((item) => (item.content.screen_fields ?? "").trim() !== "");
+  const screenItems = items.filter((item) => hasScreenInfo(item.content));
 
   return (
     <div className="max-w-3xl mx-auto mt-10">

@@ -1,4 +1,5 @@
 import { createServerActionClient } from "@/lib/supabase/server";
+import { hasScreenInfo } from "@/lib/screen-flow/derive";
 
 type ItemRow = { content: Record<string, string> };
 
@@ -15,7 +16,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .order("order_index");
   const items = (itemsData as unknown as ItemRow[] | null) ?? [];
 
-  const screenItems = items.filter((i) => (i.content.screen_fields ?? "").trim() !== "");
+  const screenItems = items.filter((i) => hasScreenInfo(i.content));
 
   const XLSX = await import("xlsx");
   const rows = screenItems.map((i) => ({
