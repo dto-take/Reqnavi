@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   addScreenNode,
+  confirmScreenNode,
   addScreenTransition,
   linkScreenFunction,
   removeScreenNode,
@@ -18,12 +19,13 @@ import type { FlowSelection } from "@/components/domain/screen-flow/ScreenFlowCa
 import { unplacedFunctions, type FlowWarning, type FunctionItem } from "@/lib/screen-flow/derive";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { isItemLocked } from "@/lib/item-lock";
 import { errorMessage } from "@/lib/error-message";
 
 const STATUS_PILL: Record<ScreenNode["status"], { label: string; fg: string; bg: string; border: string }> = {
   confirmed: { label: "✓ 確定済", fg: "var(--status-confirmed-text)", bg: "var(--status-confirmed-bg)", border: "var(--status-confirmed-text)" },
   se_reviewing: { label: "要レビュー", fg: "var(--status-review-text)", bg: "var(--status-review-bg)", border: "var(--status-review-text)" },
-  ai_draft: { label: "AI下書き", fg: "var(--text-secondary)", bg: "var(--bg-page)", border: "var(--border)" },
+  ai_draft: { label: "下書き", fg: "var(--text-secondary)", bg: "var(--bg-page)", border: "var(--border)" },
 };
 
 const SECTION_LABEL = "font-mono text-[10.5px] font-semibold tracking-wider text-faint uppercase";
@@ -36,6 +38,7 @@ export function ScreenFlowPanel({
   functions,
   warnings,
   selection,
+  focusEdgeId,
   onSelect,
 }: {
   projectId: string;
@@ -44,6 +47,7 @@ export function ScreenFlowPanel({
   functions: FunctionItem[];
   warnings: FlowWarning[];
   selection: FlowSelection;
+  focusEdgeId: string | null;
   onSelect: (selection: FlowSelection) => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -68,7 +72,7 @@ export function ScreenFlowPanel({
       {node ? (
         <NodeMode key={node.id} node={node} nodes={nodes} edges={edges} functions={functions} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
       ) : edge ? (
-        <EdgeMode key={edge.id} edge={edge} edges={edges} nodeById={nodeById} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
+        <EdgeMode key={edge.id} autoEdit={focusEdgeId === edge.id} edge={edge} edges={edges} nodeById={nodeById} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
       ) : (
         <OverviewMode nodes={nodes} functions={functions} warnings={warnings} projectId={projectId} onSelect={onSelect} run={run} isPending={isPending} />
       )}
@@ -179,6 +183,8 @@ function NodeMode({
   const [editingName, setEditingName] = useState(false);
   const [addingTarget, setAddingTarget] = useState(false);
   const pill = STATUS_PILL[node.status];
+  // 確定済み（isItemLocked）のノードは画面名・9章紐付け・遷移先（このノードを遷移元とする遷移）を編集できない
+  const locked = isItemLocked(node.status);
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const functionById = new Map(functions.map((f) => [f.id, f]));
   const linked = node.function_item_id ? functionById.get(node.function_item_id) ?? null : null;
@@ -203,7 +209,7 @@ function NodeMode({
 
       <div className="flex flex-col gap-1.5">
         <span className={SECTION_LABEL}>画面名</span>
-        {editingName ? (
+        {editingName && !locked ? (
           <Input
             autoFocus
             defaultValue={node.label}
@@ -220,8 +226,8 @@ function NodeMode({
         ) : (
           <div
             data-screen-name
-            onClick={() => setEditingName(true)}
-            className="cursor-text rounded-md border px-3 py-2 text-[14px] font-bold text-primary"
+            onClick={() => !locked && setEditingName(true)}
+            className={`${locked ? "" : "cursor-text "}rounded-md border px-3 py-2 text-[14px] font-bold text-primary`}
             style={{ borderColor: "var(--border)", background: "var(--bg-page)" }}
           >
             {node.label}
@@ -247,14 +253,16 @@ function NodeMode({
               <Link href={`/projects/${projectId}/chapters/9/screens`} className="underline text-secondary hover:text-primary">
                 画面イメージを開く
               </Link>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => run(() => linkScreenFunction(node.id, projectId, null))}
-                className="underline text-secondary hover:text-primary cursor-pointer disabled:opacity-50"
-              >
-                紐付けを外す
-              </button>
+              {!locked && (
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => run(() => linkScreenFunction(node.id, projectId, null))}
+                  className="underline text-secondary hover:text-primary cursor-pointer disabled:opacity-50"
+                >
+                  紐付けを外す
+                </button>
+              )}
             </div>
           </>
         ) : (
@@ -265,7 +273,7 @@ function NodeMode({
             <p className="text-[11.5px]" style={{ color: "var(--status-review-text)" }}>
               この画面は9章の画面情報に紐付いていません。{node.function_item_id ? "（紐付け先の項目は画面情報を持っていません）" : "下の候補から選んで紐付けてください。"}
             </p>
-            {candidates.length === 0 ? (
+            {locked ? null : candidates.length === 0 ? (
               <p className="text-[11px] text-secondary">紐付けられる未使用の9章画面はありません。</p>
             ) : (
               <div className="flex flex-col gap-1">
@@ -306,15 +314,15 @@ function NodeMode({
             <button
               type="button"
               aria-label="遷移を削除"
-              disabled={isPending}
+              disabled={isPending || locked}
               onClick={() => run(() => removeScreenTransition(e.id, projectId))}
-              className="text-faint hover:text-primary cursor-pointer px-1 disabled:opacity-50"
+              className={`text-faint hover:text-primary cursor-pointer px-1 disabled:opacity-50${locked ? " hidden" : ""}`}
             >
               ×
             </button>
           </div>
         ))}
-        {addingTarget ? (
+        {locked ? null : addingTarget ? (
           <div className="flex flex-wrap gap-1.5">
             {addableTargets.length === 0 ? (
               <span className="text-[11px] text-faint">追加できる画面がありません。</span>
@@ -372,19 +380,42 @@ function NodeMode({
         )}
       </div>
 
-      <div className="mt-2 pt-4 border-t border-border">
+      {locked && <p className="text-[11px] text-faint">確定済みのため編集できません。</p>}
+
+      {/* アクションバー（sticky bottom）：未確定なら「この画面を確定」、確定済みなら静的表示。画面を削除は常に表示 */}
+      <div className="sticky bottom-0 -mx-4 -mb-4 px-4 py-3 border-t border-border flex items-center gap-2" style={{ background: "var(--bg-sidebar)" }}>
+        {locked ? (
+          <span
+            className="text-[12px] font-medium px-3 py-2 rounded-md whitespace-nowrap"
+            style={{ background: "var(--status-confirmed-bg)", color: "var(--status-confirmed-text)", border: "1px solid var(--status-confirmed-text)" }}
+          >
+            ✓ 確定済
+          </span>
+        ) : (
+          <button
+            type="button"
+            data-confirm-node
+            disabled={isPending}
+            onClick={() => run(() => confirmScreenNode(node.id, projectId))}
+            className="text-[12px] font-medium px-3 py-2 rounded-md text-white cursor-pointer whitespace-nowrap disabled:opacity-50"
+            style={{ background: "var(--brand)" }}
+          >
+            この画面を確定
+          </button>
+        )}
         <button
           type="button"
           disabled={isPending}
           onClick={() => {
             const n = outgoing.length + incoming.length;
-            if (!confirm(`「${node.label}」を削除しますか？接続する遷移（${n}件）も一緒に削除されます。`)) return;
+            const head = locked ? "確定済みの画面です。" : "";
+            if (!confirm(`${head}「${node.label}」を削除しますか？接続する遷移（${n}件）も一緒に削除されます。`)) return;
             run(async () => {
               await removeScreenNode(node.id, projectId);
               onSelect(null);
             });
           }}
-          className="text-[12px] font-medium px-3 py-2 rounded-md border cursor-pointer hover:bg-hover disabled:opacity-50"
+          className="ml-auto text-[12px] font-medium px-3 py-2 rounded-md border cursor-pointer hover:bg-hover disabled:opacity-50"
           style={{ borderColor: "var(--status-needhearing-text)", color: "var(--status-needhearing-text)" }}
         >
           画面を削除
@@ -395,6 +426,7 @@ function NodeMode({
 }
 
 function EdgeMode({
+  autoEdit,
   edge,
   edges,
   nodeById,
@@ -403,6 +435,7 @@ function EdgeMode({
   run,
   isPending,
 }: {
+  autoEdit: boolean;
   edge: ScreenEdge;
   edges: ScreenEdge[];
   nodeById: Map<string, ScreenNode>;
@@ -411,8 +444,11 @@ function EdgeMode({
   run: RunFn;
   isPending: boolean;
 }) {
-  const [editingLabel, setEditingLabel] = useState(false);
+  // ポートからの作成直後は、操作名入力にフォーカスを当てる（autoEdit）
+  const [editingLabel, setEditingLabel] = useState(autoEdit);
   const from = nodeById.get(edge.from_node);
+  // 遷移の編集可否は遷移元ノードのロック状態で決める（遷移先ではない）
+  const locked = from ? isItemLocked(from.status) : false;
   const to = nodeById.get(edge.to_node);
   const hasReverse = edges.some((e) => e.from_node === edge.to_node && e.to_node === edge.from_node);
 
@@ -439,7 +475,7 @@ function EdgeMode({
 
       <div className="flex flex-col gap-1.5">
         <span className={SECTION_LABEL}>遷移のきっかけ（操作名）</span>
-        {editingLabel ? (
+        {editingLabel && !locked ? (
           <Input
             key={`${edge.id}-${edge.label ?? ""}`}
             autoFocus
@@ -457,15 +493,18 @@ function EdgeMode({
         ) : (
           <div
             data-edge-label-field
-            onClick={() => setEditingLabel(true)}
-            className="cursor-text rounded-md border px-3 py-2 text-[13px]"
+            onClick={() => !locked && setEditingLabel(true)}
+            className={`${locked ? "" : "cursor-text "}rounded-md border px-3 py-2 text-[13px]`}
             style={{ borderColor: "var(--border)", background: "var(--bg-page)" }}
           >
-            {edge.label || <span className="text-faint">（クリックして操作名を入力）</span>}
+            {edge.label || <span className="text-faint">{locked ? "（操作名なし）" : "（クリックして操作名を入力）"}</span>}
           </div>
         )}
       </div>
 
+      {locked && <p className="text-[11px] text-faint">遷移元の画面が確定済みのため編集できません。</p>}
+
+      {!locked && (
       <div className="mt-2 pt-4 border-t border-border flex items-center gap-2 flex-wrap">
         {!hasReverse && (
           <button
@@ -497,6 +536,7 @@ function EdgeMode({
           遷移を削除
         </button>
       </div>
+      )}
     </>
   );
 }

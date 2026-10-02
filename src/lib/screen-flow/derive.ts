@@ -22,10 +22,29 @@ export function gridPosition(index: number): { x: number; y: number } {
   };
 }
 
-export function clampPosition(x: number, y: number): { x: number; y: number } {
+// ステージの論理サイズ：既定値と「全ノードの外接矩形＋余白」の大きい方（描画ごとに算出）。
+// 自動整列は層ごとに270pxずつ右へ進むため、固定サイズだと5層以上ではみ出して潰れる。
+const STAGE_MARGIN_X = 40;
+const STAGE_MARGIN_Y = 30;
+export type StageSize = { w: number; h: number };
+export const DEFAULT_STAGE: StageSize = { w: STAGE_W, h: STAGE_H };
+
+export function stageSizeFor(positions: { x: number; y: number }[]): StageSize {
+  let w = STAGE_W;
+  let h = STAGE_H;
+  for (const p of positions) {
+    w = Math.max(w, p.x + NODE_W + STAGE_MARGIN_X);
+    h = Math.max(h, p.y + NODE_H + STAGE_MARGIN_Y);
+  }
+  return { w, h };
+}
+
+// ドラッグ中のクランプは、ドラッグ開始時点のステージサイズを渡す（ドラッグでステージが
+// 際限なく広がらないようにする）。
+export function clampPosition(x: number, y: number, stage: StageSize = DEFAULT_STAGE): { x: number; y: number } {
   return {
-    x: Math.min(Math.max(0, x), STAGE_W - NODE_W),
-    y: Math.min(Math.max(0, y), STAGE_H - NODE_H),
+    x: Math.min(Math.max(0, x), stage.w - NODE_W),
+    y: Math.min(Math.max(0, y), stage.h - NODE_H),
   };
 }
 

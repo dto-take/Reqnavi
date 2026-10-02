@@ -3,7 +3,8 @@
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
-import { gridPosition, clampPosition } from "@/lib/screen-flow/derive";
+import { gridPosition } from "@/lib/screen-flow/derive";
+import { isItemLocked } from "@/lib/item-lock";
 import { revalidatePath } from "next/cache";
 
 // screen_flow_ux_phase1.md：画面遷移図（flow_type='screen_transition'）のServer Action群。
@@ -68,11 +69,32 @@ function assertAffected(data: unknown[] | null, message: string) {
 async function projectNodes(supabase: Supabase, projectId: string) {
   const { data, error } = await supabase
     .from("flow_nodes")
-    .select("id, screen_code, order_index, function_item_id")
+    .select("id, screen_code, order_index, function_item_id, status")
     .eq("project_id", projectId)
     .eq("flow_type", "screen_transition");
   if (error) throw new UserFacingError(errorMessage(error));
-  return data as unknown as { id: string; screen_code: string | null; order_index: number; function_item_id: string | null }[];
+  return data as unknown as { id: string; screen_code: string | null; order_index: number; function_item_id: string | null; status: string }[];
+}
+
+// screen_flow_ux_phase2.md：確定済み（isItemLocked）のノードは中身（画面名・9章紐付け・
+// そのノードを遷移元とする遷移）を変更できない。UIで隠すだけでなく必ずここでも拒否する（規約33）。
+// 位置の保存・画面の削除はレイアウト/削除であり内容の変更ではないため、このガードを付けない。
+async function fetchNodeStatus(supabase: Supabase, nodeId: string): Promise<ScreenNodeStatus> {
+  const { data, error } = await supabase
+    .from("flow_nodes")
+    .select("status")
+    .eq("id", nodeId)
+    .eq("flow_type", "screen_transition")
+    .maybeSingle();
+  if (error) throw new UserFacingError(errorMessage(error));
+  if (!data) throw new UserFacingError("画面が見つかりません");
+  return (data as unknown as { status: ScreenNodeStatus }).status;
+}
+
+async function assertNodeEditable(supabase: Supabase, nodeId: string): Promise<ScreenNodeStatus> {
+  const status = await fetchNodeStatus(supabase, nodeId);
+  if (isItemLocked(status)) throw new UserFacingError("確定済みの画面は編集できません");
+  return status;
 }
 
 async function assertFunctionUsable(
@@ -95,9 +117,19 @@ async function assertFunctionUsable(
   }
 }
 
+// ステージの論理サイズは内容に合わせて広がる（自動整列で右へ伸びる）ため、サーバー側では
+// 負の値と極端に大きな値だけを弾き、ステージ上限でのクランプはしない。
+const MAX_COORD = 20000;
+function clampStored(x: number, y: number) {
+  return {
+    x: Math.min(Math.max(0, Math.round(x)), MAX_COORD),
+    y: Math.min(Math.max(0, Math.round(y)), MAX_COORD),
+  };
+}
+
 export async function moveScreenNode(nodeId: string, projectId: string, x: number, y: number) {
   const supabase = await createServerActionClient();
-  const pos = clampPosition(Math.round(x), Math.round(y));
+  const pos = clampStored(x, y);
   const { data, error } = await supabase
     .from("flow_nodes")
     .update({ pos_x: pos.x, pos_y: pos.y })
@@ -153,9 +185,10 @@ export async function renameScreenNode(nodeId: string, projectId: string, name: 
   const trimmed = name.trim();
   if (!trimmed) throw new UserFacingError("画面名を入力してください");
   const supabase = await createServerActionClient();
+  const status = await assertNodeEditable(supabase, nodeId);
   const { data, error } = await supabase
     .from("flow_nodes")
-    .update({ label: trimmed })
+    .update({ label: trimmed, ...(status === "ai_draft" ? { status: "se_reviewing" } : {}) })
     .eq("id", nodeId)
     .eq("flow_type", "screen_transition")
     .select("id");
@@ -180,10 +213,11 @@ export async function removeScreenNode(nodeId: string, projectId: string) {
 
 export async function linkScreenFunction(nodeId: string, projectId: string, functionItemId: string | null) {
   const supabase = await createServerActionClient();
+  const status = await assertNodeEditable(supabase, nodeId);
   if (functionItemId) await assertFunctionUsable(supabase, projectId, functionItemId, nodeId);
   const { data, error } = await supabase
     .from("flow_nodes")
-    .update({ function_item_id: functionItemId })
+    .update({ function_item_id: functionItemId, ...(status === "ai_draft" ? { status: "se_reviewing" } : {}) })
     .eq("id", nodeId)
     .eq("flow_type", "screen_transition")
     .select("id");
@@ -203,6 +237,9 @@ export async function addScreenTransition(
   const nodes = await projectNodes(supabase, projectId);
   const ids = new Set(nodes.map((n) => n.id));
   if (!ids.has(fromNodeId) || !ids.has(toNodeId)) throw new UserFacingError("不正な画面が指定されました");
+  // 遷移の所有者は遷移元。遷移元が確定済みなら追加できない（遷移先が確定済みなのは可）。
+  const fromNode = nodes.find((n) => n.id === fromNodeId)!;
+  if (isItemLocked(fromNode.status)) throw new UserFacingError("確定済みの画面からは遷移を追加できません");
 
   const { data: existing } = await supabase
     .from("flow_edges")
@@ -222,8 +259,17 @@ export async function addScreenTransition(
   return (data as unknown as { id: string }).id;
 }
 
+async function assertEdgeEditable(supabase: Supabase, edgeId: string) {
+  const { data, error } = await supabase.from("flow_edges").select("from_node").eq("id", edgeId).maybeSingle();
+  if (error) throw new UserFacingError(errorMessage(error));
+  if (!data) throw new UserFacingError("遷移が見つかりません");
+  const status = await fetchNodeStatus(supabase, (data as unknown as { from_node: string }).from_node);
+  if (isItemLocked(status)) throw new UserFacingError("確定済みの画面からの遷移は編集できません");
+}
+
 export async function updateScreenTransitionLabel(edgeId: string, projectId: string, label: string) {
   const supabase = await createServerActionClient();
+  await assertEdgeEditable(supabase, edgeId);
   const { data, error } = await supabase
     .from("flow_edges")
     .update({ label: label.trim() ? label.trim() : null })
@@ -236,8 +282,47 @@ export async function updateScreenTransitionLabel(edgeId: string, projectId: str
 
 export async function removeScreenTransition(edgeId: string, projectId: string) {
   const supabase = await createServerActionClient();
+  await assertEdgeEditable(supabase, edgeId);
   const { data, error } = await supabase.from("flow_edges").delete().eq("id", edgeId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
   assertAffected(data, "遷移を削除できませんでした");
+  revalidatePath(path(projectId));
+}
+
+// 自動整列など複数ノードの位置をまとめて保存する。規約47：RLSで弾かれたUPDATEは黙って0件に
+// なるため、更新できた件数が対象件数と一致しなければエラーにする。
+export async function moveScreenNodes(projectId: string, moves: { id: string; x: number; y: number }[]) {
+  if (moves.length === 0) return;
+  const supabase = await createServerActionClient();
+  let updated = 0;
+  for (const m of moves) {
+    const pos = clampStored(m.x, m.y);
+    const { data, error } = await supabase
+      .from("flow_nodes")
+      .update({ pos_x: pos.x, pos_y: pos.y })
+      .eq("id", m.id)
+      .eq("project_id", projectId)
+      .eq("flow_type", "screen_transition")
+      .select("id");
+    if (error) throw new UserFacingError(errorMessage(error));
+    updated += data?.length ?? 0;
+  }
+  if (updated !== moves.length) {
+    throw new UserFacingError(`位置を保存できなかった画面があります（${updated}/${moves.length}件）`);
+  }
+  revalidatePath(path(projectId));
+}
+
+export async function confirmScreenNode(nodeId: string, projectId: string) {
+  const supabase = await createServerActionClient();
+  const { data, error } = await supabase
+    .from("flow_nodes")
+    .update({ status: "confirmed" })
+    .eq("id", nodeId)
+    .eq("project_id", projectId)
+    .eq("flow_type", "screen_transition")
+    .select("id");
+  if (error) throw new UserFacingError(errorMessage(error));
+  assertAffected(data, "画面を確定できませんでした");
   revalidatePath(path(projectId));
 }
