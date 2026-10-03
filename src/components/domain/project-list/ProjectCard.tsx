@@ -63,7 +63,7 @@ export function ProjectCard({ project: p }: { project: ListedProjectRow }) {
           確定 {s.confirmed} / {s.total} 項目
         </span>
         <span className="ml-auto">
-          {s.confirmedChapters}/{s.chapters.length}章
+          {s.confirmedChapters}/{s.confirmableChapters}章
         </span>
       </div>
 

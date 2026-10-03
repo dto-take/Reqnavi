@@ -3,19 +3,22 @@
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
+import { fetchAllPages } from "@/lib/paged-select";
 import { revalidatePath } from "next/cache";
 import { wouldCreateCycle, addDaysIso, dayDiffIso, type ProgressTask } from "@/lib/gantt/layout";
 
 export async function listProgressTasks(projectId: string): Promise<ProgressTask[]> {
   const supabase = await createServerActionClient();
-  const { data, error } = await supabase
-    .from("progress_tasks")
-    .select("id, parent_id, task_name, owner_primary, owner_secondary, week_start, week_end, order_index, predecessor_id")
-    .eq("project_id", projectId)
-    .order("order_index")
-    .order("created_at");
-  if (error) throw error;
-  return data as unknown as ProgressTask[];
+  return fetchAllPages<ProgressTask>((from, to) =>
+    supabase
+      .from("progress_tasks")
+      .select("id, parent_id, task_name, owner_primary, owner_secondary, week_start, week_end, order_index, predecessor_id")
+      .eq("project_id", projectId)
+      .order("order_index")
+      .order("created_at")
+      .order("id")
+      .range(from, to)
+  );
 }
 
 async function nextOrderIndex(
@@ -186,12 +189,14 @@ export async function setPredecessor(taskId: string, projectId: string, predeces
     if (pred.project_id !== projectId) throw new UserFacingError("同じ案件内の中工程のみ先行工程に設定できます");
     if (pred.parent_id === null) throw new UserFacingError("大工程は先行工程に設定できません");
 
-    const { data: allData, error: allError } = await supabase
-      .from("progress_tasks")
-      .select("id, parent_id, task_name, owner_primary, owner_secondary, week_start, week_end, order_index, predecessor_id")
-      .eq("project_id", projectId);
-    if (allError) throw new UserFacingError(errorMessage(allError));
-    const nodes = allData as unknown as ProgressTask[];
+    const nodes = await fetchAllPages<ProgressTask>((from, to) =>
+      supabase
+        .from("progress_tasks")
+        .select("id, parent_id, task_name, owner_primary, owner_secondary, week_start, week_end, order_index, predecessor_id")
+        .eq("project_id", projectId)
+        .order("id")
+        .range(from, to)
+    );
     if (wouldCreateCycle(nodes, taskId, predecessorId)) {
       throw new UserFacingError("この設定では先行工程の循環参照が発生するため、設定できません。");
     }
@@ -220,14 +225,16 @@ export async function shiftTaskDates(taskId: string, projectId: string, newStart
     throw new UserFacingError("大工程の期間は中工程から自動集計されるため、直接編集できません");
   }
 
-  const { data: allTasksData, error: allTasksError } = await supabase
-    .from("progress_tasks")
-    .select("id, week_start, week_end, predecessor_id")
-    .eq("project_id", projectId)
-    .not("parent_id", "is", null);
-  if (allTasksError) throw new UserFacingError(errorMessage(allTasksError));
   type TaskRow = { id: string; week_start: string | null; week_end: string | null; predecessor_id: string | null };
-  const tasks = allTasksData as unknown as TaskRow[];
+  const tasks = await fetchAllPages<TaskRow>((from, to) =>
+    supabase
+      .from("progress_tasks")
+      .select("id, week_start, week_end, predecessor_id")
+      .eq("project_id", projectId)
+      .not("parent_id", "is", null)
+      .order("id")
+      .range(from, to)
+  );
 
   const updates = new Map<string, { week_start: string; week_end: string }>();
   updates.set(taskId, { week_start: newStart, week_end: newEnd });

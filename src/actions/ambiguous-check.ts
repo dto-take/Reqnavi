@@ -8,19 +8,21 @@ import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
 import { errorMessage } from "@/lib/error-message";
+import { fetchAllPages } from "@/lib/paged-select";
 
 type ItemRow = { id: string; content: Record<string, string | null>; ambiguous_flags: AmbiguousFlag[] | null };
 
 export async function runAmbiguousCheck(projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
-  const { data: itemsData, error } = await supabase
-    .from("requirement_items")
-    .select("id, content, ambiguous_flags")
-    .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo);
-  if (error) throw error;
-
-  const items = itemsData as unknown as ItemRow[];
+  const items = await fetchAllPages<ItemRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id, content, ambiguous_flags")
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .order("id")
+      .range(from, to)
+  );
   for (const item of items) {
     const dictionaryFlags = scanContentForAmbiguousPhrases(item.content);
     const existingOtherFlags = (item.ambiguous_flags ?? []).filter(
@@ -58,14 +60,15 @@ const AI_AMBIGUITY_RESPONSE_SCHEMA = {
 
 async function runAmbiguousCheckAIInternal(projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
-  const { data: itemsData, error } = await supabase
-    .from("requirement_items")
-    .select("id, content, ambiguous_flags")
-    .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo);
-  if (error) throw error;
-
-  const items = itemsData as unknown as ItemRow[];
+  const items = await fetchAllPages<ItemRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id, content, ambiguous_flags")
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .order("id")
+      .range(from, to)
+  );
   const { id: promptId, body: promptBody } = await getActivePrompt("ambiguity_check_l2");
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 

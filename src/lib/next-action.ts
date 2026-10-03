@@ -11,8 +11,16 @@ export function computeNextAction(overview: Awaited<ReturnType<typeof getProject
   if (noItemChapters.length > 0) {
     const first = noItemChapters[0];
     const remainingCount = noItemChapters.length - 1;
+    const label = `「${first.chapterNo}. ${CHAPTER_NAMES[first.chapterNo]}」`;
+    // 4章はKPIノード、10章は採用中の観点が確定判定の単位（5章以降の項目とは文言を分ける）
+    const body =
+      first.chapterNo === 4
+        ? `${label}にKPIがまだありません。KPIツリーを作成しましょう。`
+        : first.chapterNo === 10
+          ? `${label}で採用中の観点がまだありません。観点を確認して採用しましょう。`
+          : `${label}でまだ要件項目がありません。AI素案を生成しましょう。`;
     return {
-      message: `「${first.chapterNo}. ${CHAPTER_NAMES[first.chapterNo]}」でまだ要件項目がありません。AI素案を生成しましょう。${remainingCount > 0 ? `（他${remainingCount}章も未着手）` : ""}`,
+      message: `${body}${remainingCount > 0 ? `（他${remainingCount}章も未着手）` : ""}`,
       href: `chapters/${first.chapterNo}`,
       linkLabel: "章を開く",
     };

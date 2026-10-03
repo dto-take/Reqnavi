@@ -1,4 +1,5 @@
 import { createServerActionClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/paged-select";
 import { hasScreenInfo } from "@/lib/screen-flow/derive";
 
 type ItemRow = { content: Record<string, string> };
@@ -8,13 +9,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const supabase = await createServerActionClient();
 
   const { data: project } = await supabase.from("projects").select("name").eq("id", projectId).single();
-  const { data: itemsData } = await supabase
-    .from("requirement_items")
-    .select("content")
-    .eq("project_id", projectId)
-    .eq("chapter_no", 9)
-    .order("order_index");
-  const items = (itemsData as unknown as ItemRow[] | null) ?? [];
+  const items = await fetchAllPages<ItemRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("content")
+      .eq("project_id", projectId)
+      .eq("chapter_no", 9)
+      .order("order_index")
+      .order("id")
+      .range(from, to)
+  );
 
   const screenItems = items.filter((i) => hasScreenInfo(i.content));
 

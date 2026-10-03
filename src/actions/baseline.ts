@@ -3,6 +3,7 @@
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { getReadinessSummary } from "@/actions/readiness";
 import { UserFacingError } from "@/lib/user-error";
+import { errorMessage } from "@/lib/error-message";
 import { revalidatePath } from "next/cache";
 
 export type ActiveBaseline = {
@@ -11,14 +12,6 @@ export type ActiveBaseline = {
   approval_note: string | null;
   created_at: string;
   readiness_snapshot: unknown;
-};
-
-type RequirementItemRow = {
-  id: string;
-  chapter_no: number;
-  template_type: string;
-  content: Record<string, string>;
-  status: string;
 };
 
 export async function getActiveBaseline(projectId: string): Promise<ActiveBaseline | null> {
@@ -51,49 +44,20 @@ export async function createBaseline(projectId: string, formData: FormData) {
     .from("baseline_snapshots")
     .select("id", { count: "exact", head: true })
     .eq("project_id", projectId);
-  await supabase
-    .from("baseline_snapshots")
-    .update({ status: "superseded" })
-    .eq("project_id", projectId)
-    .eq("status", "active");
-
   const versionNo = `v1.${count ?? 0}`;
 
-  const { data: baselineData, error: baselineError } = await supabase
-    .from("baseline_snapshots")
-    .insert({
-      project_id: projectId,
-      tenant_id: tenantId,
-      version_no: versionNo,
-      status: "active",
-      approved_by: userData.user.id,
-      approval_note: approvalNote,
-      readiness_snapshot: readinessSnapshot,
-    })
-    .select("id")
-    .single();
-  if (baselineError || !baselineData) throw baselineError ?? new Error("ベースライン作成に失敗しました");
-  const baseline = baselineData as unknown as { id: string };
-
-  const { data: itemsData, error: itemsError } = await supabase
-    .from("requirement_items")
-    .select("id, chapter_no, template_type, content, status")
-    .eq("project_id", projectId);
-  if (itemsError) throw itemsError;
-  const items = itemsData as unknown as RequirementItemRow[];
-
-  if (items && items.length > 0) {
-    const snapshotRows = items.map((item) => ({
-      baseline_id: baseline.id,
-      item_id: item.id,
-      chapter_no: item.chapter_no,
-      template_type: item.template_type,
-      content: item.content,
-      status_at_baseline: item.status,
-    }));
-    const { error: snapshotError } = await supabase.from("baseline_item_snapshots").insert(snapshotRows);
-    if (snapshotError) throw snapshotError;
-  }
+  // 旧activeのsuperseded化・新ベースラインの作成・項目スナップショットの作成を、DB関数（1トランザクション）で行う。
+  // 項目の行はアプリに通さない（PostgRESTの1000行上限で黙って切り捨てられるため。規約62）。
+  // 関数内でスナップショット件数が元の件数と一致することを確認し、不一致なら全体をロールバックする。
+  const { error } = await supabase.rpc("create_baseline_snapshot", {
+    p_project_id: projectId,
+    p_version_no: versionNo,
+    p_approval_note: approvalNote,
+    p_readiness: readinessSnapshot,
+    p_tenant_id: tenantId,
+    p_approved_by: userData.user.id,
+  });
+  if (error) throw new UserFacingError(errorMessage(error));
 
   revalidatePath(`/projects/${projectId}/baseline`);
 }

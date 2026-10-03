@@ -1,29 +1,27 @@
 // project_list_ux.md Step1：案件一覧の派生ロジック（DB非依存の純粋関数）。
 // 数え方は確定判定ダッシュボード・サイドバーの章ドットと一本化する（新しい判定基準は作らない）。
-import { CHAPTER_NAMES, CHAPTER_TEMPLATE_MAP } from "../chapters";
-import { chapterStatusFromReadiness, type ChapterStatus } from "../chapter-status";
+import { CHAPTER_NAMES } from "../chapters";
+import type { ChapterStatus } from "../chapter-status";
+import { chapterStatusOf, isConfirmableChapter, type ChapterStat } from "../chapter-stats";
 
-// SQL関数 list_project_chapter_stats() の1行（案件×章）
-export type ChapterStat = {
-  chapterNo: number;
-  totalItems: number; // 不採用を除く
-  confirmedItems: number;
-  allItems: number; // 不採用を含む
-  updatedAt: string | null;
-  updatedBy: string | null;
-};
+// 章の状態・数える単位の定義は chapter-stats.ts / list_project_chapter_stats()（確定判定ダッシュボード・
+// サイドバー・案件トップと共通）。ここでは再定義しない。
+export { chapterStatusOf };
+export type { ChapterStat };
 
 export type ProjectState = "not_started" | "in_progress" | "completed";
 export type CtaKind = "continue" | "start" | "open";
 
 export type ProjectSummary = {
-  // 確定率の分母・分子：確定判定ダッシュボードと同じ（A/B/C章のみ。4・10・15章は含めない）
+  // 確定率の分母・分子：確定判定ダッシュボードと同じ（確定できる章。15章は含めない）
   total: number;
   confirmed: number;
   rate: number; // 表示用（四捨五入）
   fraction: number; // 並べ替え用（確定／総数）
   state: ProjectState;
   chapters: { chapterNo: number; status: ChapterStatus }[];
+  // 「確定章数／対象章数」の分母は、確定の概念を持たない15章を除いた対象章の数
+  confirmableChapters: number;
   confirmedChapters: number;
   workingChapters: number;
   lastUpdatedAt: string | null;
@@ -31,21 +29,6 @@ export type ProjectSummary = {
   continueChapterNo: number | null;
   cta: CtaKind;
 };
-
-// 章の状態：サイドバーの章ドットと同じ基準。
-//  - A/B/C章：getReadinessSummaryと同じ（総数0＝未着手／充足率100%＝確定／それ以外＝進行中）
-//  - 4章：行が1件でもあれば進行中（不採用も含めて数える。getSimpleChapterStatusesと同じ）
-//  - 10章：不採用を除く行が1件でもあれば進行中／15章：progress_tasksが1件でもあれば進行中
-//  4・10・15章は「確定」にならない（サイドバーも未着手／進行中の2段階のみ）。
-export function chapterStatusOf(chapterNo: number, stat: ChapterStat | undefined): ChapterStatus {
-  if (!stat) return "not_started";
-  if (CHAPTER_TEMPLATE_MAP[chapterNo]) {
-    const rate = stat.totalItems > 0 ? Math.round((stat.confirmedItems / stat.totalItems) * 100) : 0;
-    return chapterStatusFromReadiness({ totalItems: stat.totalItems, readinessRate: rate });
-  }
-  if (chapterNo === 4) return stat.allItems > 0 ? "in_progress" : "not_started";
-  return stat.totalItems > 0 ? "in_progress" : "not_started";
-}
 
 export function projectStateOf(total: number, confirmed: number): ProjectState {
   if (total === 0) return "not_started";
@@ -60,7 +43,7 @@ export function summarizeProject(selectedChapters: number[], stats: ChapterStat[
   let total = 0;
   let confirmed = 0;
   for (const n of targets) {
-    if (!CHAPTER_TEMPLATE_MAP[n]) continue;
+    if (!isConfirmableChapter(n)) continue;
     const s = byChapter.get(n);
     if (!s) continue;
     total += s.totalItems;
@@ -87,7 +70,7 @@ export function summarizeProject(selectedChapters: number[], stats: ChapterStat[
     continueChapterNo = targets[0] ?? null;
     cta = "start";
   } else {
-    continueChapterNo = last?.chapterNo ?? chapters.find((c) => c.status !== "confirmed")?.chapterNo ?? targets[0] ?? null;
+    continueChapterNo = last?.chapterNo ?? chapters.find((c) => c.status !== "confirmed" && isConfirmableChapter(c.chapterNo))?.chapterNo ?? targets[0] ?? null;
     cta = "continue";
   }
 
@@ -98,8 +81,9 @@ export function summarizeProject(selectedChapters: number[], stats: ChapterStat[
     fraction: total > 0 ? confirmed / total : 0,
     state,
     chapters,
+    confirmableChapters: chapters.filter((c) => isConfirmableChapter(c.chapterNo)).length,
     confirmedChapters: chapters.filter((c) => c.status === "confirmed").length,
-    workingChapters: chapters.filter((c) => c.status === "in_progress").length,
+    workingChapters: chapters.filter((c) => c.status === "in_progress" && isConfirmableChapter(c.chapterNo)).length,
     lastUpdatedAt: last?.at ?? null,
     lastUpdatedBy: last?.by ?? null,
     continueChapterNo,

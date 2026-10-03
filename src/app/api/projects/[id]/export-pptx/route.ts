@@ -1,5 +1,6 @@
 import PptxGenJS from "pptxgenjs";
 import { createServerActionClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/paged-select";
 import { getProjectOverview } from "@/actions/project-overview";
 import { CHAPTER_NAMES, CHAPTER_TEMPLATE_MAP as FLAT_CHAPTER_TEMPLATE_MAP } from "@/lib/chapters";
 
@@ -157,13 +158,16 @@ async function addTableSlides(pres: PptxGenJS, projectId: string, chapterNo: num
     (c) => c.applicable_chapters === null || c.applicable_chapters.includes(chapterNo)
   );
 
-  const { data: itemsData } = await supabase
-    .from("requirement_items")
-    .select("content")
-    .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo)
-    .order("order_index");
-  const rows = (itemsData as unknown as ItemRow[] | null) ?? [];
+  const rows = await fetchAllPages<ItemRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("content")
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .order("order_index")
+      .order("id")
+      .range(from, to)
+  );
   const ROWS_PER_SLIDE = 6;
 
   if (rows.length === 0) {
@@ -196,12 +200,15 @@ async function addTableSlides(pres: PptxGenJS, projectId: string, chapterNo: num
 
 async function addKpiSlide(pres: PptxGenJS, projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
-  const { data: nodesData } = await supabase
-    .from("requirement_items")
-    .select("id, parent_id, content")
-    .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo);
-  const nodes = (nodesData as unknown as KpiNodeRow[] | null) ?? [];
+  const nodes = await fetchAllPages<KpiNodeRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id, parent_id, content")
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .order("id")
+      .range(from, to)
+  );
 
   const slide = pres.addSlide();
   addChapterTitle(slide, chapterNo);
@@ -229,12 +236,15 @@ async function addKpiSlide(pres: PptxGenJS, projectId: string, chapterNo: number
 // の注記通り）。未採用（status:'rejected'）の観点は方針・チェック項目ごとスライド化しない。
 async function addChecklistSlides(pres: PptxGenJS, projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
-  const { data: rowsData } = await supabase
-    .from("requirement_items")
-    .select("id, parent_id, content, status")
-    .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo);
-  const rows = (rowsData as unknown as ChecklistRow[] | null) ?? [];
+  const rows = await fetchAllPages<ChecklistRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id, parent_id, content, status")
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .order("id")
+      .range(from, to)
+  );
   const aspects = rows.filter((r) => r.parent_id === null && r.status !== "rejected");
 
   if (aspects.length === 0) {

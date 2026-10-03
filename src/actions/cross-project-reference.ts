@@ -2,6 +2,7 @@
 
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
+import { fetchAllPages } from "@/lib/paged-select";
 import { revalidatePath } from "next/cache";
 
 export type CrossProjectItem = {
@@ -15,13 +16,16 @@ export type CrossProjectItem = {
 export async function listCrossProjectReferences(currentProjectId: string, chapterNo: number): Promise<CrossProjectItem[]> {
   const supabase = await createServerActionClient();
   // RLS（can_view_cross_project_item）が、自案件以外の確定済み項目のみを絞り込んで返す
-  const { data, error } = await supabase
-    .from("requirement_items")
-    .select("id, project_id, content, template_type, projects(name)")
-    .neq("project_id", currentProjectId)
-    .eq("chapter_no", chapterNo);
-  if (error) throw error;
-  return data as unknown as CrossProjectItem[];
+  // 他案件の確定済み項目は件数に上限が無いため、ページングする（規約62）
+  return fetchAllPages<CrossProjectItem>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id, project_id, content, template_type, projects(name)")
+      .neq("project_id", currentProjectId)
+      .eq("chapter_no", chapterNo)
+      .order("id")
+      .range(from, to)
+  );
 }
 
 export async function copyReferenceItem(

@@ -505,10 +505,20 @@ create policy "progress_tasks_delete" on progress_tasks for delete using (is_pro
 ## 4.5 補足：画面構成・集計ロジックに関する実装メモ
 
 - **ヘッダーの共通化**：ログイン後の共通ヘッダー（ReqNaviロゴ・ユーザー名・ログアウト）は`src/app/projects/layout.tsx`が担う。`/projects`配下（一覧・詳細・新規作成）全体にネストされる。案件詳細のサイドバー（`src/app/projects/[id]/layout.tsx`）はこの内側に乗る構成で、ロゴの重複表示はしない。`/admin/partners`等、この階層に含まれないページには適用されない点に注意。
-- **充足率集計は複数存在する**：
-  - `getReadinessSummary`（`src/actions/readiness.ts`）：単一案件の章別詳細（充足率・曖昧表現件数・要ヒアリング件数）を算出する重めの処理。確定判定ダッシュボード（`/projects/{id}/readiness`）で使用。
-  - SQL関数`list_project_chapter_stats()`（`security invoker`＝RLSがそのまま効く）：案件一覧画面用。案件×章ごとに、総数（不採用を除く）・確定数（confirmed／exception_approved）・不採用を含む総数・最終更新日時・最終更新者を返す（15章は`progress_tasks`の件数）。項目の行を全件取得して数える方式はPostgRESTの1000行上限で切り捨てられるため、DBで集計する。旧`listProjectsReadinessSummary`はこれに置き換えて撤去した。どの章を確定率の分母に含めるか（A/B/C章のみ。4・10・15章は含めない）と章の状態判定は`src/lib/project-list/derive.ts`が、確定判定ダッシュボード・サイドバーの章ドットと同じ基準で行う。
-  充足率・章状態の定義を変える場合は、`getReadinessSummary`・`getSimpleChapterStatuses`（サイドバー）・`derive.ts`の3か所に影響が無いか確認する。
+- **確定判定の集計は、定義を1か所（DBの集計関数）に集約している**：
+  - 総数・確定数は、SQL関数`list_project_chapter_stats(p_project_id uuid default null)`（`security invoker`＝RLSがそのまま効く。自分がメンバーの案件の行だけを返す。引数省略で見える全案件）が唯一の定義。確定判定ダッシュボード（`getReadinessSummary`）・サイドバーと案件トップ（`getProjectProgress`）・案件一覧（`listProjectsForList`）は、すべてここから数える。項目の行を取得してTS側で数えない（PostgRESTの1000行上限で黙って切り捨てられるため）。
+  - 章の状態・充足率・全体進捗を決めるTS側の関数は`src/lib/chapter-stats.ts`の1か所（`chapterStatusOf`／`chapterRates`／`averageRate`）。総数0＝未着手／確定数＝総数＝確定／それ以外＝進行中。15章だけは確定が無く、未着手／進行中の2段階。
+  - 曖昧表現・要ヒアリングの件数は確定数とは別の詳細で、A/B/C章のみ`getReadinessSummary`が項目の内容から数える（4章・10章は対象外で、ダッシュボードでは「—」）。
+
+  | 章 | 数える単位（総数） | 確定の条件 |
+  |---|---|---|
+  | 1〜3・5〜9・11〜14章 | 各項目（不採用を除く） | confirmed または exception_approved |
+  | 4章（KPI） | KPIノード（ゴール・目標・戦略・戦術。不採用を除く） | status = confirmed |
+  | 10章（非機能要件） | 採用中の観点（parent_idがnull。不採用を除く）。チェック項目の行は数えない | 観点のstatus = confirmed |
+  | 15章（進捗） | progress_tasksの件数。確定の概念は無い（確定数は常に0） | — |
+
+  充足率・章状態の定義を変えるときは、SQL関数と`chapter-stats.ts`の2か所だけを直す。案件一覧の「確定章数／対象章数」の分母は、15章を除いた対象章の数。
+- **1000行上限への対応（規約62）**：件数に上限が無い複数行の取得は、共通のページング処理`fetchAllPages`／`fetchAllPagesByKeys`（`src/lib/paged-select.ts`。並びの最後のキーはid）を通す。ベースラインの確定は、DB関数`create_baseline_snapshot()`（1トランザクション。項目スナップショットを`insert … select`で作り、保存件数が元の件数と一致しなければ例外でロールバック）で行い、項目の行をアプリに通さない。
 
 ## 5. AI呼び出しフロー
 

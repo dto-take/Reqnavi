@@ -4,6 +4,7 @@ import { createServerActionClient } from "@/lib/supabase/server";
 import { classifyDocument } from "@/lib/ai/classify-document";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
+import { fetchAllPages } from "@/lib/paged-select";
 import { revalidatePath } from "next/cache";
 
 // ファイル本体はクライアントから直接Supabase Storageへアップロード済み（規約：
@@ -81,12 +82,14 @@ export async function reclassifyDocument(
 
 export async function listDocuments(projectId: string) {
   const supabase = await createServerActionClient();
-  const { data, error } = await supabase
-    .from("source_documents")
-    .select("id, file_name, classified_tags, storage_path")
-    .eq("project_id", projectId);
-  if (error) throw error;
-  return data;
+  return fetchAllPages<{ id: string; file_name: string; classified_tags: unknown; storage_path: string }>((from, to) =>
+    supabase
+      .from("source_documents")
+      .select("id, file_name, classified_tags, storage_path")
+      .eq("project_id", projectId)
+      .order("id")
+      .range(from, to)
+  );
 }
 
 export type RecentDocument = { id: string; fileName: string; updatedAt: string };

@@ -3,6 +3,7 @@
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
+import { fetchAllPages, fetchAllPagesByKeys } from "@/lib/paged-select";
 import { groupByCategory, UNCATEGORIZED_LABEL } from "@/lib/requirement-grouping";
 import { revalidatePath } from "next/cache";
 import type { AmbiguousFlag } from "@/lib/ambiguous-phrases";
@@ -55,22 +56,36 @@ export async function listRequirementItems(
   // user_profiles(display_name)の埋め込みJOINは、requirement_items.updated_byが
   // user_profiles(user_id)を直接参照しているため解決できる（auth.usersへのFKでは
   // PostgRESTが関係を解決できない。規約14）。
-  const { data: items, error } = await supabase
-    .from("requirement_items")
-    .select(
-      "id, chapter_no, template_type, content, status, ambiguous_flags, confidence, exception_reason, updated_at, user_profiles(display_name)"
-    )
-    .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo)
-    .order("order_index")
-    .order("created_at");
-  if (error) throw error;
-  if (!items || items.length === 0) return [];
+  // 1000行ごとにページングする（規約62）。並びは一意にするため、最後のキーにidを加える（規約42）
+  const items = await fetchAllPages<{ id: string }>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select(
+        "id, chapter_no, template_type, content, status, ambiguous_flags, confidence, exception_reason, updated_at, user_profiles(display_name)"
+      )
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .order("order_index")
+      .order("created_at")
+      .order("id")
+      .range(from, to)
+  );
+  if (items.length === 0) return [];
 
-  const { data: sourceLinks } = await supabase
-    .from("item_sources")
-    .select("item_id, location_note, source_documents(file_name)")
-    .in("item_id", items.map((i) => i.id));
+  const sourceLinks = await fetchAllPagesByKeys<
+    { item_id: string; location_note: string | null; source_documents: unknown },
+    string
+  >(
+    items.map((i) => i.id),
+    (chunk) => (from, to) =>
+      supabase
+        .from("item_sources")
+        .select("item_id, location_note, source_documents(file_name)")
+        .in("item_id", chunk)
+        .order("item_id")
+        .order("source_id")
+        .range(from, to)
+  );
 
   const sourcesByItem = new Map<string, { fileName: string; locationNote: string | null }[]>();
   for (const link of sourceLinks ?? []) {
@@ -101,15 +116,17 @@ async function fetchOrderedItems(
   projectId: string,
   chapterNo: number
 ): Promise<OrderRow[]> {
-  const { data, error } = await supabase
-    .from("requirement_items")
-    .select("id, content, order_index")
-    .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo)
-    .order("order_index")
-    .order("created_at");
-  if (error) throw new UserFacingError(errorMessage(error));
-  return (data as unknown as OrderRow[]) ?? [];
+  return fetchAllPages<OrderRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id, content, order_index")
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .order("order_index")
+      .order("created_at")
+      .order("id")
+      .range(from, to)
+  );
 }
 
 async function applyOrder(supabase: Awaited<ReturnType<typeof createServerActionClient>>, orderedIds: string[]) {

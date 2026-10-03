@@ -2,6 +2,16 @@
 
 import { createServerActionClient } from "@/lib/supabase/server";
 import { CHAPTER_TEMPLATE_MAP } from "@/lib/chapters";
+import type { ChapterStatus } from "@/lib/chapter-status";
+import { fetchAllPages } from "@/lib/paged-select";
+import {
+  averageRate,
+  chapterRates,
+  chapterStatuses,
+  hasAmbiguityDetail,
+  type ChapterRate,
+  type ChapterStat,
+} from "@/lib/chapter-stats";
 
 export type ChapterReadiness = {
   chapterNo: number;
@@ -9,101 +19,113 @@ export type ChapterReadiness = {
   totalItems: number;
   confirmedItems: number;
   readinessRate: number;
-  ambiguousCount: number;
-  needHearingCount: number;
+  // 曖昧表現・要ヒアリングは4章・10章の対象外（null）
+  ambiguousCount: number | null;
+  needHearingCount: number | null;
   exceptionApprovedCount: number;
 };
 
-type ItemRow = {
-  content: Record<string, string | null>;
-  status: string;
-  ambiguous_flags: unknown[] | null;
+type StatRow = {
+  chapter_no: number;
+  total_items: number;
+  confirmed_items: number;
+  exception_items: number;
+  last_updated_at: string | null;
+  last_updated_by: string | null;
 };
 
+// 確定判定の「総数・確定数」は、DBの集計関数 list_project_chapter_stats()（1か所）から得る。
+// 項目の行を取得してTS側で数えると、PostgRESTの既定上限（1000行）で黙って切り捨てられる。
+export async function getChapterStats(projectId: string): Promise<ChapterStat[]> {
+  const supabase = await createServerActionClient();
+  const { data, error } = await supabase.rpc("list_project_chapter_stats", { p_project_id: projectId });
+  if (error) throw error;
+  return ((data ?? []) as unknown as StatRow[]).map((r) => ({
+    chapterNo: r.chapter_no,
+    totalItems: Number(r.total_items),
+    confirmedItems: Number(r.confirmed_items),
+    exceptionItems: Number(r.exception_items),
+    updatedAt: r.last_updated_at,
+    updatedBy: r.last_updated_by,
+  }));
+}
+
+async function getSelectedChapters(projectId: string): Promise<number[]> {
+  const supabase = await createServerActionClient();
+  const { data } = await supabase.from("projects").select("selected_chapters").eq("id", projectId).single();
+  return (data as unknown as { selected_chapters: number[] } | null)?.selected_chapters ?? [];
+}
+
+// サイドバー・案件トップ用の軽量な進捗（確定数・総数のみ。曖昧表現等の詳細は取得しない）。
+// 全対象章の状態（15章を含む）、確定できる章の充足率、その平均（全体進捗）を返す。
+export async function getProjectProgress(projectId: string): Promise<{
+  rates: ChapterRate[];
+  statuses: Record<number, ChapterStatus>;
+  avgReadiness: number;
+}> {
+  const [selectedChapters, stats] = await Promise.all([getSelectedChapters(projectId), getChapterStats(projectId)]);
+  const rates = chapterRates(selectedChapters, stats);
+  return { rates, statuses: chapterStatuses(selectedChapters, stats), avgReadiness: averageRate(rates) };
+}
+
+type ItemRow = {
+  content: Record<string, string | null>;
+  ambiguous_flags: unknown[] | null;
+};
 type ColumnRow = { column_key: string; applicable_chapters: number[] | null };
 
+// 確定判定ダッシュボード用。総数・確定数・例外承認件数は集計関数から、曖昧表現・要ヒアリングの件数は
+// A/B/C章の項目の内容から数える（4章・10章は対象外）。
 export async function getReadinessSummary(projectId: string): Promise<ChapterReadiness[]> {
   const supabase = await createServerActionClient();
+  const [selectedChapters, stats] = await Promise.all([getSelectedChapters(projectId), getChapterStats(projectId)]);
+  const rates = chapterRates(selectedChapters, stats);
 
-  const { data: projectData } = await supabase
-    .from("projects")
-    .select("selected_chapters")
-    .eq("id", projectId)
-    .single();
-  const project = projectData as unknown as { selected_chapters: number[] } | null;
-  const selectedChapters = project?.selected_chapters ?? [];
-
-  const targetChapters = selectedChapters.filter((c) => CHAPTER_TEMPLATE_MAP[c]);
   const results: ChapterReadiness[] = [];
+  for (const r of rates) {
+    const base = {
+      chapterNo: r.chapterNo,
+      totalItems: r.totalItems,
+      confirmedItems: r.confirmedItems,
+      readinessRate: r.readinessRate,
+      exceptionApprovedCount: r.exceptionApprovedCount,
+    };
+    if (!hasAmbiguityDetail(r.chapterNo)) {
+      results.push({ ...base, templateType: r.chapterNo === 4 ? "D" : "E", ambiguousCount: null, needHearingCount: null });
+      continue;
+    }
 
-  for (const chapterNo of targetChapters) {
-    const templateType = CHAPTER_TEMPLATE_MAP[chapterNo];
-
-    const { data: itemsData, error } = await supabase
-      .from("requirement_items")
-      .select("content, status, ambiguous_flags")
-      .eq("project_id", projectId)
-      .eq("chapter_no", chapterNo);
-    if (error) throw error;
-    const items = itemsData as unknown as ItemRow[];
-
+    const templateType = CHAPTER_TEMPLATE_MAP[r.chapterNo];
     const { data: columnsData } = await supabase
       .from("chapter_column_templates")
       .select("column_key, applicable_chapters")
       .eq("template_type", templateType);
     const columns = columnsData as unknown as ColumnRow[] | null;
     const columnKeys = (columns ?? [])
-      .filter((c) => c.applicable_chapters === null || c.applicable_chapters.includes(chapterNo))
+      .filter((c) => c.applicable_chapters === null || c.applicable_chapters.includes(r.chapterNo))
       .map((c) => c.column_key);
 
-    // 不採用項目は充足率・要ヒアリング件数等、すべての集計から除外する（対応不要と判断済みのため）
-    const activeItems = items?.filter((i) => i.status !== "rejected") ?? [];
-
-    const totalItems = activeItems.length;
-    const confirmedItems = activeItems.filter((i) => i.status === "confirmed" || i.status === "exception_approved").length;
-    const exceptionApprovedCount = activeItems.filter((i) => i.status === "exception_approved").length;
-    const ambiguousCount = activeItems.reduce((sum, i) => sum + (i.ambiguous_flags?.length ?? 0), 0);
-    const needHearingCount = activeItems.filter((i) =>
-      columnKeys.some((key) => !i.content?.[key] || i.content[key]!.trim() === "")
-    ).length;
+    // 不採用項目は曖昧表現・要ヒアリング件数から除外する（対応不要と判断済みのため）。1000行を超えても切り捨てないようページングする
+    const items = await fetchAllPages<ItemRow>((from, to) =>
+      supabase
+        .from("requirement_items")
+        .select("content, ambiguous_flags")
+        .eq("project_id", projectId)
+        .eq("chapter_no", r.chapterNo)
+        .neq("status", "rejected")
+        .order("created_at")
+        .order("id")
+        .range(from, to)
+    );
 
     results.push({
-      chapterNo,
+      ...base,
       templateType,
-      totalItems,
-      confirmedItems,
-      readinessRate: totalItems > 0 ? Math.round((confirmedItems / totalItems) * 100) : 0,
-      ambiguousCount,
-      needHearingCount,
-      exceptionApprovedCount,
+      ambiguousCount: items.reduce((sum, i) => sum + (i.ambiguous_flags?.length ?? 0), 0),
+      needHearingCount: items.filter((i) =>
+        columnKeys.some((key) => !i.content?.[key] || i.content[key]!.trim() === "")
+      ).length,
     });
   }
-
-  return results;
-}
-
-// D（4章KPI）・E（10章非機能要件）・ガント（15章進捗）はgetReadinessSummaryの対象外
-// （充足率という概念に馴染まないテンプレートのため）。このため別途、
-// 「未着手/進行中」の2段階のみの簡易判定を用意する（規約：確定の概念を無理に統一しない）。
-export async function getSimpleChapterStatuses(projectId: string): Promise<Record<number, "not_started" | "in_progress">> {
-  const supabase = await createServerActionClient();
-  const results: Record<number, "not_started" | "in_progress"> = {};
-
-  const { count: kpiCount } = await supabase.from("requirement_items").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("chapter_no", 4);
-  results[4] = (kpiCount ?? 0) > 0 ? "in_progress" : "not_started";
-
-  // nonfunctional_ux_phase1.md：未採用（status:'rejected'）の観点行は「検討したが採用しなかった」
-  // 記録に過ぎず、着手中とは言えないため、行数カウントから除外する。
-  const { count: nonFuncCount } = await supabase
-    .from("requirement_items")
-    .select("id", { count: "exact", head: true })
-    .eq("project_id", projectId)
-    .eq("chapter_no", 10)
-    .neq("status", "rejected");
-  results[10] = (nonFuncCount ?? 0) > 0 ? "in_progress" : "not_started";
-
-  const { count: progressCount } = await supabase.from("progress_tasks").select("id", { count: "exact", head: true }).eq("project_id", projectId);
-  results[15] = (progressCount ?? 0) > 0 ? "in_progress" : "not_started";
-
   return results;
 }

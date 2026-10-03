@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { CHAPTER_NAMES, chapterHref } from "@/lib/chapters";
-import { getReadinessSummary, getSimpleChapterStatuses } from "@/actions/readiness";
-import { chapterStatusFromReadiness, statusColor, type ChapterStatus } from "@/lib/chapter-status";
+import { getProjectProgress } from "@/actions/readiness";
+import { statusColor, type ChapterStatus } from "@/lib/chapter-status";
 
 export default async function ProjectLayout({
   children,
@@ -21,19 +21,11 @@ export default async function ProjectLayout({
 
   const selectedChapters = ((project?.selected_chapters as number[]) ?? []).sort((a, b) => a - b);
 
-  const [readiness, simpleStatuses] = await Promise.all([
-    getReadinessSummary(id),
-    getSimpleChapterStatuses(id),
-  ]);
-  const readinessMap = new Map<number, ChapterStatus>(
-    readiness.map((r) => [r.chapterNo, chapterStatusFromReadiness(r)])
-  );
-  const avgReadiness = readiness.length > 0
-    ? Math.round(readiness.reduce((sum, r) => sum + r.readinessRate, 0) / readiness.length)
-    : 0;
+  // 章ドット・全体進捗は、確定判定ダッシュボードと同じ集計（list_project_chapter_stats）から得る
+  const { statuses, avgReadiness } = await getProjectProgress(id);
 
   function chapterDot(chapterNo: number) {
-    const status: ChapterStatus = readinessMap.get(chapterNo) ?? simpleStatuses[chapterNo] ?? "not_started";
+    const status: ChapterStatus = statuses[chapterNo] ?? "not_started";
     // statusColor()のbgはバッジ用の淡い背景色で、--bg-sidebar（サイドバー自体の背景）と
     // 明度がほぼ同じため、6px程度の小さいドットに使うと視認できない
     // （実機確認：not_startedの淡いベージュがサイドバーの淡いベージュに沈む）。

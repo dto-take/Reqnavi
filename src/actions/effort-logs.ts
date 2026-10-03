@@ -2,6 +2,7 @@
 
 import { createServerActionClient } from "@/lib/supabase/server";
 import { errorMessage } from "@/lib/error-message";
+import { fetchAllPages } from "@/lib/paged-select";
 import { revalidatePath } from "next/cache";
 
 export type EffortLog = {
@@ -26,13 +27,17 @@ type EffortLogRow = {
 
 export async function listEffortLogs(projectId: string): Promise<EffortLog[]> {
   const supabase = await createServerActionClient();
-  const { data, error } = await supabase
-    .from("effort_logs")
-    .select("id, work_start_date, work_end_date, hours_spent, note, recorded_by, user_profiles(display_name)")
-    .eq("project_id", projectId)
-    .order("work_start_date", { ascending: false });
-  if (error) throw error;
-  return (data as unknown as EffortLogRow[]).map(({ user_profiles, ...log }) => ({
+  // 工数記録は日々増えて件数に上限が無いため、ページングする（規約62）
+  const data = await fetchAllPages<EffortLogRow>((from, to) =>
+    supabase
+      .from("effort_logs")
+      .select("id, work_start_date, work_end_date, hours_spent, note, recorded_by, user_profiles(display_name)")
+      .eq("project_id", projectId)
+      .order("work_start_date", { ascending: false })
+      .order("id")
+      .range(from, to)
+  );
+  return data.map(({ user_profiles, ...log }) => ({
     ...log,
     recordedByName: user_profiles?.display_name ?? "(不明)",
   }));

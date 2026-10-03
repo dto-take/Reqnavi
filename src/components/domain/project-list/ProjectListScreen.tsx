@@ -202,6 +202,7 @@ export function ProjectListScreen({
             {label}
           </span>
         ))}
+        <span data-legend-progress-note>※進捗（15章）は確定の対象外です</span>
       </div>
     </div>
   );

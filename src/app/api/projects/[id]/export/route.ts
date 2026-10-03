@@ -1,4 +1,5 @@
 import { createServerActionClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/paged-select";
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   HeadingLevel, WidthType, AlignmentType,
@@ -95,23 +96,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (templateType === "D") {
-      const { data: nodesData } = await supabase
-        .from("requirement_items")
-        .select("id, parent_id, content")
-        .eq("project_id", projectId)
-        .eq("chapter_no", chapterNo);
-      const nodes = (nodesData as unknown as KpiNodeRow[] | null) ?? [];
+      const nodes = await fetchAllPages<KpiNodeRow>((from, to) =>
+        supabase
+          .from("requirement_items")
+          .select("id, parent_id, content")
+          .eq("project_id", projectId)
+          .eq("chapter_no", chapterNo)
+          .order("id")
+          .range(from, to)
+      );
       sections.push(...renderKpiTree(nodes));
       continue;
     }
 
     if (templateType === "E") {
-      const { data: rowsData } = await supabase
-        .from("requirement_items")
-        .select("id, parent_id, content, status")
-        .eq("project_id", projectId)
-        .eq("chapter_no", chapterNo);
-      const rows = (rowsData as unknown as ChecklistRow[] | null) ?? [];
+      const rows = await fetchAllPages<ChecklistRow>((from, to) =>
+        supabase
+          .from("requirement_items")
+          .select("id, parent_id, content, status")
+          .eq("project_id", projectId)
+          .eq("chapter_no", chapterNo)
+          .order("id")
+          .range(from, to)
+      );
       sections.push(...renderChecklist(rows));
       continue;
     }
@@ -128,13 +135,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       (c) => c.applicable_chapters === null || c.applicable_chapters.includes(chapterNo)
     );
 
-    const { data: itemsData } = await supabase
-      .from("requirement_items")
-      .select("content")
-      .eq("project_id", projectId)
-      .eq("chapter_no", chapterNo)
-      .order("order_index");
-    const items = (itemsData as unknown as ItemRow[] | null) ?? [];
+    const items = await fetchAllPages<ItemRow>((from, to) =>
+      supabase
+        .from("requirement_items")
+        .select("content")
+        .eq("project_id", projectId)
+        .eq("chapter_no", chapterNo)
+        .order("order_index")
+        .order("id")
+        .range(from, to)
+    );
 
     if (items.length === 0) {
       sections.push(p("（この章にはまだ項目がありません）"));

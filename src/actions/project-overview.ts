@@ -1,9 +1,8 @@
 "use server";
 
 import { createServerActionClient } from "@/lib/supabase/server";
-import { getReadinessSummary, getSimpleChapterStatuses } from "@/actions/readiness";
+import { getProjectProgress } from "@/actions/readiness";
 import { listColumnDefs } from "@/actions/requirement-items";
-import { chapterStatusFromReadiness, type ChapterStatus } from "@/lib/chapter-status";
 import { pickBodyColumnKey } from "@/lib/requirement-body-field";
 
 type ProjectOverviewProject = {
@@ -45,19 +44,8 @@ export async function getProjectOverview(projectId: string) {
     .eq("project_id", projectId)
     .eq("status", "open");
 
-  const readiness = await getReadinessSummary(projectId);
-  const avgReadiness = readiness.length > 0
-    ? Math.round(readiness.reduce((sum, r) => sum + r.readinessRate, 0) / readiness.length)
-    : 0;
-
-  const simpleStatuses = await getSimpleChapterStatuses(projectId);
-  const chapterStatusMap: Record<number, ChapterStatus> = {};
-  for (const r of readiness) {
-    chapterStatusMap[r.chapterNo] = chapterStatusFromReadiness(r);
-  }
-  for (const [chapterNo, status] of Object.entries(simpleStatuses)) {
-    chapterStatusMap[Number(chapterNo)] = status;
-  }
+  // 確定判定ダッシュボード・サイドバーと同じ集計（list_project_chapter_stats）から得る
+  const { rates: readiness, statuses: chapterStatusMap, avgReadiness } = await getProjectProgress(projectId);
 
   return {
     project,

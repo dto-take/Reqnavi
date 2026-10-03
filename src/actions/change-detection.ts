@@ -2,6 +2,7 @@
 
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
+import { fetchAllPages } from "@/lib/paged-select";
 import { revalidatePath } from "next/cache";
 
 export type ItemDiff = {
@@ -40,19 +41,24 @@ export async function getDiffFromBaseline(projectId: string): Promise<ItemDiff[]
   const baseline = baselineData as unknown as { id: string } | null;
   if (!baseline) return [];
 
-  const { data: snapshotsData, error: snapError } = await supabase
-    .from("baseline_item_snapshots")
-    .select("item_id, chapter_no, content")
-    .eq("baseline_id", baseline.id);
-  if (snapError) throw snapError;
-  const snapshots = snapshotsData as unknown as SnapshotRow[];
+  // 案件の全章にまたがる取得のため、1000行ずつページングする（規約62。並びはidで一意にする）
+  const snapshots = await fetchAllPages<SnapshotRow>((from, to) =>
+    supabase
+      .from("baseline_item_snapshots")
+      .select("item_id, chapter_no, content")
+      .eq("baseline_id", baseline.id)
+      .order("id")
+      .range(from, to)
+  );
 
-  const { data: currentItemsData, error: curError } = await supabase
-    .from("requirement_items")
-    .select("id, chapter_no, content")
-    .eq("project_id", projectId);
-  if (curError) throw curError;
-  const currentItems = currentItemsData as unknown as CurrentItemRow[];
+  const currentItems = await fetchAllPages<CurrentItemRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id, chapter_no, content")
+      .eq("project_id", projectId)
+      .order("id")
+      .range(from, to)
+  );
 
   const snapshotMap = new Map((snapshots ?? []).map((s) => [s.item_id, s]));
   const currentMap = new Map((currentItems ?? []).map((i) => [i.id, i]));
@@ -122,13 +128,15 @@ export async function raiseChangeRequest(projectId: string, formData: FormData) 
 
 export async function listChangeRequests(projectId: string): Promise<ChangeRequestRow[]> {
   const supabase = await createServerActionClient();
-  const { data, error } = await supabase
-    .from("change_requests")
-    .select("id, item_id, chapter_no, change_type, reason, estimation_impact, status, raised_at")
-    .eq("project_id", projectId)
-    .order("raised_at", { ascending: false });
-  if (error) throw error;
-  const rows = data as unknown as ChangeRequestRow[];
+  const rows = await fetchAllPages<ChangeRequestRow>((from, to) =>
+    supabase
+      .from("change_requests")
+      .select("id, item_id, chapter_no, change_type, reason, estimation_impact, status, raised_at")
+      .eq("project_id", projectId)
+      .order("raised_at", { ascending: false })
+      .order("id")
+      .range(from, to)
+  );
 
   // estimation_impactはパートナーには不可視（RLSは行単位のためここで列マスキングする。
   // Phase3 Step5の実機検証で判明：行単位のRLSではこの列が入っている行自体が丸ごと

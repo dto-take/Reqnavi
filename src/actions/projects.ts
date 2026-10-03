@@ -6,6 +6,7 @@ import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { fetchAllPages } from "@/lib/paged-select";
 import { summarizeProject, type ChapterStat, type ListedProject } from "@/lib/project-list/derive";
 
 export type ListedProjectRow = ListedProject & { lastUpdatedByName: string | null };
@@ -15,7 +16,7 @@ type StatRow = {
   chapter_no: number;
   total_items: number;
   confirmed_items: number;
-  all_items: number;
+  exception_items: number;
   last_updated_at: string | null;
   last_updated_by: string | null;
 };
@@ -40,15 +41,7 @@ export async function listProjectsForList(): Promise<ListedProjectRow[]> {
   }[];
   if (projects.length === 0) return [];
 
-  const PAGE = 1000;
-  const stats: StatRow[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error: statError } = await supabase.rpc("list_project_chapter_stats").range(from, from + PAGE - 1);
-    if (statError) throw statError;
-    const rows = (data ?? []) as unknown as StatRow[];
-    stats.push(...rows);
-    if (rows.length < PAGE) break;
-  }
+  const stats = await fetchAllPages<StatRow>((from, to) => supabase.rpc("list_project_chapter_stats").range(from, to));
   const statsByProject = new Map<string, ChapterStat[]>();
   for (const r of stats) {
     const list = statsByProject.get(r.project_id) ?? [];
@@ -56,7 +49,7 @@ export async function listProjectsForList(): Promise<ListedProjectRow[]> {
       chapterNo: r.chapter_no,
       totalItems: Number(r.total_items),
       confirmedItems: Number(r.confirmed_items),
-      allItems: Number(r.all_items),
+      exceptionItems: Number(r.exception_items),
       updatedAt: r.last_updated_at,
       updatedBy: r.last_updated_by,
     });

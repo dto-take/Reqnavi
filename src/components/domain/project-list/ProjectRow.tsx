@@ -42,7 +42,7 @@ export function ProjectRow({ project: p }: { project: ListedProjectRow }) {
       <div className="flex items-center gap-2">
         <ChapterSegments summary={s} className="flex-1" />
         <span className="text-[11px] tabular-nums text-faint whitespace-nowrap">
-          {s.confirmedChapters}/{s.chapters.length}章
+          {s.confirmedChapters}/{s.confirmableChapters}章
         </span>
       </div>
       <span className="hidden text-xs tabular-nums text-secondary min-[900px]:block">
