@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { fromTotals } from "@/lib/chapter-stats";
 
 export default async function BaselinePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,10 +14,12 @@ export default async function BaselinePage({ params }: { params: Promise<{ id: s
   const { data: claims } = await supabase.auth.getClaims();
   const canApprove = ["admin", "pm"].includes(claims?.claims?.user_role as string);
 
-  const readiness = (baseline?.readiness_snapshot as { chapterNo: number; readinessRate: number }[]) ?? [];
-  const avgReadiness = readiness.length > 0
-    ? Math.round(readiness.reduce((sum, r) => sum + r.readinessRate, 0) / readiness.length)
-    : 0;
+  // 確定時点の確定率（確定項目数 ÷ 総項目数）。スナップショットは章ごとの総数・確定数を持つ
+  const snapshot = (baseline?.readiness_snapshot as { totalItems?: number; confirmedItems?: number }[] | null) ?? [];
+  const overall = fromTotals(
+    snapshot.reduce((sum, r) => sum + (r.totalItems ?? 0), 0),
+    snapshot.reduce((sum, r) => sum + (r.confirmedItems ?? 0), 0)
+  );
 
   return (
     <Card className="max-w-2xl mx-auto mt-10">
@@ -26,7 +29,7 @@ export default async function BaselinePage({ params }: { params: Promise<{ id: s
         <div className="mb-6 p-4 bg-sidebar rounded-md">
           <div className="text-sm font-medium text-primary">{baseline.version_no}（確定中）</div>
           <div className="text-xs text-secondary mt-1">確定日：{new Date(baseline.created_at).toLocaleDateString("ja-JP")}</div>
-          <div className="text-xs text-secondary">平均充足率（確定時点）：{avgReadiness}%</div>
+          <div className="text-xs text-secondary">確定率（確定時点）：{overall.rate}%（確定 {overall.confirmed} / {overall.total} 項目）</div>
           {baseline.approval_note && <div className="text-xs text-secondary mt-1">メモ：{baseline.approval_note}</div>}
         </div>
       ) : (

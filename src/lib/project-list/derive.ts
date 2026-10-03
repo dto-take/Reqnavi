@@ -2,7 +2,7 @@
 // 数え方は確定判定ダッシュボード・サイドバーの章ドットと一本化する（新しい判定基準は作らない）。
 import { CHAPTER_NAMES } from "../chapters";
 import type { ChapterStatus } from "../chapter-status";
-import { chapterStatusOf, isConfirmableChapter, type ChapterStat } from "../chapter-stats";
+import { chapterStatusOf, isConfirmableChapter, overallRate, type ChapterStat } from "../chapter-stats";
 
 // 章の状態・数える単位の定義は chapter-stats.ts / list_project_chapter_stats()（確定判定ダッシュボード・
 // サイドバー・案件トップと共通）。ここでは再定義しない。
@@ -40,15 +40,8 @@ export function summarizeProject(selectedChapters: number[], stats: ChapterStat[
   const targets = [...new Set(selectedChapters)].filter((n) => CHAPTER_NAMES[n]).sort((a, b) => a - b);
   const byChapter = new Map(stats.map((s) => [s.chapterNo, s]));
 
-  let total = 0;
-  let confirmed = 0;
-  for (const n of targets) {
-    if (!isConfirmableChapter(n)) continue;
-    const s = byChapter.get(n);
-    if (!s) continue;
-    total += s.totalItems;
-    confirmed += s.confirmedItems;
-  }
+  // 確定率の定義は chapter-stats.ts の overallRate（案件トップ・サイドバー・PowerPointと共通）
+  const { total, confirmed, rate, fraction } = overallRate(targets, stats);
 
   const chapters = targets.map((n) => ({ chapterNo: n, status: chapterStatusOf(n, byChapter.get(n)) }));
   const state = projectStateOf(total, confirmed);
@@ -77,8 +70,8 @@ export function summarizeProject(selectedChapters: number[], stats: ChapterStat[
   return {
     total,
     confirmed,
-    rate: total > 0 ? Math.round((confirmed / total) * 100) : 0,
-    fraction: total > 0 ? confirmed / total : 0,
+    rate,
+    fraction,
     state,
     chapters,
     confirmableChapters: chapters.filter((c) => isConfirmableChapter(c.chapterNo)).length,
@@ -100,6 +93,8 @@ export type ListedProject = {
   customerName: string;
   platform: string | null;
   summary: ProjectSummary;
+  // 自分がメンバーではない案件（管理者・PMO等にだけ一覧に出る）。集計は取れないため進捗は出さない
+  isMember: boolean;
 };
 
 export type StatusFilter = "all" | ProjectState;
@@ -123,12 +118,13 @@ export function filterBySearchAndCustomer(projects: ListedProject[], query: stri
 
 export function countByState(projects: ListedProject[]): Record<StatusFilter, number> {
   const counts: Record<StatusFilter, number> = { all: projects.length, in_progress: 0, not_started: 0, completed: 0 };
-  for (const p of projects) counts[p.summary.state] += 1;
+  // メンバーではない案件は「すべて」にだけ含め、進行中・未着手・完了には数えない
+  for (const p of projects) if (p.isMember) counts[p.summary.state] += 1;
   return counts;
 }
 
 export function filterByStatus(projects: ListedProject[], status: StatusFilter): ListedProject[] {
-  return status === "all" ? projects : projects.filter((p) => p.summary.state === status);
+  return status === "all" ? projects : projects.filter((p) => p.isMember && p.summary.state === status);
 }
 
 const ja = (a: string, b: string) => a.localeCompare(b, "ja");
@@ -156,5 +152,9 @@ export function sortProjects(projects: ListedProject[], key: SortKey): ListedPro
         return ja(a.customerName, b.customerName) || ja(a.name, b.name);
     }
   };
-  return [...projects].sort((a, b) => cmp(a, b) || byId(a, b));
+  // 進捗が取れない案件（メンバーではない案件）は、並べ替えのキーに依らず「進捗が高い順」では末尾に置く
+  return [...projects].sort((a, b) => {
+    if (key === "progress" && a.isMember !== b.isMember) return a.isMember ? -1 : 1;
+    return cmp(a, b) || byId(a, b);
+  });
 }

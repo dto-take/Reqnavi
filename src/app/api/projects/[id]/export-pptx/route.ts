@@ -127,7 +127,7 @@ async function addOverviewSlide(pres: PptxGenJS, projectId: string) {
   slide.addText("案件概要", { x: 0.5, y: 0.4, w: 12.3, h: 0.8, fontSize: 22, bold: true, color: NAVY });
 
   const stats: [string, string][] = [
-    ["平均充足率", `${overview.avgReadiness}%`],
+    ["確定率", `${overview.overall.rate}%（確定 ${overview.overall.confirmed} / ${overview.overall.total} 項目）`],
     ["資料件数", `${overview.documentCount}件`],
     ["メンバー", `${overview.memberCount}名`],
     ["ベースライン", overview.baseline?.version_no ?? "未確定"],

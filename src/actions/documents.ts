@@ -91,24 +91,3 @@ export async function listDocuments(projectId: string) {
       .range(from, to)
   );
 }
-
-export type RecentDocument = { id: string; fileName: string; updatedAt: string };
-
-// 案件トップ画面の「最近更新された資料」用。資料の中身へのリンクは持たず、
-// クリック先は一律で資料一覧（documents）画面とする。
-export async function getRecentDocuments(projectId: string, limit = 5): Promise<RecentDocument[]> {
-  const supabase = await createServerActionClient();
-  const { data, error } = await supabase
-    .from("source_documents")
-    .select("id, file_name, updated_at")
-    .eq("project_id", projectId)
-    .order("updated_at", { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-
-  return ((data ?? []) as unknown as { id: string; file_name: string; updated_at: string }[]).map((d) => ({
-    id: d.id,
-    fileName: d.file_name,
-    updatedAt: d.updated_at,
-  }));
-}

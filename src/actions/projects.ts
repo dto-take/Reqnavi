@@ -41,6 +41,16 @@ export async function listProjectsForList(): Promise<ListedProjectRow[]> {
   }[];
   if (projects.length === 0) return [];
 
+  // 自分がメンバーの案件（メンバー情報で明示的に判定する。集計結果の有無では推測しない）
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims?.sub as string | undefined;
+  const memberRows = userId
+    ? await fetchAllPages<{ project_id: string }>((from, to) =>
+        supabase.from("project_members").select("project_id").eq("user_id", userId).order("project_id").range(from, to)
+      )
+    : [];
+  const memberIds = new Set(memberRows.map((m) => m.project_id));
+
   const stats = await fetchAllPages<StatRow>((from, to) => supabase.rpc("list_project_chapter_stats").range(from, to));
   const statsByProject = new Map<string, ChapterStat[]>();
   for (const r of stats) {
@@ -63,6 +73,7 @@ export async function listProjectsForList(): Promise<ListedProjectRow[]> {
     customerName: p.organizations?.name ?? "―",
     platform: p.platform_knowledge_sets?.platform_name ?? null,
     summary: summarizeProject(p.selected_chapters ?? [], statsByProject.get(p.id) ?? []),
+    isMember: memberIds.has(p.id),
   }));
 
   const userIds = [...new Set(listed.map((p) => p.summary.lastUpdatedBy).filter((id): id is string => !!id))];

@@ -62,9 +62,28 @@ export function chapterRates(selectedChapters: number[], stats: ChapterStat[]): 
     });
 }
 
-// 全体進捗（サイドバー・案件トップ）：確定できる章の充足率の平均
-export function averageRate(rates: ChapterRate[]): number {
-  return rates.length > 0 ? Math.round(rates.reduce((sum, r) => sum + r.readinessRate, 0) / rates.length) : 0;
+// 案件全体の「確定率」：確定項目数 ÷ 総項目数。案件トップのヘッダー・サイドバー・案件一覧・
+// PowerPointの概要スライド・ベースラインが共用する唯一の定義。総数は不採用を除き、10章はチェック項目行を
+// 数えない（list_project_chapter_stats の定義どおり）。対象は案件の対象章のうち確定できる章（15章を除く）。
+// 章ごとの充足率の平均は、案件全体の指標としては使わない（章の件数の偏りで値が食い違うため）。
+export type OverallRate = { total: number; confirmed: number; rate: number; fraction: number };
+
+export function overallRate(selectedChapters: number[], stats: ChapterStat[]): OverallRate {
+  const byChapter = new Map(stats.map((s) => [s.chapterNo, s]));
+  let total = 0;
+  let confirmed = 0;
+  for (const n of new Set(selectedChapters)) {
+    if (!isConfirmableChapter(n)) continue;
+    const s = byChapter.get(n);
+    if (!s) continue;
+    total += s.totalItems;
+    confirmed += s.confirmedItems;
+  }
+  return fromTotals(total, confirmed);
+}
+
+export function fromTotals(total: number, confirmed: number): OverallRate {
+  return { total, confirmed, rate: total > 0 ? Math.round((confirmed / total) * 100) : 0, fraction: total > 0 ? confirmed / total : 0 };
 }
 
 // 章ごとに全対象章の状態（15章を含む）

@@ -507,7 +507,7 @@ create policy "progress_tasks_delete" on progress_tasks for delete using (is_pro
 - **ヘッダーの共通化**：ログイン後の共通ヘッダー（ReqNaviロゴ・ユーザー名・ログアウト）は`src/app/projects/layout.tsx`が担う。`/projects`配下（一覧・詳細・新規作成）全体にネストされる。案件詳細のサイドバー（`src/app/projects/[id]/layout.tsx`）はこの内側に乗る構成で、ロゴの重複表示はしない。`/admin/partners`等、この階層に含まれないページには適用されない点に注意。
 - **確定判定の集計は、定義を1か所（DBの集計関数）に集約している**：
   - 総数・確定数は、SQL関数`list_project_chapter_stats(p_project_id uuid default null)`（`security invoker`＝RLSがそのまま効く。自分がメンバーの案件の行だけを返す。引数省略で見える全案件）が唯一の定義。確定判定ダッシュボード（`getReadinessSummary`）・サイドバーと案件トップ（`getProjectProgress`）・案件一覧（`listProjectsForList`）は、すべてここから数える。項目の行を取得してTS側で数えない（PostgRESTの1000行上限で黙って切り捨てられるため）。
-  - 章の状態・充足率・全体進捗を決めるTS側の関数は`src/lib/chapter-stats.ts`の1か所（`chapterStatusOf`／`chapterRates`／`averageRate`）。総数0＝未着手／確定数＝総数＝確定／それ以外＝進行中。15章だけは確定が無く、未着手／進行中の2段階。
+  - 章の状態・章別の充足率を決めるTS側の関数は`src/lib/chapter-stats.ts`の1か所（`chapterStatusOf`／`chapterRates`）。案件全体の「確定率」は確定項目数÷総項目数（`overallRate`。15章を除く。章ごとの充足率の平均は使わない）で、案件トップのヘッダー・サイドバー・案件一覧・PowerPointの概要・ベースラインが共用する。総数0＝未着手／確定数＝総数＝確定／それ以外＝進行中。15章だけは確定が無く、未着手／進行中の2段階。
   - 曖昧表現・要ヒアリングの件数は確定数とは別の詳細で、A/B/C章のみ`getReadinessSummary`が項目の内容から数える（4章・10章は対象外で、ダッシュボードでは「—」）。
 
   | 章 | 数える単位（総数） | 確定の条件 |

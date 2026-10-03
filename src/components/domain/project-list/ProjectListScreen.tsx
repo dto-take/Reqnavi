@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { ListedProjectRow } from "@/actions/projects";
 import { ProjectCard } from "@/components/domain/project-list/ProjectCard";
 import { ProjectRow, ProjectTableHeader } from "@/components/domain/project-list/ProjectRow";
 import { Card } from "@/components/ui/card";
+import { usePersistedValue } from "@/lib/use-persisted-value";
 import { Input, Select } from "@/components/ui/input";
 import { buttonClasses } from "@/components/ui/button";
 import {
@@ -18,37 +19,10 @@ import {
 } from "@/lib/project-list/derive";
 
 // 表示形式（カード／一覧）はlocalStorageに保存して次回も復元する。既定はカード。
-// 規約54：localStorage同期はuseSyncExternalStoreを使う（useEffect＋setStateは使わない）。
-// サーバー描画（getServerSnapshot）は常にカード。ブラウザごとの保存なので、別のブラウザ・
-// シークレットウィンドウでは既定のカードに戻る。
+// 保存は共通フック usePersistedValue（useSyncExternalStore。規約54）。ブラウザごとの保存なので、
+// 別のブラウザ・シークレットウィンドウでは既定のカードに戻る。
 type ViewMode = "card" | "list";
 const VIEW_KEY = "reqnavi:project-list-view";
-const viewListeners = new Set<() => void>();
-
-function subscribeView(listener: () => void) {
-  viewListeners.add(listener);
-  window.addEventListener("storage", listener);
-  return () => {
-    viewListeners.delete(listener);
-    window.removeEventListener("storage", listener);
-  };
-}
-function getViewSnapshot(): ViewMode {
-  try {
-    return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "card";
-  } catch {
-    return "card";
-  }
-}
-const getViewServerSnapshot = (): ViewMode => "card";
-function setView(next: ViewMode) {
-  try {
-    localStorage.setItem(VIEW_KEY, next);
-  } catch {
-    // 保存できなくても、この画面での切替自体は反映する
-  }
-  viewListeners.forEach((l) => l());
-}
 
 const STATUS_CHIPS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "すべて" },
@@ -72,7 +46,8 @@ export function ProjectListScreen({
   projects: ListedProjectRow[];
   initialCustomerId: string;
 }) {
-  const view = useSyncExternalStore(subscribeView, getViewSnapshot, getViewServerSnapshot);
+  const [viewRaw, setView] = usePersistedValue(VIEW_KEY, "card");
+  const view: ViewMode = viewRaw === "list" ? "list" : "card";
   const [query, setQuery] = useState("");
   const customers = useMemo(() => {
     const map = new Map<string, string>();

@@ -33,6 +33,18 @@ export function BulkGenerateZone({
 
   function startGeneration() {
     const targets = chapters.filter((c) => selected.has(c.chapterNo));
+    // 確認文は generateDraft の実際の挙動（ai_draft の項目のみ削除して再生成。それ以外のステータスは保持）と一致させる
+    if (
+      !confirm(
+        `選択した${targets.length}章のAI素案を生成します。
+
+・「AI素案（未確認）」のままの項目は削除され、新しい素案に置き換わります。
+・「確認中」「確定」「例外承認」「不採用」の項目は上書きされず、そのまま残ります。
+
+よろしいですか？`
+      )
+    )
+      return;
     setStatuses(Object.fromEntries(targets.map((c) => [c.chapterNo, { status: "pending" as const }])));
 
     startTransition(async () => {

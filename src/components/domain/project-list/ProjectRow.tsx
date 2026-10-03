@@ -39,15 +39,27 @@ export function ProjectRow({ project: p }: { project: ListedProjectRow }) {
         {p.platform && <PlatformTag name={p.platform} />}
       </div>
       <span className="truncate text-secondary">{p.customerName}</span>
-      <div className="flex items-center gap-2">
-        <ChapterSegments summary={s} className="flex-1" />
-        <span className="text-[11px] tabular-nums text-faint whitespace-nowrap">
-          {s.confirmedChapters}/{s.confirmableChapters}章
+      {p.isMember ? (
+        <div className="flex items-center gap-2">
+          <ChapterSegments summary={s} className="flex-1" />
+          <span className="text-[11px] tabular-nums text-faint whitespace-nowrap">
+            {s.confirmedChapters}/{s.confirmableChapters}章
+          </span>
+        </div>
+      ) : (
+        <span data-not-member className="truncate text-[11px] text-secondary">
+          メンバーではない案件のため、進捗は表示されません
         </span>
-      </div>
+      )}
       <span className="hidden text-xs tabular-nums text-secondary min-[900px]:block">
-        {s.confirmed}/{s.total}{" "}
-        <span className={s.rate === 0 ? "text-faint" : "text-primary"}>{s.rate}%</span>
+        {p.isMember ? (
+          <>
+            {s.confirmed}/{s.total}{" "}
+            <span className={s.rate === 0 ? "text-faint" : "text-primary"}>{s.rate}%</span>
+          </>
+        ) : (
+          "―"
+        )}
       </span>
       <span className="hidden truncate text-[11px] text-faint min-[900px]:block">
         <LastUpdated at={s.lastUpdatedAt} by={p.lastUpdatedByName} />

@@ -5,12 +5,13 @@ import { CHAPTER_TEMPLATE_MAP } from "@/lib/chapters";
 import type { ChapterStatus } from "@/lib/chapter-status";
 import { fetchAllPages } from "@/lib/paged-select";
 import {
-  averageRate,
+  overallRate,
   chapterRates,
   chapterStatuses,
   hasAmbiguityDetail,
   type ChapterRate,
   type ChapterStat,
+  type OverallRate,
 } from "@/lib/chapter-stats";
 
 export type ChapterReadiness = {
@@ -57,22 +58,45 @@ async function getSelectedChapters(projectId: string): Promise<number[]> {
 }
 
 // サイドバー・案件トップ用の軽量な進捗（確定数・総数のみ。曖昧表現等の詳細は取得しない）。
-// 全対象章の状態（15章を含む）、確定できる章の充足率、その平均（全体進捗）を返す。
+// 全対象章の状態（15章を含む）、確定できる章の充足率、案件全体の確定率（確定項目数 ÷ 総項目数）を返す。
 export async function getProjectProgress(projectId: string): Promise<{
   rates: ChapterRate[];
   statuses: Record<number, ChapterStatus>;
-  avgReadiness: number;
+  overall: OverallRate;
 }> {
   const [selectedChapters, stats] = await Promise.all([getSelectedChapters(projectId), getChapterStats(projectId)]);
   const rates = chapterRates(selectedChapters, stats);
-  return { rates, statuses: chapterStatuses(selectedChapters, stats), avgReadiness: averageRate(rates) };
+  return { rates, statuses: chapterStatuses(selectedChapters, stats), overall: overallRate(selectedChapters, stats) };
 }
 
 type ItemRow = {
   content: Record<string, string | null>;
-  ambiguous_flags: unknown[] | null;
 };
 type ColumnRow = { column_key: string; applicable_chapters: number[] | null };
+
+// 曖昧表現の件数（章番号→件数。A/B/C章のみ。不採用の項目は除く）。確定判定ダッシュボード・
+// サイドバーの⚠バッジ・案件トップの章カードが、この1つの定義を共用する。
+// フラグを持つ項目の行だけを取得する（フラグ無しの大多数は転送しない）。
+export async function getAmbiguousCounts(projectId: string, selectedChapters?: number[]): Promise<Record<number, number>> {
+  const supabase = await createServerActionClient();
+  const chapters = (selectedChapters ?? (await getSelectedChapters(projectId))).filter((c) => CHAPTER_TEMPLATE_MAP[c]);
+  const counts: Record<number, number> = {};
+  for (const c of chapters) counts[c] = 0;
+  if (chapters.length === 0) return counts;
+  const rows = await fetchAllPages<{ chapter_no: number; ambiguous_flags: unknown[] | null }>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("chapter_no, ambiguous_flags")
+      .eq("project_id", projectId)
+      .in("chapter_no", chapters)
+      .neq("status", "rejected")
+      .neq("ambiguous_flags", "[]")
+      .order("id")
+      .range(from, to)
+  );
+  for (const r of rows) counts[r.chapter_no] = (counts[r.chapter_no] ?? 0) + (r.ambiguous_flags?.length ?? 0);
+  return counts;
+}
 
 // 確定判定ダッシュボード用。総数・確定数・例外承認件数は集計関数から、曖昧表現・要ヒアリングの件数は
 // A/B/C章の項目の内容から数える（4章・10章は対象外）。
@@ -80,6 +104,7 @@ export async function getReadinessSummary(projectId: string): Promise<ChapterRea
   const supabase = await createServerActionClient();
   const [selectedChapters, stats] = await Promise.all([getSelectedChapters(projectId), getChapterStats(projectId)]);
   const rates = chapterRates(selectedChapters, stats);
+  const ambiguousCounts = await getAmbiguousCounts(projectId, selectedChapters);
 
   const results: ChapterReadiness[] = [];
   for (const r of rates) {
@@ -109,7 +134,7 @@ export async function getReadinessSummary(projectId: string): Promise<ChapterRea
     const items = await fetchAllPages<ItemRow>((from, to) =>
       supabase
         .from("requirement_items")
-        .select("content, ambiguous_flags")
+        .select("content")
         .eq("project_id", projectId)
         .eq("chapter_no", r.chapterNo)
         .neq("status", "rejected")
@@ -121,7 +146,7 @@ export async function getReadinessSummary(projectId: string): Promise<ChapterRea
     results.push({
       ...base,
       templateType,
-      ambiguousCount: items.reduce((sum, i) => sum + (i.ambiguous_flags?.length ?? 0), 0),
+      ambiguousCount: ambiguousCounts[r.chapterNo] ?? 0,
       needHearingCount: items.filter((i) =>
         columnKeys.some((key) => !i.content?.[key] || i.content[key]!.trim() === "")
       ).length,

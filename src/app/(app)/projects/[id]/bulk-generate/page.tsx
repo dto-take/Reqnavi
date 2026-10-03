@@ -26,6 +26,10 @@ export default async function BulkGeneratePage({ params }: { params: Promise<{ i
       <p className="text-xs text-secondary mb-4">
         テンプレートA/B/C（4章KPI・10章非機能要件・15章進捗は対象外）の章から選択し、まとめてAI素案を生成します。処理は1章ずつ順番に行われます。
       </p>
+      <p className="text-xs text-secondary mb-4" data-bulk-generate-note>
+        選んだ章では、「AI素案（未確認）」のまま人の手が入っていない項目だけが削除され、新しい素案に置き換わります。
+        「確認中」「確定」「例外承認」「不採用」にした項目は上書きされず、そのまま残ります。
+      </p>
       <BulkGenerateZone projectId={id} tenantId={tenantId ?? ""} chapters={chapters} />
     </Card>
   );

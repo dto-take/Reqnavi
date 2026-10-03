@@ -23,7 +23,7 @@ export function LastUpdated({ at, by }: { at: string | null; by: string | null }
 
 export function ctaOf(p: ListedProjectRow): { label: string; href: string; variant: "primary" | "secondary" } {
   const s = p.summary;
-  if (s.cta === "open" || s.continueChapterNo === null) return { label: "案件を開く →", href: `/projects/${p.id}`, variant: "secondary" };
+  if (!p.isMember || s.cta === "open" || s.continueChapterNo === null) return { label: "案件を開く →", href: `/projects/${p.id}`, variant: "secondary" };
   const chapter = CHAPTER_NAMES[s.continueChapterNo];
   return {
     label: `${chapter}から${s.cta === "continue" ? "続ける" : "始める"} →`,
@@ -56,16 +56,24 @@ export function ProjectCard({ project: p }: { project: ListedProjectRow }) {
         </Link>
       </h2>
 
-      <ChapterSegments summary={s} />
-      <div className="mb-4 mt-2 flex items-baseline gap-3 text-xs tabular-nums text-secondary">
-        <span className={`text-sm font-semibold ${s.rate === 0 ? "text-faint" : "text-primary"}`}>{s.rate}%</span>
-        <span>
-          確定 {s.confirmed} / {s.total} 項目
-        </span>
-        <span className="ml-auto">
-          {s.confirmedChapters}/{s.confirmableChapters}章
-        </span>
-      </div>
+      {p.isMember ? (
+        <>
+          <ChapterSegments summary={s} />
+          <div className="mb-4 mt-2 flex items-baseline gap-3 text-xs tabular-nums text-secondary">
+            <span className={`text-sm font-semibold ${s.rate === 0 ? "text-faint" : "text-primary"}`}>{s.rate}%</span>
+            <span>
+              確定 {s.confirmed} / {s.total} 項目
+            </span>
+            <span className="ml-auto">
+              {s.confirmedChapters}/{s.confirmableChapters}章
+            </span>
+          </div>
+        </>
+      ) : (
+        <p data-not-member className="mb-4 mt-1 text-xs text-secondary">
+          メンバーではない案件のため、進捗は表示されません
+        </p>
+      )}
 
       <div className="mt-auto flex items-center justify-between gap-2 border-t border-hover pt-3">
         <span className="min-w-0 truncate text-[11px] text-faint">
