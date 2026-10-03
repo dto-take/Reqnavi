@@ -6,43 +6,81 @@ import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { summarizeProject, type ChapterStat, type ListedProject } from "@/lib/project-list/derive";
 
-export async function listProjects(organizationId?: string) {
+export type ListedProjectRow = ListedProject & { lastUpdatedByName: string | null };
+
+type StatRow = {
+  project_id: string;
+  chapter_no: number;
+  total_items: number;
+  confirmed_items: number;
+  all_items: number;
+  last_updated_at: string | null;
+  last_updated_by: string | null;
+};
+
+// project_list_ux.md：案件一覧用。案件×章の集計はSQL関数（list_project_chapter_stats、security invoker
+// なのでRLSがそのまま効く）で行い、項目の行は取得しない（PostgRESTの1000行上限で黙って切り捨てられるため）。
+// 関数の返す行数は案件数×章数なので、上限に達しないようページングして全件取得する。
+// 最終更新者の名前は、必要なidをまとめて1回で取得する（案件ごとの個別クエリにしない）。
+export async function listProjectsForList(): Promise<ListedProjectRow[]> {
   const supabase = await createServerActionClient();
-  let query = supabase
+  const { data: projectsData, error } = await supabase
     .from("projects")
-    .select("id, name, selected_chapters, organizations(id, name)")
+    .select("id, name, selected_chapters, organizations(id, name), platform_knowledge_sets(platform_name)")
     .order("created_at", { ascending: false });
-  if (organizationId) query = query.eq("organization_id", organizationId);
-  const { data, error } = await query;
   if (error) throw error;
-  return data;
-}
+  const projects = projectsData as unknown as {
+    id: string;
+    name: string;
+    selected_chapters: number[] | null;
+    organizations: { id: string; name: string } | null;
+    platform_knowledge_sets: { platform_name: string } | null;
+  }[];
+  if (projects.length === 0) return [];
 
-export type ProjectReadinessSummary = { total: number; confirmed: number };
-
-// 案件一覧カードの簡易サマリー用。readiness機能（getReadinessSummary）は章ごとに
-// 列定義まで見て詳細な要ヒアリング件数等を出すため一覧の全案件分を都度呼ぶには重く、
-// ここでは確定率だけを見せたいので全案件分をまとめて1回のクエリで取得し、JS側で集計する
-export async function listProjectsReadinessSummary(
-  projectIds: string[]
-): Promise<Record<string, ProjectReadinessSummary>> {
-  if (projectIds.length === 0) return {};
-  const supabase = await createServerActionClient();
-  const { data, error } = await supabase
-    .from("requirement_items")
-    .select("project_id, status")
-    .in("project_id", projectIds);
-  if (error) throw error;
-
-  const summary: Record<string, ProjectReadinessSummary> = {};
-  for (const row of data as { project_id: string; status: string }[]) {
-    const entry = summary[row.project_id] ?? { total: 0, confirmed: 0 };
-    entry.total += 1;
-    if (row.status === "confirmed" || row.status === "exception_approved") entry.confirmed += 1;
-    summary[row.project_id] = entry;
+  const PAGE = 1000;
+  const stats: StatRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error: statError } = await supabase.rpc("list_project_chapter_stats").range(from, from + PAGE - 1);
+    if (statError) throw statError;
+    const rows = (data ?? []) as unknown as StatRow[];
+    stats.push(...rows);
+    if (rows.length < PAGE) break;
   }
-  return summary;
+  const statsByProject = new Map<string, ChapterStat[]>();
+  for (const r of stats) {
+    const list = statsByProject.get(r.project_id) ?? [];
+    list.push({
+      chapterNo: r.chapter_no,
+      totalItems: Number(r.total_items),
+      confirmedItems: Number(r.confirmed_items),
+      allItems: Number(r.all_items),
+      updatedAt: r.last_updated_at,
+      updatedBy: r.last_updated_by,
+    });
+    statsByProject.set(r.project_id, list);
+  }
+
+  const listed = projects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    customerId: p.organizations?.id ?? null,
+    customerName: p.organizations?.name ?? "―",
+    platform: p.platform_knowledge_sets?.platform_name ?? null,
+    summary: summarizeProject(p.selected_chapters ?? [], statsByProject.get(p.id) ?? []),
+  }));
+
+  const userIds = [...new Set(listed.map((p) => p.summary.lastUpdatedBy).filter((id): id is string => !!id))];
+  const names = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase.from("user_profiles").select("user_id, display_name").in("user_id", userIds);
+    for (const u of (profiles ?? []) as unknown as { user_id: string; display_name: string | null }[]) {
+      if (u.display_name) names.set(u.user_id, u.display_name);
+    }
+  }
+  return listed.map((p) => ({ ...p, lastUpdatedByName: p.summary.lastUpdatedBy ? names.get(p.summary.lastUpdatedBy) ?? null : null }));
 }
 
 export async function listOrganizations() {

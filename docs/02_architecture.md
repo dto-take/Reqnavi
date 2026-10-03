@@ -505,10 +505,10 @@ create policy "progress_tasks_delete" on progress_tasks for delete using (is_pro
 ## 4.5 補足：画面構成・集計ロジックに関する実装メモ
 
 - **ヘッダーの共通化**：ログイン後の共通ヘッダー（ReqNaviロゴ・ユーザー名・ログアウト）は`src/app/projects/layout.tsx`が担う。`/projects`配下（一覧・詳細・新規作成）全体にネストされる。案件詳細のサイドバー（`src/app/projects/[id]/layout.tsx`）はこの内側に乗る構成で、ロゴの重複表示はしない。`/admin/partners`等、この階層に含まれないページには適用されない点に注意。
-- **充足率集計は2種類存在する**：
+- **充足率集計は複数存在する**：
   - `getReadinessSummary`（`src/actions/readiness.ts`）：単一案件の章別詳細（充足率・曖昧表現件数・要ヒアリング件数）を算出する重めの処理。確定判定ダッシュボード（`/projects/{id}/readiness`）で使用。
-  - `listProjectsReadinessSummary`：案件一覧画面で全案件分の概況（確定率程度の軽量な指標）を表示するための軽量版。`requirement_items`のstatusのみを集計し、章別の詳細ロジック（曖昧表現・要ヒアリング判定等）は行わない。
-  この2つを混同して片方だけ修正しないよう注意する（例えば充足率の定義を変える場合、両方に影響が無いか確認する）。
+  - SQL関数`list_project_chapter_stats()`（`security invoker`＝RLSがそのまま効く）：案件一覧画面用。案件×章ごとに、総数（不採用を除く）・確定数（confirmed／exception_approved）・不採用を含む総数・最終更新日時・最終更新者を返す（15章は`progress_tasks`の件数）。項目の行を全件取得して数える方式はPostgRESTの1000行上限で切り捨てられるため、DBで集計する。旧`listProjectsReadinessSummary`はこれに置き換えて撤去した。どの章を確定率の分母に含めるか（A/B/C章のみ。4・10・15章は含めない）と章の状態判定は`src/lib/project-list/derive.ts`が、確定判定ダッシュボード・サイドバーの章ドットと同じ基準で行う。
+  充足率・章状態の定義を変える場合は、`getReadinessSummary`・`getSimpleChapterStatuses`（サイドバー）・`derive.ts`の3か所に影響が無いか確認する。
 
 ## 5. AI呼び出しフロー
 

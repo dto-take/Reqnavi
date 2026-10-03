@@ -24,3 +24,9 @@ export const CHAPTER_GROUPS: { label: string; chapters: number[] }[] = [
   { label: "運用・定着", chapters: [12, 13, 14] },
   { label: "進捗管理", chapters: [15] },
 ];
+
+// 章ページのURL。4・10・15章は固定ルート（chapters/4 等。上記CHAPTER_TEMPLATE_MAPのコメント参照）
+// だが、いずれも /chapters/{番号} の形で到達できる。URLを手書きせずここで組み立てる。
+export function chapterHref(projectId: string, chapterNo: number): string {
+  return `/projects/${projectId}/chapters/${chapterNo}`;
+}

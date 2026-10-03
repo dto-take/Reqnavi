@@ -10,7 +10,7 @@ export function statusColor(status: ChapterStatus): { bg: string; text: string }
 
 // A/B/C章向け。純粋な同期関数のため、"use server"ファイル（src/actions/readiness.ts）には
 // 置けない（規約17：非同期関数以外をexportできない）。ここに切り出す。
-export function chapterStatusFromReadiness(r: ChapterReadiness): ChapterStatus {
+export function chapterStatusFromReadiness(r: Pick<ChapterReadiness, "totalItems" | "readinessRate">): ChapterStatus {
   if (r.totalItems === 0) return "not_started";
   if (r.readinessRate >= 100) return "confirmed";
   return "in_progress";

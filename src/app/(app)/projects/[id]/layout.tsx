@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createServerActionClient } from "@/lib/supabase/server";
-import { CHAPTER_NAMES } from "@/lib/chapters";
+import { CHAPTER_NAMES, chapterHref } from "@/lib/chapters";
 import { getReadinessSummary, getSimpleChapterStatuses } from "@/actions/readiness";
 import { chapterStatusFromReadiness, statusColor, type ChapterStatus } from "@/lib/chapter-status";
 
@@ -85,7 +85,7 @@ export default async function ProjectLayout({
             {selectedChapters.map((n) => (
               <Link
                 key={n}
-                href={`/projects/${id}/chapters/${n}`}
+                href={chapterHref(id, n)}
                 className="text-sm text-secondary hover:text-primary hover:bg-hover rounded px-2 py-1 flex items-center gap-2"
               >
                 {chapterDot(n)}

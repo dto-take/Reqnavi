@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box}body{margin:0;background:#f2efe7;color:#1b1a17;font-family:"Zen Kaku Gothic New",system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:#2f5d45;text-decoration:none}a:hover{color:#20422f}input::placeholder{color:#8b8474}input:focus,select:focus{outline:2px solid #2f5d45;outline-offset:1px}</style></helmet>
+
+<div style="min-height:100vh;background:#f2efe7">
+  <header style="background:#faf8f3;border-bottom:1px solid #e3ded2;padding:0 28px;height:52px;display:flex;align-items:center;gap:22px">
+    <div style="display:flex;align-items:center;gap:9px"><span style="width:24px;height:24px;border-radius:50%;background:#2f5d45;color:#fff;font:700 13px/24px 'IBM Plex Mono',monospace;text-align:center">R</span><span style="font:700 14px/1 'Zen Kaku Gothic New',sans-serif">ReqNavi</span></div>
+    <a href="#" style="font:400 13px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">顧客管理</a>
+    <a href="#" style="font:400 13px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">ユーザ管理</a>
+  </header>
+
+  <main style="max-width:1120px;margin:0 auto;padding:32px 28px 56px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <span style="font:500 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6f6a5e">PROJECTS</span>
+        <h1 style="margin:0;font:600 26px/1.2 'Shippori Mincho',serif">案件一覧</h1>
+      </div>
+      <button style="margin-left:auto;font:500 13px/1 'Zen Kaku Gothic New',sans-serif;color:#fff;background:#2f5d45;border:none;border-radius:9px;padding:12px 18px;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(27,26,23,.14)" style-hover="background:#254a37">＋ 新規案件</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px;max-width:340px;position:relative">
+        <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="案件名・顧客名で検索" style="width:100%;font:400 13px/1 'Zen Kaku Gothic New',sans-serif;color:#1b1a17;background:#fff;border:1px solid #d8d2c4;border-radius:9px;padding:12px 14px" />
+      </div>
+      <select value="{{ customer }}" onChange="{{ onCustomer }}" style="font:500 12.5px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:9px;padding:12px 12px;cursor:pointer">
+        <sc-for list="{{ customerOptions }}" as="o" hint-placeholder-count="3"><option value="{{ o.value }}">{{ o.label }}</option></sc-for>
+      </select>
+      <select value="{{ sort }}" onChange="{{ onSort }}" style="font:500 12.5px/1 'Zen Kaku Gothic New',sans-serif;color:#3c382f;background:#fff;border:1px solid #d8d2c4;border-radius:9px;padding:12px 12px;cursor:pointer">
+        <option value="updated">更新が新しい順</option><option value="progress">進捗が高い順</option><option value="name">案件名順</option><option value="customer">顧客別にまとめる</option>
+      </select>
+      <div style="margin-left:auto;display:flex;border:1px solid #d8d2c4;border-radius:9px;overflow:hidden;background:#fff" role="group" aria-label="表示形式">
+        <button onClick="{{ setCard }}" style="font:500 12.5px/1 'Zen Kaku Gothic New',sans-serif;border:none;padding:12px 14px;cursor:pointer;white-space:nowrap;background:{{ cardBg }};color:{{ cardFg }}">▦ カード</button>
+        <button onClick="{{ setTable }}" style="font:500 12.5px/1 'Zen Kaku Gothic New',sans-serif;border:none;border-left:1px solid #e3ded2;padding:12px 14px;cursor:pointer;white-space:nowrap;background:{{ tableBg }};color:{{ tableFg }}">☰ 一覧</button>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+        <button onClick="{{ c.onClick }}" style="font:500 12px/1 'Zen Kaku Gothic New',sans-serif;border-radius:20px;padding:8px 14px;cursor:pointer;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }} <span style="font-family:'IBM Plex Mono',monospace;color:{{ c.numFg }}">{{ c.count }}</span></button>
+      </sc-for>
+      <span style="margin-left:auto;font:400 11.5px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">{{ resultLabel }}</span>
+    </div>
+
+    <sc-if value="{{ isCard }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+        <sc-for list="{{ cards }}" as="p" hint-placeholder-count="2">
+          <article onClick="{{ p.open }}" style="background:#faf8f3;border:1px solid #e3ded2;border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;cursor:pointer;box-shadow:0 1px 2px rgba(27,26,23,.05)" style-hover="border-color:#b3ac9c;background:#fff">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font:400 12px/1.4 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.customer }}</span>
+              <span style="margin-left:auto;font:500 10.5px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;background:#fff;border:1px solid #e3ded2;border-radius:20px;padding:4px 9px;white-space:nowrap">{{ p.platform }}</span>
+            </div>
+            <h2 style="margin:0;font:600 18px/1.45 'Shippori Mincho',serif;text-wrap:pretty">{{ p.name }}</h2>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;gap:2px">
+                <sc-for list="{{ p.segs }}" as="s" hint-placeholder-count="15"><span style="flex:1;height:7px;border-radius:2px;background:{{ s.c }}"></span></sc-for>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+                <span style="font:500 15px/1 'IBM Plex Mono',monospace;color:{{ p.pctColor }}">{{ p.pct }}</span>
+                <span style="font:400 12px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">確定 {{ p.done }} / {{ p.total }} 項目</span>
+                <span style="margin-left:auto;font:400 11px/1 'IBM Plex Mono',monospace;color:#7a7466">{{ p.chapters }}</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;border-top:1px solid #ece7dc;padding-top:13px;flex-wrap:wrap">
+              <span style="font:400 11px/1.4 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e">{{ p.updated }}</span>
+              <button onClick="{{ p.open }}" style="margin-left:auto;font:500 12px/1 'Zen Kaku Gothic New',sans-serif;border-radius:8px;padding:10px 13px;cursor:pointer;white-space:nowrap;border:1px solid {{ p.ctaBd }};background:{{ p.ctaBg }};color:{{ p.ctaFg }}">{{ p.cta }}</button>
+            </div>
+          </article>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTable }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#faf8f3;border:1px solid #e3ded2;border-radius:14px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1.3fr) 168px 112px 104px 44px;background:#f4f1e9;border-bottom:1px solid #e3ded2">
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#6f6a5e;padding:13px 20px">案件</span>
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#6f6a5e;padding:13px 8px">顧客</span>
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#6f6a5e;padding:13px 8px">15章の進捗</span>
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#6f6a5e;padding:13px 8px">確定項目</span>
+          <span style="font:500 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#6f6a5e;padding:13px 8px">最終更新</span>
+          <span></span>
+        </div>
+        <sc-for list="{{ cards }}" as="p" hint-placeholder-count="2">
+          <div onClick="{{ p.open }}" style="display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1.3fr) 168px 112px 104px 44px;align-items:center;border-bottom:1px solid #ece7dc;cursor:pointer;background:#faf8f3" style-hover="background:#fff">
+            <div style="padding:16px 20px;display:flex;align-items:center;gap:9px;min-width:0">
+              <span style="font:600 14.5px/1.4 'Shippori Mincho',serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</span>
+              <span style="font:500 10px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;background:#fff;border:1px solid #e3ded2;border-radius:20px;padding:3px 8px;white-space:nowrap;flex:none">{{ p.platform }}</span>
+            </div>
+            <span style="font:400 12.5px/1.4 'Zen Kaku Gothic New',sans-serif;color:#3c382f;padding:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.customer }}</span>
+            <div style="display:flex;gap:1.5px;padding:0 8px;align-items:center">
+              <sc-for list="{{ p.segs }}" as="s" hint-placeholder-count="15"><span style="flex:1;height:8px;border-radius:1px;background:{{ s.c }}"></span></sc-for>
+            </div>
+            <span style="font:400 12px/1 'IBM Plex Mono',monospace;padding:0 8px;white-space:nowrap">{{ p.done }}/{{ p.total }} <span style="color:{{ p.pctColor }};font-weight:500">{{ p.pct }}</span></span>
+            <span style="font:400 11.5px/1.4 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e;padding:0 8px">{{ p.updatedShort }}</span>
+            <button onClick="{{ p.noop }}" aria-label="操作メニュー" style="font:500 13px/1 'IBM Plex Mono',monospace;color:#3c382f;background:transparent;border:none;padding:10px;cursor:pointer">⋯</button>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:44px 20px;text-align:center;border:1px dashed #cdc6b6;border-radius:14px;background:#faf8f3;display:flex;flex-direction:column;gap:12px;align-items:center">
+        <span style="font:500 14px/1.6 'Zen Kaku Gothic New',sans-serif;color:#3c382f">条件に合う案件がありません。</span>
+        <button onClick="{{ reset }}" style="font:500 12.5px/1 'Zen Kaku Gothic New',sans-serif;color:#2f5d45;background:#fff;border:1px solid #cfd9d2;border-radius:8px;padding:10px 14px;cursor:pointer">条件をクリア</button>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:4px">
+      <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#6f6a5e">章の進捗</span>
+      <span style="display:flex;align-items:center;gap:6px;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e"><span style="width:14px;height:7px;border-radius:2px;background:#2f5d45"></span>確定</span>
+      <span style="display:flex;align-items:center;gap:6px;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e"><span style="width:14px;height:7px;border-radius:2px;background:#d9a341"></span>作成中</span>
+      <span style="display:flex;align-items:center;gap:6px;font:400 11px/1 'Zen Kaku Gothic New',sans-serif;color:#6f6a5e"><span style="width:14px;height:7px;border-radius:2px;background:#e3ded2"></span>未着手</span>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:760},&quot;defaultView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;card&quot;,&quot;table&quot;],&quot;default&quot;:&quot;card&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;表示&quot;}}">
+const KEY = 'reqnavi.projectView';
+const PROJECTS = [
+  { id: 'p1', customer: '株式会社サンライズ商事', name: 'Salesforce導入支援', platform: 'Salesforce', done: 13, total: 78, chapters: [2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], current: '4. KPI', age: 0, updated: '3分前・田中', updatedShort: '3分前', ts: 3 },
+  { id: 'p2', customer: '株式会社JB', name: '音声文字起こし分析導入', platform: 'Salesforce', done: 0, total: 30, chapters: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], current: '1. 顧客情報', age: 1, updated: '未着手', updatedShort: '—', ts: 99999 }
+];
+
+class Component extends DCLogic {
+  state = { view: null, query: '', customer: 'all', status: 'all', sort: 'updated' };
+
+  componentDidMount() {
+    try { const v = localStorage.getItem(KEY); if (v === 'card' || v === 'table') this.setState({ view: v }); } catch (e) {}
+  }
+
+  setView(v) {
+    this.setState({ view: v });
+    try { localStorage.setItem(KEY, v); } catch (e) {}
+  }
+
+  statusOf(p) {
+    const pct = Math.round(p.done / p.total * 100);
+    return pct >= 100 ? 'done' : p.done > 0 ? 'doing' : 'todo';
+  }
+
+  renderVals() {
+    const s = this.state;
+    const view = s.view || this.props.defaultView || 'card';
+    const q = s.query.trim().toLowerCase();
+    const customers = Array.from(new Set(PROJECTS.map(p => p.customer)));
+
+    const base = PROJECTS.filter(p => (s.customer === 'all' || p.customer === s.customer) && (!q || (p.name + p.customer).toLowerCase().includes(q)));
+    const cnt = k => base.filter(p => k === 'all' || this.statusOf(p) === k).length;
+    let list = base.filter(p => s.status === 'all' || this.statusOf(p) === s.status);
+    list = list.slice().sort((a, b) => {
+      if (s.sort === 'progress') return b.done / b.total - a.done / a.total;
+      if (s.sort === 'name') return a.name.localeCompare(b.name, 'ja');
+      if (s.sort === 'customer') return a.customer.localeCompare(b.customer, 'ja');
+      return a.ts - b.ts;
+    });
+
+    const chipDefs = [['all', 'すべて'], ['doing', '進行中'], ['todo', '未着手'], ['done', '完了']];
+    const chips = chipDefs.map(([k, label]) => {
+      const on = s.status === k;
+      return { label, count: cnt(k), bg: on ? '#1b1a17' : '#fff', fg: on ? '#f6f3ec' : '#3c382f', bd: on ? '#1b1a17' : '#d8d2c4', numFg: on ? '#b8b1a1' : '#7a7466', onClick: () => this.setState({ status: k }) };
+    });
+
+    const tg = on => ({ bg: on ? '#1b1a17' : '#fff', fg: on ? '#f6f3ec' : '#3c382f' });
+    const c = tg(view === 'card'), t = tg(view === 'table');
+
+    const cards = list.map(p => {
+      const pct = Math.round(p.done / p.total * 100);
+      const doneCh = p.chapters.filter(x => x === 2).length;
+      const st = this.statusOf(p);
+      return {
+        customer: p.customer, name: p.name, platform: p.platform, done: p.done, total: p.total,
+        pct: pct + '%', pctColor: pct ? '#2f5d45' : '#6f6a5e',
+        chapters: doneCh + '/15章',
+        segs: p.chapters.map(x => ({ c: x === 2 ? '#2f5d45' : x === 1 ? '#d9a341' : '#e3ded2' })),
+        updated: p.updated, updatedShort: p.updatedShort,
+        cta: st === 'todo' ? p.current + ' から始める →' : p.current + ' から続ける →',
+        ctaBg: st === 'todo' ? '#fff' : '#2f5d45', ctaFg: st === 'todo' ? '#2f5d45' : '#fff', ctaBd: st === 'todo' ? '#cfd9d2' : '#2f5d45',
+        open: () => {}, noop: ev => { ev && ev.stopPropagation && ev.stopPropagation(); }
+      };
+    });
+
+    return {
+      query: s.query, onQuery: e => this.setState({ query: e.target.value }),
+      customer: s.customer, onCustomer: e => this.setState({ customer: e.target.value }),
+      customerOptions: [{ value: 'all', label: '顧客：すべて' }].concat(customers.map(x => ({ value: x, label: x }))),
+      sort: s.sort, onSort: e => this.setState({ sort: e.target.value }),
+      chips, cards,
+      resultLabel: list.length + ' 件を表示',
+      isCard: view === 'card' && list.length > 0, isTable: view === 'table' && list.length > 0,
+      empty: list.length === 0,
+      setCard: () => this.setView('card'), setTable: () => this.setView('table'),
+      cardBg: c.bg, cardFg: c.fg, tableBg: t.bg, tableFg: t.fg,
+      reset: () => this.setState({ query: '', customer: 'all', status: 'all' })
+    };
+  }
+}
+</script>
+</body>
+</html>
