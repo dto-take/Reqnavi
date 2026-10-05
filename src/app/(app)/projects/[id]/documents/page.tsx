@@ -4,6 +4,10 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { DocumentUploadZone } from "@/components/domain/document-upload-zone";
+import { DocumentRowActions } from "@/components/domain/document-row-actions";
+import { createServerActionClient } from "@/lib/supabase/server";
+import { getIsProjectMember } from "@/lib/project-data";
+import { canDeleteDocument } from "@/lib/permissions";
 
 type SourceDocument = {
   id: string;
@@ -20,6 +24,10 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const documents = (await listDocuments(id)) as unknown as SourceDocument[] | null;
   const unclassifiedCount = (documents ?? []).filter(isUnclassified).length;
+  const supabase = await createServerActionClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  // 削除できるのは、案件のメンバーであるadmin・pm（サーバー側でも確認する）
+  const canDelete = canDeleteDocument(claims?.claims?.user_role as string | undefined, await getIsProjectMember(id));
 
   return (
     <Card className="max-w-2xl mx-auto mt-10">
@@ -53,6 +61,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
               <InlineErrorForm action={reclassifyDocument.bind(null, d.id, id)} successMessage="再分類しました">
                 <SubmitButton variant="ghost" size="sm" pendingText="分類中..." className="ml-1">再分類</SubmitButton>
               </InlineErrorForm>
+              {canDelete && <DocumentRowActions documentId={d.id} fileName={d.file_name} />}
             </div>
           </div>
         ))}

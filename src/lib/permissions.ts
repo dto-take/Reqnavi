@@ -10,6 +10,11 @@ export function canAddProjectMember(role: string | undefined, isMember: boolean)
   return isMember && (role === "admin" || role === "pm");
 }
 
+// 資料の削除：案件のメンバーであるadmin・pm（RLS source_documents_delete／project_documents_delete）
+export function canDeleteDocument(role: string | undefined, isMember: boolean): boolean {
+  return isMember && (role === "admin" || role === "pm");
+}
+
 // ロールにとって非公開の章（requirement_itemsのRLS：reqnavi_select/insert/update/delete）。
 // partnerは7章（ビジネス要件）を読み書きできない。表示・集計はこの章を除き、「非公開」と明示する。
 const HIDDEN_CHAPTERS_BY_ROLE: Record<string, number[]> = { partner: [7] };

@@ -546,6 +546,8 @@ create policy "progress_tasks_delete" on progress_tasks for delete using (is_pro
 
 - **資料の登録（アップロード）**：ファイル本体はブラウザからStorageへ直接送り、`registerUploadedDocument`が分類・登録する。AI分類が失敗しても、タグを空・`source_documents.classification_failed=true`の「未分類」として登録する（資料一覧に「未分類」バッジ、一覧と一括生成ページに案内。AI素案は分類タグで資料を選ぶため、再分類するまで生成に使われない。再分類に成功すると`classification_failed`は`false`に戻る）。分類以外の失敗（DB・権限・重複）は登録せず、アップロード済みのファイルをStorageから消す。削除は利用者自身のクライアントで行い、サーバー側で「パスが`{案件id}/uploads/`で始まる」「そのパスを参照する`source_documents`の行が無い」ことを確かめる。RLS`project_documents_delete_unregistered_by_member`も、案件メンバーに、uploads配下で未登録のファイルの削除だけを許す（登録済みのファイルは、従来どおりadminのみ）。マイグレーション：`20261007020000_add_classification_failed_and_member_orphan_delete.sql`。
 
+- **資料の削除**：案件のメンバーであるadmin・pmのみ（`canDeleteDocument`。member・partnerには「⋯→削除」を出さず、`deleteDocument`も拒否する）。引数は資料のidだけで、案件・ファイルの場所はサーバーでDBから読み直す。順序は、①権限と資料の存在を確認 ②Storageのファイルを削除し、残っていないことを一覧で確認（既に無ければ成功扱い。RLSに拒否された削除は0件になるため、残存の確認で検出する）③`source_documents`の行を削除（件数確認）。②が失敗したらDB行を残す。出典（`item_sources`）は外部キー（ON DELETE CASCADE）で資料と一緒に消え、項目の内容・ベースラインのスナップショットは残る。確認ダイアログには、この資料を出典に持つ項目の数を表示する。RLSは`source_documents_delete`（admin・pm かつ案件のメンバー）を追加し、Storageの`project_documents_delete`を同じ条件に置き換えた（従来は、案件のメンバーでなくてもadmin可。案件削除のStorage削除はservice-roleなので影響なし）。マイグレーション：`20261007030000_add_document_delete_policies.sql`。
+
 ## 5. AI呼び出しフロー
 
 ### 5.1 Flow 1（初期構築）／Flow 2（差分最適化）

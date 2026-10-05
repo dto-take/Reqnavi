@@ -6,6 +6,7 @@ import { classifyDocument } from "@/lib/ai/classify-document";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { fetchAllPages } from "@/lib/paged-select";
+import { canDeleteDocument } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
 
 // ファイル本体はクライアントから直接Supabase Storageへアップロード済み（規約：
@@ -198,4 +199,73 @@ export async function listDocuments(projectId: string) {
 export async function countUnclassifiedDocuments(projectId: string): Promise<number> {
   const docs = await listDocuments(projectId);
   return docs.filter((d) => d.classification_failed || !Array.isArray(d.classified_tags) || d.classified_tags.length === 0).length;
+}
+
+type DocRow = { id: string; project_id: string; file_name: string; storage_path: string };
+
+// 資料の読み直し（引数は資料のidだけ。案件・ファイルの場所は、サーバーでDBから読む。規約66）。
+// source_documentsのRLSは案件メンバーだけに見せるため、読めない＝存在しない・アクセスできない。
+async function loadDocument(supabase: Awaited<ReturnType<typeof createServerActionClient>>, documentId: string): Promise<DocRow> {
+  const { data, error } = await supabase
+    .from("source_documents")
+    .select("id, project_id, file_name, storage_path")
+    .eq("id", documentId)
+    .maybeSingle();
+  if (error) throw new UserFacingError(errorMessage(error));
+  if (!data) throw new UserFacingError("対象が見つかりません");
+  return data as unknown as DocRow;
+}
+
+// 削除の確認ダイアログ用：この資料を出典に持つ「項目の数」（item_sourcesの主キーは(item_id, source_id)なので、
+// この資料を参照する行の数＝出典に持つ項目の数）。
+export async function countDocumentSourceItems(documentId: string): Promise<ActionResult<number>> {
+  return safeAction("countDocumentSourceItems", async () => {
+    const supabase = await createServerActionClient();
+    await loadDocument(supabase, documentId);
+    const { count, error } = await supabase.from("item_sources").select("item_id", { count: "exact", head: true }).eq("source_id", documentId);
+    if (error) throw new UserFacingError(errorMessage(error));
+    return count ?? 0;
+  });
+}
+
+// 資料の削除（規約65）：①権限と資料の存在を確認 ②Storageのファイルを削除し、残っていないことを確認
+// （既に無ければ成功扱い＝再試行できる）③DBの行を削除（件数確認）。②が失敗したらDB行を残す。
+// 出典（item_sources）は外部キーで一緒に消える。項目の内容・ベースラインのスナップショットは残る。
+export async function deleteDocument(documentId: string): Promise<ActionResult> {
+  return safeAction("deleteDocument", () => deleteDocumentInner(documentId));
+}
+
+async function deleteDocumentInner(documentId: string): Promise<void> {
+  const supabase = await createServerActionClient();
+  const doc = await loadDocument(supabase, documentId); // 読めた＝案件のメンバー
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!canDeleteDocument(claims?.claims?.user_role as string | undefined, true)) {
+    throw new UserFacingError("この操作を行う権限がありません");
+  }
+
+  const storage = supabase.storage.from("project-documents");
+  const slash = doc.storage_path.lastIndexOf("/");
+  const dir = doc.storage_path.slice(0, slash);
+  const name = doc.storage_path.slice(slash + 1);
+  const exists = async (): Promise<boolean> => {
+    const { data, error } = await storage.list(dir, { search: name, limit: 100 });
+    if (error) throw new UserFacingError("ファイルの削除を確認できませんでした。時間をおいて再度お試しください");
+    return (data ?? []).some((o) => o.name === name);
+  };
+  if (await exists()) {
+    const { error } = await storage.remove([doc.storage_path]);
+    if (error) throw new UserFacingError("ファイルの削除に失敗したため、資料は削除されていません。時間をおいて再度お試しください");
+    // RLSに拒否された削除は、エラーにならず0件になる。残存の確認で検出する
+    if (await exists()) {
+      throw new UserFacingError("ファイルを削除できなかったため、資料は削除されていません。権限を確認するか、時間をおいて再度お試しください");
+    }
+  }
+
+  const { data: deleted, error: deleteError } = await supabase.from("source_documents").delete().eq("id", documentId).select("id");
+  if (deleteError) throw new UserFacingError(errorMessage(deleteError));
+  if (!deleted || deleted.length === 0) throw new UserFacingError("対象が見つかりません");
+
+  revalidatePath(`/projects/${doc.project_id}/documents`);
+  revalidatePath(`/projects/${doc.project_id}/bulk-generate`);
+  revalidatePath(`/projects/${doc.project_id}`);
 }
