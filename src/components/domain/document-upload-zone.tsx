@@ -7,7 +7,7 @@ import { errorMessage } from "@/lib/error-message";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 
-type QueueItem = { file: File; status: "pending" | "uploading" | "done" | "error" | "skipped"; error?: string };
+type QueueItem = { file: File; status: "pending" | "uploading" | "done" | "unclassified" | "error" | "skipped"; error?: string };
 
 // upload_size_limit.md：1ファイルあたり20MBを上限とする。Storage側のfile_size_limit
 // （20260910041626_set_project_documents_size_limit.sqlマイグレーション）と合わせた
@@ -22,7 +22,7 @@ const DUPLICATE_MESSAGE = "同じ名前・サイズの資料が既に登録さ�
 // ペイロード上限（約4.5MB）が、大きめのPDF/PowerPointファイルで413エラーの原因になっていたため。
 // storagePathの組み立ては規約35（日本語ファイル名をStorageキーに含めない）を踏襲する。
 // 戻り値：登録したら"done"、同じ名前・サイズの資料が既にあれば（Storageへ送らず）"skipped"
-async function uploadOneFile(projectId: string, file: File): Promise<"done" | "skipped"> {
+async function uploadOneFile(projectId: string, file: File): Promise<"done" | "skipped" | "unclassified"> {
   // Server Actionの失敗（{ok:false}）は、サーバーの日本語の文言のままErrorにして、呼び出し元の個別のcatchで扱う
   const dup = await checkDuplicateDocument(projectId, file.name, file.size);
   if (!dup.ok) throw new Error(dup.error);
@@ -34,9 +34,18 @@ async function uploadOneFile(projectId: string, file: File): Promise<"done" | "s
   const { error: uploadError } = await supabase.storage.from("project-documents").upload(storagePath, file);
   if (uploadError) throw uploadError;
 
-  const reg = await registerUploadedDocument(projectId, storagePath, file.name);
+  let reg;
+  try {
+    reg = await registerUploadedDocument(projectId, storagePath, file.name);
+  } catch (e) {
+    // Server Actionの呼び出し自体が通信で失敗した場合、アップロード済みのファイルを消すことをベストエフォートで試みる。
+    // 登録が実は成功していた場合は、RLS（登録済みのファイルはメンバーが直接消せない）が削除を拒否する。
+    // 失敗しても、利用者への通知は元のエラーのままにする。
+    await supabase.storage.from("project-documents").remove([storagePath]).catch(() => undefined);
+    throw e;
+  }
   if (!reg.ok) throw new Error(reg.error);
-  return reg.data;
+  return reg.data === "classification_failed" ? "unclassified" : reg.data;
 }
 
 export function DocumentUploadZone({ projectId }: { projectId: string }) {
@@ -66,6 +75,7 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
       let successCount = 0;
       let errorCount = 0;
       let skippedCount = 0;
+      let unclassifiedCount = 0;
       for (let i = 0; i < queue.length; i++) {
         if (queue[i].status !== "pending") continue;
         setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: "uploading" } : item)));
@@ -77,6 +87,7 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
           const result = await uploadOneFile(projectId, queue[i].file);
           setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: result, error: result === "skipped" ? DUPLICATE_MESSAGE : undefined } : item)));
           if (result === "skipped") skippedCount++;
+          else if (result === "unclassified") unclassifiedCount++;
           else successCount++;
         } catch (e) {
           const message = errorMessage(e);
@@ -86,7 +97,8 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
           errorCount++;
         }
       }
-      const parts = [`${successCount}件アップロード完了`];
+      const parts = [`${successCount + unclassifiedCount}件アップロード完了`];
+      if (unclassifiedCount > 0) parts.push(`うち${unclassifiedCount}件は分類に失敗したため、未分類で登録しました（資料一覧から再分類できます）`);
       if (skippedCount > 0) parts.push(`スキップ：${skippedCount}件（${DUPLICATE_MESSAGE}）`);
       if (errorCount > 0) parts.push(`失敗${errorCount}件`);
       show(parts.join("、"), errorCount > 0 ? "error" : "success");
@@ -135,6 +147,8 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
                     ? "text-[#A23B2E]"
                     : item.status === "done"
                     ? "text-brand"
+                    : item.status === "unclassified"
+                    ? "text-secondary"
                     : item.status === "skipped"
                     ? "text-secondary"
                     : "text-faint"
@@ -144,6 +158,7 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
                 {item.status === "pending" && "待機中"}
                 {item.status === "uploading" && "アップロード中"}
                 {item.status === "done" && "完了"}
+                {item.status === "unclassified" && "完了（未分類）"}
                 {item.status === "error" && "失敗"}
                 {item.status === "skipped" && "スキップ（登録済み）"}
               </span>

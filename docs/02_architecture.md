@@ -544,6 +544,8 @@ create policy "progress_tasks_delete" on progress_tasks for delete using (is_pro
 - **他案件の参照（横断参照）の仕様**：参照・取り込みできるのは、①同じ顧客（organization）の案件で、②**自案件と参照元の双方が`allow_cross_project_reference`をオンにしている**場合の、③**確定済み（confirmed・exception_approved）の項目のみ**。この条件は、利用者が参照元の案件のメンバーであるかどうかに関わらず、`listCrossProjectReferences`・`copyReferenceItem`（`src/actions/cross-project-reference.ts`）が明示的に課す。RLS`requirement_items_cross_project_select`は非メンバー向けの同条件だが、メンバー用ポリシーとの論理和で効くため、メンバーには効かない（変更しない）。`copyReferenceItem`は参照元の項目idだけを受け取り、内容はサーバー側で読み直して複製する。
 - **案件削除とStorage**：`deleteProject`は、service-roleで`project-documents/{projectId}/`配下を再帰的・ページング（100件）で列挙→削除→再列挙して0件を確認してから、DB行を削除する。失敗時はDBを残してエラーを返す（メンバーではない管理者は、利用者のクライアントではStorageの一覧が空に見えるため）。
 
+- **資料の登録（アップロード）**：ファイル本体はブラウザからStorageへ直接送り、`registerUploadedDocument`が分類・登録する。AI分類が失敗しても、タグを空・`source_documents.classification_failed=true`の「未分類」として登録する（資料一覧に「未分類」バッジ、一覧と一括生成ページに案内。AI素案は分類タグで資料を選ぶため、再分類するまで生成に使われない。再分類に成功すると`classification_failed`は`false`に戻る）。分類以外の失敗（DB・権限・重複）は登録せず、アップロード済みのファイルをStorageから消す。削除は利用者自身のクライアントで行い、サーバー側で「パスが`{案件id}/uploads/`で始まる」「そのパスを参照する`source_documents`の行が無い」ことを確かめる。RLS`project_documents_delete_unregistered_by_member`も、案件メンバーに、uploads配下で未登録のファイルの削除だけを許す（登録済みのファイルは、従来どおりadminのみ）。マイグレーション：`20261007020000_add_classification_failed_and_member_orphan_delete.sql`。
+
 ## 5. AI呼び出しフロー
 
 ### 5.1 Flow 1（初期構築）／Flow 2（差分最適化）
