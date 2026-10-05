@@ -548,6 +548,8 @@ create policy "progress_tasks_delete" on progress_tasks for delete using (is_pro
 
 - **資料の削除**：案件のメンバーであるadmin・pmのみ（`canDeleteDocument`。member・partnerには「⋯→削除」を出さず、`deleteDocument`も拒否する）。引数は資料のidだけで、案件・ファイルの場所はサーバーでDBから読み直す。順序は、①権限と資料の存在を確認 ②Storageのファイルを削除し、残っていないことを一覧で確認（既に無ければ成功扱い。RLSに拒否された削除は0件になるため、残存の確認で検出する）③`source_documents`の行を削除（件数確認）。②が失敗したらDB行を残す。出典（`item_sources`）は外部キー（ON DELETE CASCADE）で資料と一緒に消え、項目の内容・ベースラインのスナップショットは残る。確認ダイアログには、この資料を出典に持つ項目の数を表示する。RLSは`source_documents_delete`（admin・pm かつ案件のメンバー）を追加し、Storageの`project_documents_delete`を同じ条件に置き換えた（従来は、案件のメンバーでなくてもadmin可。案件削除のStorage削除はservice-roleなので影響なし）。マイグレーション：`20261007030000_add_document_delete_policies.sql`。
 
+- **案件メンバーの削除**：案件のメンバーであるadmin・pmのみ（`canRemoveProjectMember`＝メンバー追加と同じ条件）。`removeProjectMember(projectId, userId)`（project_membersにid列が無いためuser_idで指定）。順序は、①自分が案件のメンバーであることと権限 ②外す相手がこの案件のメンバーであること（存在しない・別の案件のメンバーは「対象が見つかりません」）③**全体の役割がpmまたはadminのメンバーが最低1人残る**ガード（権限・存在の確認のあとに判定）④削除（件数確認）。自分自身を外す操作はガードを満たすかぎり許可し、成功したら案件一覧へ移る。外したメンバーが作成・編集した項目・工数記録は残る。再度追加できる。案件ごとの役割（project_membersの役割の列）は無いため、役割の変更は実装していない（全体の役割は`/admin/users`。案件ごとの役割は`docs/backlog.md`）。RLSは`project_members_delete`（admin・pm かつ案件のメンバー）を追加し、`authenticated`にDELETE権限（GRANT）も付与した（GRANTが無いと、ポリシーがあっても`permission denied`になる）。マイグレーション：`20261007040000_add_project_members_delete_policy.sql`。
+
 ## 5. AI呼び出しフロー
 
 ### 5.1 Flow 1（初期構築）／Flow 2（差分最適化）

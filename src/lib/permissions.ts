@@ -10,6 +10,11 @@ export function canAddProjectMember(role: string | undefined, isMember: boolean)
   return isMember && (role === "admin" || role === "pm");
 }
 
+// 案件メンバーの削除：追加と同じ条件（RLS project_members_insert／project_members_delete）
+export function canRemoveProjectMember(role: string | undefined, isMember: boolean): boolean {
+  return canAddProjectMember(role, isMember);
+}
+
 // 資料の削除：案件のメンバーであるadmin・pm（RLS source_documents_delete／project_documents_delete）
 export function canDeleteDocument(role: string | undefined, isMember: boolean): boolean {
   return isMember && (role === "admin" || role === "pm");

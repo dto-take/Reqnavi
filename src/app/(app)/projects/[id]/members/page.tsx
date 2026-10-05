@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { getIsProjectMember } from "@/lib/project-data";
-import { canAddProjectMember } from "@/lib/permissions";
+import { canAddProjectMember, canRemoveProjectMember } from "@/lib/permissions";
+import { MemberRowActions } from "@/components/domain/member-row-actions";
 
 type ProjectDetail = {
   id: string;
@@ -32,7 +33,10 @@ export default async function ProjectMembersPage({ params }: { params: Promise<{
   const supabase = await createServerActionClient();
   const { data: claims } = await supabase.auth.getClaims();
   // メンバーの追加は、案件のメンバーであるadmin・pmのみ（project_members_insert）
-  const canAdd = canAddProjectMember(claims?.claims?.user_role as string | undefined, await getIsProjectMember(id));
+  const isMember = await getIsProjectMember(id);
+  const canAdd = canAddProjectMember(claims?.claims?.user_role as string | undefined, isMember);
+  // メンバーを外せるのも、案件のメンバーであるadmin・pm（project_members_delete）
+  const canRemove = canRemoveProjectMember(claims?.claims?.user_role as string | undefined, isMember);
 
   return (
     <Card className="max-w-2xl mx-auto mt-10">
@@ -53,10 +57,13 @@ export default async function ProjectMembersPage({ params }: { params: Promise<{
 
       <div className="flex flex-col">
         {members?.map((m) => (
-          <div key={m.user_id} className="grid grid-cols-3 items-center py-2 border-t border-hover text-sm">
+          <div key={m.user_id} className="grid grid-cols-4 items-center py-2 border-t border-hover text-sm">
             <span>{m.user_profiles?.display_name ?? "(未設定)"}</span>
             <span className="text-secondary text-xs">{m.user_profiles?.companies?.name}</span>
             <RoleBadge role={m.user_profiles?.user_role ?? "member"} />
+            <span className="justify-self-end">
+              {canRemove && <MemberRowActions projectId={id} userId={m.user_id} displayName={m.user_profiles?.display_name ?? "このメンバー"} />}
+            </span>
           </div>
         ))}
       </div>
