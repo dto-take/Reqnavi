@@ -182,15 +182,29 @@ export async function unadoptAspect(aspectId: string, projectId: string): Promis
 
 async function unadoptAspectInner(aspectId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
+  // 1) 対象の存在の確認（RLSで見えない＝存在しない・アクセスできない場合は「対象が見つかりません」）。
+  //    ガード（最後の1件か）の判定より先に行う。RLSで絞られた読み取りの件数だけでガードを決めない。
+  const { data: aspect, error: fetchError } = await supabase
+    .from("requirement_items")
+    .select("id, status")
+    .eq("id", aspectId)
+    .eq("project_id", projectId)
+    .eq("chapter_no", 10)
+    .is("parent_id", null)
+    .maybeSingle();
+  if (fetchError) throw new UserFacingError(errorMessage(fetchError));
+  if (!aspect) throw new UserFacingError("対象が見つかりません");
+  // 2) 「採用中の観点を0件にはできない」ガード
   const adoptedCount = await countAspects(supabase, projectId, true);
   if (adoptedCount <= 1) throw new UserFacingError("採用中の観点を0件にはできません。");
+  // 3) 更新。対象が見えているのに0件なら、RLSで書き込みが拒否された（権限が無い）
   const { data: affected2, error } = await supabase
     .from("requirement_items")
     .update({ status: "rejected" })
     .eq("id", aspectId)
     .is("parent_id", null).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
-  if (!affected2 || affected2.length === 0) throw new UserFacingError("対象が見つかりません");
+  if (!affected2 || affected2.length === 0) throw new UserFacingError("この操作を行う権限がありません");
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 

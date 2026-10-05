@@ -2,7 +2,7 @@
 
 `node scripts/check-action-errors.mjs --table`で生成（docs/action_errors_result.md 段階5）。
 
-## 変換済み（ActionResult）（59件）
+## 変換済み（ActionResult）（58件）
 
 | アクション | ファイル | 使用箇所 |
 |---|---|---|
@@ -33,7 +33,6 @@
 | reorderCheckItem | nonfunctional.ts | components/domain/nonfunctional-checklist/AspectDetailPane.tsx<br>components/domain/nonfunctional-checklist/NonfunctionalScreen.tsx<br>lib/nonfunctional/derive.ts |
 | moveCheckItem | nonfunctional.ts | components/domain/nonfunctional-checklist/AspectDetailPane.tsx |
 | suggestNonfunctionalCandidates | nonfunctional.ts | components/domain/nonfunctional-checklist/AspectCandidatePanel.tsx |
-| updateOrganization | organizations.ts | **未使用** |
 | createPhase | progress-tasks.ts | components/domain/progress/ProgressChart.tsx |
 | createTask | progress-tasks.ts | components/domain/progress/ProgressChart.tsx |
 | updateProgressTaskField | progress-tasks.ts | components/domain/progress/ProgressDetailPanel.tsx |
@@ -159,6 +158,6 @@
 |---|---|---|
 | regenerateEdges | business-flow.ts | 内部のみ（ai-draft-business-flow.ts・workflow-builder.ts） |
 
-## 未使用のexport（1件）
+## 未使用のexport（0件）
 
-- organizations.ts#updateOrganization（変換済み（ActionResult））
+なし

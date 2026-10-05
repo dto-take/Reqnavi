@@ -11,6 +11,16 @@ import { GoogleGenAI } from "@google/genai";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
 import { errorMessage } from "@/lib/error-message";
 import { fetchAllPages } from "@/lib/paged-select";
+import { CHAPTER_NAMES } from "@/lib/chapters";
+
+// 冒頭の確認：対象の案件・章が存在し、自分がアクセスできること。メンバーではない場合は項目が見えず、
+// 何も更新しないまま成功になってしまうため（RLSで絞られた読み取りの結果が空＝成功、にしない）。
+async function assertChapterReadable(supabase: Awaited<ReturnType<typeof createServerActionClient>>, projectId: string, chapterNo: number) {
+  if (!CHAPTER_NAMES[chapterNo]) throw new UserFacingError("対象が見つかりません");
+  const { data, error } = await supabase.from("projects").select("id").eq("id", projectId).maybeSingle();
+  if (error) throw new UserFacingError(errorMessage(error));
+  if (!data) throw new UserFacingError("対象が見つかりません");
+}
 
 type ItemRow = { id: string; content: Record<string, string | null>; ambiguous_flags: AmbiguousFlag[] | null };
 
@@ -21,6 +31,7 @@ export async function runAmbiguousCheck(projectId: string, chapterNo: number, _p
 
 async function runAmbiguousCheckInner(projectId: string, chapterNo: number): Promise<void> {
   const supabase = await createServerActionClient();
+  await assertChapterReadable(supabase, projectId, chapterNo);
   const items = await fetchAllPages<ItemRow>((from, to) =>
     supabase
       .from("requirement_items")
@@ -68,6 +79,7 @@ const AI_AMBIGUITY_RESPONSE_SCHEMA = {
 
 async function runAmbiguousCheckAIInternal(projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
+  await assertChapterReadable(supabase, projectId, chapterNo);
   const items = await fetchAllPages<ItemRow>((from, to) =>
     supabase
       .from("requirement_items")
