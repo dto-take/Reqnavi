@@ -1,5 +1,7 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
+import type { ActionResult } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,7 +28,6 @@ import { unplacedFunctions, type FlowWarning, type FunctionItem } from "@/lib/sc
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
-import { errorMessage } from "@/lib/error-message";
 
 const STATUS_PILL: Record<ScreenNode["status"], { label: string; fg: string; bg: string; border: string }> = {
   confirmed: { label: "✓ 確定済", fg: "var(--status-confirmed-text)", bg: "var(--status-confirmed-bg)", border: "var(--status-confirmed-text)" },
@@ -74,14 +75,13 @@ export function ScreenFlowPanel({
   const router = useRouter();
 
   // 失敗時はトーストのあと再取得して、画面をDBの実際の状態に揃える（確定済みになっていた等）
-  function run(fn: () => Promise<void>) {
+  // ActionResultを返すアクションを実行する。失敗（{ok:false}・通信エラーとも）はトーストを1件出し、再取得する。
+  // 成功時はafterに結果のdataを渡す（採用で作られたidの選択など）。
+  function run<T>(fn: () => Promise<ActionResult<T>>, after?: (data: T) => void) {
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (e) {
-        show(errorMessage(e), "error");
-        router.refresh();
-      }
+      const r = await runAction(fn, show);
+      if (!r) router.refresh();
+      else after?.(r.data);
     });
   }
 
@@ -94,10 +94,10 @@ export function ScreenFlowPanel({
   const busy = isPending || bulkBusy;
   const suggestionActions: SuggestionActions = {
     adopt: (s) =>
-      run(async () => {
-        const r = await adoptScreenSuggestion(s.id, projectId);
-        onAdopted(r.kind, r.resultId);
-      }),
+      run(
+        () => adoptScreenSuggestion(s.id, projectId),
+        (r) => onAdopted(r.kind, r.resultId)
+      ),
     reject: (s) => onRejectSuggestion(s.id),
     busy,
   };
@@ -119,7 +119,7 @@ export function ScreenFlowPanel({
   );
 }
 
-type RunFn = (fn: () => Promise<void>) => void;
+type RunFn = <T>(fn: () => Promise<ActionResult<T>>, after?: (data: T) => void) => void;
 
 type SuggestionActions = {
   adopt: (s: NodeSuggestion | TransitionSuggestion) => void;
@@ -350,10 +350,10 @@ function OverviewMode({
                 type="button"
                 disabled={isPending}
                 onClick={() =>
-                  run(async () => {
-                    const id = await addScreenNode(projectId, { name: f.name, functionItemId: f.id });
-                    onSelect({ type: "node", id });
-                  })
+                  run(
+                    () => addScreenNode(projectId, { name: f.name, functionItemId: f.id }),
+                    (id) => onSelect({ type: "node", id })
+                  )
                 }
                 className="text-[11.5px] font-medium px-3 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover whitespace-nowrap disabled:opacity-50"
               >
@@ -566,10 +566,10 @@ function NodeMode({
                   data-add-target={t.id}
                   disabled={isPending}
                   onClick={() =>
-                    run(async () => {
-                      await addScreenTransition(projectId, node.id, t.id);
-                      setAddingTarget(false);
-                    })
+                    run(
+                      () => addScreenTransition(projectId, node.id, t.id),
+                      () => setAddingTarget(false)
+                    )
                   }
                   className="text-[11.5px] px-2.5 py-1 rounded-full border border-border bg-page cursor-pointer hover:bg-hover disabled:opacity-50"
                 >
@@ -737,10 +737,10 @@ function EdgeMode({
             type="button"
             disabled={isPending}
             onClick={() =>
-              run(async () => {
-                const id = await addScreenTransition(projectId, edge.to_node, edge.from_node);
-                onSelect({ type: "edge", id });
-              })
+              run(
+                () => addScreenTransition(projectId, edge.to_node, edge.from_node),
+                (id) => onSelect({ type: "edge", id })
+              )
             }
             className="text-[12px] font-medium px-3 py-2 rounded-md border border-border bg-page cursor-pointer hover:bg-hover disabled:opacity-50"
           >

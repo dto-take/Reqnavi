@@ -1,6 +1,6 @@
 "use server";
 
-import { safeFormAction, type FormActionState } from "@/lib/action-result";
+import { safeAction, safeFormAction, type ActionResult, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { revalidatePath } from "next/cache";
@@ -90,21 +90,36 @@ export async function moveFlowStep(
   flowType: FlowType,
   newRoleLane: string,
   orderedStepIds: string[]
-) {
+): Promise<ActionResult> {
+  return safeAction("moveFlowStep", () => moveFlowStepInner(stepId, projectId, flowType, newRoleLane, orderedStepIds));
+}
+
+async function moveFlowStepInner(
+  stepId: string,
+  projectId: string,
+  flowType: FlowType,
+  newRoleLane: string,
+  orderedStepIds: string[]
+): Promise<void> {
   const supabase = await createServerActionClient();
 
-  const { error: laneError } = await supabase
+  // 規約47：RLSで拒否された更新は error:null・0件になるため、返った件数を確認する
+  const { data: laneData, error: laneError } = await supabase
     .from("flow_nodes")
     .update({ role_lane: newRoleLane })
-    .eq("id", stepId);
+    .eq("id", stepId)
+    .select("id");
   if (laneError) throw laneError;
+  if (!laneData || laneData.length === 0) throw new UserFacingError("対象が見つかりません");
 
   for (let i = 0; i < orderedStepIds.length; i++) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("flow_nodes")
       .update({ order_index: i })
-      .eq("id", orderedStepIds[i]);
+      .eq("id", orderedStepIds[i])
+      .select("id");
     if (error) throw error;
+    if (!data || data.length === 0) throw new UserFacingError("対象が見つかりません");
   }
 
   await regenerateEdges(projectId, flowType);

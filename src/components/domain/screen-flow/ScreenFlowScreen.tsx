@@ -1,5 +1,7 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
+import type { ActionResult } from "@/lib/action-result";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -24,7 +26,6 @@ import { ScreenFlowPanel } from "@/components/domain/screen-flow/ScreenFlowPanel
 import { clampPosition, degrees, flowWarnings, nodePosition, stageSizeFor, type FunctionItem } from "@/lib/screen-flow/derive";
 import { isItemLocked } from "@/lib/item-lock";
 import { autoLayoutPositions } from "@/lib/screen-flow/layout";
-import { errorMessage } from "@/lib/error-message";
 import { useToast } from "@/components/ui/toast";
 
 // screen_flow_ux_phase1/2.md：キャンバス（主役）＋右パネルの2カラム構成のオーケストレータ。
@@ -61,9 +62,12 @@ export function ScreenFlowScreen({
 
   // 失敗時の共通処理（screen_flow_ux_phase4.md Step5）：エラートーストを出し、再取得して
   // 画面をDBの実際の状態に揃える（確定済みになっていた等、状態の食い違いによる拒否にも対応）。
-  function fail(e: unknown) {
-    show(errorMessage(e), "error");
-    router.refresh();
+  // ActionResultを返すアクションの実行。失敗（{ok:false}・通信エラーとも）はトーストを1件出し、再取得して
+  // DBの実際の状態に揃える。成功時はdataを返し、失敗時はnullを返す（呼び出し側が上書きを外す）。
+  async function call<T>(fn: () => Promise<ActionResult<T>>): Promise<{ data: T } | null> {
+    const r = await runAction(fn, show);
+    if (!r) router.refresh();
+    return r;
   }
 
   // 矢印キー移動の保存は、最後の入力から400ms後にまとめて1回行う。保留中の分は、選択の
@@ -111,31 +115,32 @@ export function ScreenFlowScreen({
   async function handleGenerate() {
     setGenerating(true);
     try {
-      const r = await generateScreenFlowSuggestions(projectId);
-      show(r.nodes + r.transitions === 0 ? "追加の提案はありませんでした" : `画面${r.nodes}件・遷移${r.transitions}件を提案しました`);
-    } catch (e) {
-      fail(e);
+      const res = await call(() => generateScreenFlowSuggestions(projectId));
+      if (res) {
+        const r = res.data;
+        show(r.nodes + r.transitions === 0 ? "追加の提案はありませんでした" : `画面${r.nodes}件・遷移${r.transitions}件を提案しました`);
+      }
     } finally {
       setGenerating(false);
     }
   }
   function handleAdoptAll() {
     startBulk(async () => {
-      try {
-        const r = await adoptAllScreenSuggestions(projectId);
-        show(r.failed > 0 ? `${r.adopted}件を採用しました（${r.failed}件は採用できませんでした）` : `${r.adopted}件を採用しました`, r.adopted === 0 ? "error" : "success");
-      } catch (e) {
-        fail(e);
+      const res = await call(() => adoptAllScreenSuggestions(projectId));
+      if (!res) return;
+      const r = res.data;
+      const failedCount = r.failed.reduce((n, f) => n + f.count, 0);
+      if (failedCount === 0) {
+        show(`${r.adopted}件を採用しました`, r.adopted === 0 ? "error" : "success");
+      } else {
+        const detail = r.failed.map((f) => `${f.reason}：${f.count}件`).join("、");
+        show(`${r.adopted}件を採用しました。${failedCount}件は採用できませんでした（${detail}）`, r.adopted === 0 ? "error" : "success");
       }
     });
   }
   function handleRejectAll() {
     startBulk(async () => {
-      try {
-        await rejectAllScreenSuggestions(projectId);
-      } catch (e) {
-        fail(e);
-      }
+      await call(() => rejectAllScreenSuggestions(projectId));
     });
   }
 
@@ -170,13 +175,10 @@ export function ScreenFlowScreen({
     pendingMovesRef.current.clear();
     if (moves.length === 0) return;
     // アンマウント時にも呼ぶためstartTransitionは使わず、try/catchで失敗を拾う（規約44）
+    // 結果は捨てない：失敗（{ok:false}・通信エラーとも）は上書きを外して元へ戻し、トーストを1件出す
     void (async () => {
-      try {
-        await moveScreenNodes(projectId, moves);
-      } catch (e) {
-        clearOverrides(moves.map((m) => m.id));
-        fail(e);
-      }
+      const r = await call(() => moveScreenNodes(projectId, moves));
+      if (!r) clearOverrides(moves.map((m) => m.id));
     })();
   }
   const flushMovesRef = useRef(flushMoves);
@@ -212,12 +214,8 @@ export function ScreenFlowScreen({
     if (!confirm(`${head}「${n.label}」を削除しますか？接続する遷移（${count}件）も一緒に削除されます。`)) return;
     flushMoves();
     startAction(async () => {
-      try {
-        await removeScreenNode(nodeId, projectId);
-        setSelection(null);
-      } catch (e) {
-        fail(e);
-      }
+      const r = await call(() => removeScreenNode(nodeId, projectId));
+      if (r) setSelection(null);
     });
   }
   function deleteEdge(edgeId: string) {
@@ -229,22 +227,14 @@ export function ScreenFlowScreen({
       return;
     }
     startAction(async () => {
-      try {
-        await removeScreenTransition(edgeId, projectId);
-        setSelection(null);
-      } catch (err) {
-        fail(err);
-      }
+      const r = await call(() => removeScreenTransition(edgeId, projectId));
+      if (r) setSelection(null);
     });
   }
   function rejectSuggestion(id: string) {
     startAction(async () => {
-      try {
-        await rejectScreenSuggestion(id, projectId);
-        setSelection(null);
-      } catch (e) {
-        fail(e);
-      }
+      const r = await call(() => rejectScreenSuggestion(id, projectId));
+      if (r) setSelection(null);
     });
   }
   function handleDeleteKey() {
@@ -260,12 +250,8 @@ export function ScreenFlowScreen({
     setOverrides([pos]);
     handleSelect({ type: "node", id: nodeId });
     startTransition(async () => {
-      try {
-        await moveScreenNode(nodeId, projectId, pos.x, pos.y);
-      } catch (e) {
-        clearOverrides([nodeId]);
-        fail(e);
-      }
+      const r = await call(() => moveScreenNode(nodeId, projectId, pos.x, pos.y));
+      if (!r) clearOverrides([nodeId]);
     });
   }
 
@@ -275,14 +261,13 @@ export function ScreenFlowScreen({
       return;
     }
     startTransition(async () => {
-      try {
-        const id = await addScreenTransition(projectId, fromId, toId);
+      const r = await call(() => addScreenTransition(projectId, fromId, toId));
+      if (r) {
+        const id = r.data;
         flushMoves();
         setSelection({ type: "edge", id });
         setPendingEdgeId(id);
         setFocusEdgeId(id);
-      } catch (e) {
-        fail(e);
       }
     });
   }
@@ -296,12 +281,8 @@ export function ScreenFlowScreen({
     const moves = [...layout.entries()].map(([id, p]) => ({ id, x: p.x, y: p.y }));
     setOverrides(moves);
     startTransition(async () => {
-      try {
-        await moveScreenNodes(projectId, moves);
-      } catch (e) {
-        clearOverrides(moves.map((m) => m.id));
-        fail(e);
-      }
+      const r = await call(() => moveScreenNodes(projectId, moves));
+      if (!r) clearOverrides(moves.map((m) => m.id));
     });
   }
 

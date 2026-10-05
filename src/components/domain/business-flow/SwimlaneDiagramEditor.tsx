@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { moveFlowStep } from "@/actions/business-flow";
+import { runAction } from "@/lib/run-action";
+import { useToast } from "@/components/ui/toast";
 import { computeSwimlaneLayout, LAYOUT_CONSTANTS } from "@/lib/business-flow/layout";
 import type { FlowStep, FlowEdge, FlowType } from "@/actions/business-flow";
 
@@ -21,6 +23,7 @@ export function SwimlaneDiagramEditor({
   const layout = computeSwimlaneLayout(steps);
   const [positions, setPositions] = useState(() => new Map(layout.positions));
   const [isPending, startTransition] = useTransition();
+  const { show } = useToast();
 
   function handlePointerDown(e: React.PointerEvent<SVGGElement>, stepId: string) {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -60,8 +63,10 @@ export function SwimlaneDiagramEditor({
       .sort((a, b) => a.x - b.x)
       .map((s) => s.id);
 
-    startTransition(() => {
-      moveFlowStep(stepId, projectId, flowType, newLane, ordered);
+    startTransition(async () => {
+      // 失敗（{ok:false}・通信エラーとも）のときは、ドラッグで動かした位置を取り消し、保存済みの位置へ戻す
+      const r = await runAction(() => moveFlowStep(stepId, projectId, flowType, newLane, ordered), show);
+      if (!r) setPositions(new Map(layout.positions));
     });
   }
 

@@ -26,6 +26,7 @@ const KNOWN_PATTERNS: [RegExp, string][] = [
   [/invalid input syntax for type uuid/i, "指定された対象が正しくありません"],
   [/cannot coerce the result to a single json object|the result contains 0 rows/i, "対象が見つかりません"],
   [/jwt expired|invalid jwt|auth session missing/i, "ログインの有効期限が切れました。再度ログインしてください"],
+  [/jwt issued at future/i, "ログイン情報の確認に失敗しました。少し待ってから、もう一度お試しください"],
   [/an error occurred in the server components render/i, GENERIC_ERROR_JA],
 ];
 

@@ -1,10 +1,11 @@
 "use server";
 
+import { safeAction, type ActionResult } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
 import { UserFacingError } from "@/lib/user-error";
-import { errorMessage } from "@/lib/error-message";
+import { errorMessage, knownErrorMessage, GENERIC_ERROR_JA } from "@/lib/error-message";
 import { nodePosition } from "@/lib/screen-flow/derive";
 import { buildFunctionItems } from "@/lib/screen-flow/function-items";
 import { createScreenEdgeRow, createScreenNodeRow, type Supabase } from "@/lib/screen-flow/node-ops";
@@ -106,7 +107,11 @@ export async function listScreenSuggestions(projectId: string): Promise<ScreenSu
 const FIELD_LIMIT = 300;
 const clip = (s: string) => (s.length > FIELD_LIMIT ? `${s.slice(0, FIELD_LIMIT)}…` : s);
 
-export async function generateScreenFlowSuggestions(projectId: string): Promise<{ nodes: number; transitions: number }> {
+export async function generateScreenFlowSuggestions(projectId: string): Promise<ActionResult<{ nodes: number; transitions: number }>> {
+  return safeAction("generateScreenFlowSuggestions", () => generateScreenFlowSuggestionsInner(projectId));
+}
+
+async function generateScreenFlowSuggestionsInner(projectId: string): Promise<{ nodes: number; transitions: number }> {
   const supabase = await createServerActionClient();
   const tenantId = await getTenantId(supabase);
   if (!tenantId) throw new UserFacingError("認証が必要です");
@@ -351,6 +356,13 @@ async function adoptOne(supabase: Supabase, tenantId: string, suggestionId: stri
 export async function adoptScreenSuggestion(
   suggestionId: string,
   projectId: string
+): Promise<ActionResult<{ kind: "node" | "transition"; resultId: string }>> {
+  return safeAction("adoptScreenSuggestion", () => adoptScreenSuggestionInner(suggestionId, projectId));
+}
+
+async function adoptScreenSuggestionInner(
+  suggestionId: string,
+  projectId: string
 ): Promise<{ kind: "node" | "transition"; resultId: string }> {
   const supabase = await createServerActionClient();
   const tenantId = await getTenantId(supabase);
@@ -387,34 +399,51 @@ async function rejectOne(supabase: Supabase, suggestionId: string, projectId: st
   }
 }
 
-export async function rejectScreenSuggestion(suggestionId: string, projectId: string) {
+export async function rejectScreenSuggestion(suggestionId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("rejectScreenSuggestion", () => rejectScreenSuggestionInner(suggestionId, projectId));
+}
+
+async function rejectScreenSuggestionInner(suggestionId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   await rejectOne(supabase, suggestionId, projectId);
   revalidatePath(path(projectId));
 }
 
 // 「すべて採用」：ノード提案→遷移提案の順に処理する。個別の失敗では止めず、成功・失敗件数を返す。
-export async function adoptAllScreenSuggestions(projectId: string): Promise<{ adopted: number; failed: number }> {
+// 失敗の理由は、同じ文言の件数をまとめて返す（画面で「〇〇：2件、△△：1件」と集計して表示する）
+export type AdoptAllResult = { adopted: number; failed: { reason: string; count: number }[] };
+
+export async function adoptAllScreenSuggestions(projectId: string): Promise<ActionResult<AdoptAllResult>> {
+  return safeAction("adoptAllScreenSuggestions", () => adoptAllScreenSuggestionsInner(projectId));
+}
+
+async function adoptAllScreenSuggestionsInner(projectId: string): Promise<AdoptAllResult> {
   const supabase = await createServerActionClient();
   const tenantId = await getTenantId(supabase);
   if (!tenantId) throw new UserFacingError("認証が必要です");
   const open = await fetchRows(supabase, projectId, "open");
   const ordered = [...open.filter((r) => r.kind === "node"), ...open.filter((r) => r.kind === "transition")];
   let adopted = 0;
-  let failed = 0;
+  const failedByReason = new Map<string, number>();
   for (const r of ordered) {
     try {
       await adoptOne(supabase, tenantId, r.id, projectId);
       adopted += 1;
-    } catch {
-      failed += 1;
+    } catch (e) {
+      const reason = e instanceof UserFacingError ? e.message : (knownErrorMessage(e) ?? GENERIC_ERROR_JA);
+      if (!(e instanceof UserFacingError)) console.error("[action:adoptAllScreenSuggestions] unexpected error:", e);
+      failedByReason.set(reason, (failedByReason.get(reason) ?? 0) + 1);
     }
   }
   revalidatePath(path(projectId));
-  return { adopted, failed };
+  return { adopted, failed: [...failedByReason.entries()].map(([reason, count]) => ({ reason, count })) };
 }
 
-export async function rejectAllScreenSuggestions(projectId: string): Promise<{ rejected: number }> {
+export async function rejectAllScreenSuggestions(projectId: string): Promise<ActionResult<{ rejected: number }>> {
+  return safeAction("rejectAllScreenSuggestions", () => rejectAllScreenSuggestionsInner(projectId));
+}
+
+async function rejectAllScreenSuggestionsInner(projectId: string): Promise<{ rejected: number }> {
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
     .from("screen_flow_suggestions")

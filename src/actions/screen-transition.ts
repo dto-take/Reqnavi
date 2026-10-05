@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAction, type ActionResult } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
@@ -95,7 +96,11 @@ function clampStored(x: number, y: number) {
   };
 }
 
-export async function moveScreenNode(nodeId: string, projectId: string, x: number, y: number) {
+export async function moveScreenNode(nodeId: string, projectId: string, x: number, y: number): Promise<ActionResult> {
+  return safeAction("moveScreenNode", () => moveScreenNodeInner(nodeId, projectId, x, y));
+}
+
+async function moveScreenNodeInner(nodeId: string, projectId: string, x: number, y: number): Promise<void> {
   const supabase = await createServerActionClient();
   const pos = clampStored(x, y);
   const { data, error } = await supabase
@@ -112,6 +117,13 @@ export async function moveScreenNode(nodeId: string, projectId: string, x: numbe
 export async function addScreenNode(
   projectId: string,
   input: { name: string; functionItemId?: string | null }
+): Promise<ActionResult<string>> {
+  return safeAction("addScreenNode", () => addScreenNodeInner(projectId, input));
+}
+
+async function addScreenNodeInner(
+  projectId: string,
+  input: { name: string; functionItemId?: string | null }
 ): Promise<string> {
   const supabase = await createServerActionClient();
   const tenantId = await getTenantId(supabase);
@@ -121,7 +133,11 @@ export async function addScreenNode(
   return id;
 }
 
-export async function renameScreenNode(nodeId: string, projectId: string, name: string) {
+export async function renameScreenNode(nodeId: string, projectId: string, name: string): Promise<ActionResult> {
+  return safeAction("renameScreenNode", () => renameScreenNodeInner(nodeId, projectId, name));
+}
+
+async function renameScreenNodeInner(nodeId: string, projectId: string, name: string): Promise<void> {
   const trimmed = name.trim();
   if (!trimmed) throw new UserFacingError("画面名を入力してください");
   const supabase = await createServerActionClient();
@@ -138,7 +154,11 @@ export async function renameScreenNode(nodeId: string, projectId: string, name: 
 }
 
 // 接続する遷移はflow_edgesの外部キー（from_node/to_node、ON DELETE CASCADE）で一緒に削除される。
-export async function removeScreenNode(nodeId: string, projectId: string) {
+export async function removeScreenNode(nodeId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("removeScreenNode", () => removeScreenNodeInner(nodeId, projectId));
+}
+
+async function removeScreenNodeInner(nodeId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
     .from("flow_nodes")
@@ -151,7 +171,11 @@ export async function removeScreenNode(nodeId: string, projectId: string) {
   revalidatePath(path(projectId));
 }
 
-export async function linkScreenFunction(nodeId: string, projectId: string, functionItemId: string | null) {
+export async function linkScreenFunction(nodeId: string, projectId: string, functionItemId: string | null): Promise<ActionResult> {
+  return safeAction("linkScreenFunction", () => linkScreenFunctionInner(nodeId, projectId, functionItemId));
+}
+
+async function linkScreenFunctionInner(nodeId: string, projectId: string, functionItemId: string | null): Promise<void> {
   const supabase = await createServerActionClient();
   const status = await assertNodeEditable(supabase, nodeId);
   if (functionItemId) await assertFunctionUsable(supabase, projectId, functionItemId, nodeId);
@@ -171,6 +195,15 @@ export async function addScreenTransition(
   fromNodeId: string,
   toNodeId: string,
   label?: string
+): Promise<ActionResult<string>> {
+  return safeAction("addScreenTransition", () => addScreenTransitionInner(projectId, fromNodeId, toNodeId, label));
+}
+
+async function addScreenTransitionInner(
+  projectId: string,
+  fromNodeId: string,
+  toNodeId: string,
+  label?: string
 ): Promise<string> {
   const supabase = await createServerActionClient();
   const id = await createScreenEdgeRow(supabase, projectId, fromNodeId, toNodeId, label);
@@ -186,7 +219,11 @@ async function assertEdgeEditable(supabase: Supabase, edgeId: string) {
   if (isItemLocked(status)) throw new UserFacingError("確定済みの画面からの遷移は編集できません");
 }
 
-export async function updateScreenTransitionLabel(edgeId: string, projectId: string, label: string) {
+export async function updateScreenTransitionLabel(edgeId: string, projectId: string, label: string): Promise<ActionResult> {
+  return safeAction("updateScreenTransitionLabel", () => updateScreenTransitionLabelInner(edgeId, projectId, label));
+}
+
+async function updateScreenTransitionLabelInner(edgeId: string, projectId: string, label: string): Promise<void> {
   const supabase = await createServerActionClient();
   await assertEdgeEditable(supabase, edgeId);
   const { data, error } = await supabase
@@ -199,7 +236,11 @@ export async function updateScreenTransitionLabel(edgeId: string, projectId: str
   revalidatePath(path(projectId));
 }
 
-export async function removeScreenTransition(edgeId: string, projectId: string) {
+export async function removeScreenTransition(edgeId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("removeScreenTransition", () => removeScreenTransitionInner(edgeId, projectId));
+}
+
+async function removeScreenTransitionInner(edgeId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   await assertEdgeEditable(supabase, edgeId);
   const { data, error } = await supabase.from("flow_edges").delete().eq("id", edgeId).select("id");
@@ -210,7 +251,11 @@ export async function removeScreenTransition(edgeId: string, projectId: string) 
 
 // 自動整列など複数ノードの位置をまとめて保存する。規約47：RLSで弾かれたUPDATEは黙って0件に
 // なるため、更新できた件数が対象件数と一致しなければエラーにする。
-export async function moveScreenNodes(projectId: string, moves: { id: string; x: number; y: number }[]) {
+export async function moveScreenNodes(projectId: string, moves: { id: string; x: number; y: number }[]): Promise<ActionResult> {
+  return safeAction("moveScreenNodes", () => moveScreenNodesInner(projectId, moves));
+}
+
+async function moveScreenNodesInner(projectId: string, moves: { id: string; x: number; y: number }[]): Promise<void> {
   if (moves.length === 0) return;
   const supabase = await createServerActionClient();
   let updated = 0;
@@ -232,7 +277,11 @@ export async function moveScreenNodes(projectId: string, moves: { id: string; x:
   revalidatePath(path(projectId));
 }
 
-export async function confirmScreenNode(nodeId: string, projectId: string) {
+export async function confirmScreenNode(nodeId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("confirmScreenNode", () => confirmScreenNodeInner(nodeId, projectId));
+}
+
+async function confirmScreenNodeInner(nodeId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
     .from("flow_nodes")
