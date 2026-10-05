@@ -1,10 +1,10 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { addCheckItem, suggestNonfunctionalCandidates } from "@/actions/nonfunctional";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 
 type Candidate = { text: string; why: string };
 
@@ -32,11 +32,11 @@ export function AspectCandidatePanel({
     setGenerating(true);
     startTransition(async () => {
       try {
-        const result = await suggestNonfunctionalCandidates(aspectId, projectId, excludeTexts);
-        setCandidates(result);
-        setHasGenerated(true);
-      } catch (e) {
-        show(errorMessage(e), "error");
+        const r = await runAction(() => suggestNonfunctionalCandidates(aspectId, projectId, excludeTexts), show);
+        if (r) {
+          setCandidates(r.data);
+          setHasGenerated(true);
+        }
       } finally {
         setGenerating(false);
       }
@@ -45,12 +45,8 @@ export function AspectCandidatePanel({
 
   function handleAdopt(candidate: Candidate) {
     startTransition(async () => {
-      try {
-        await addCheckItem(aspectId, projectId, tenantId, candidate.text, "ai");
-        setCandidates((prev) => prev.filter((c) => c !== candidate));
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => addCheckItem(aspectId, projectId, tenantId, candidate.text, "ai"), show);
+      if (r) setCandidates((prev) => prev.filter((c) => c !== candidate));
     });
   }
 
@@ -61,14 +57,11 @@ export function AspectCandidatePanel({
 
   function handleAdoptAll() {
     startTransition(async () => {
-      try {
-        for (const candidate of candidates) {
-          await addCheckItem(aspectId, projectId, tenantId, candidate.text, "ai");
-        }
-        setCandidates([]);
-      } catch (e) {
-        show(errorMessage(e), "error");
+      for (const candidate of candidates) {
+        const r = await runAction(() => addCheckItem(aspectId, projectId, tenantId, candidate.text, "ai"), show);
+        if (!r) return; // 失敗はトースト表示済み。以降の候補は追加せず中断する
       }
+      setCandidates([]);
     });
   }
 

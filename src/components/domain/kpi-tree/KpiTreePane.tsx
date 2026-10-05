@@ -1,9 +1,9 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useTransition } from "react";
 import { createKpiNode, type KpiNode } from "@/actions/kpi-tree";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 
 // kpi_ux_phase2.md Step6：状態ドットの色。新しいステータス列は追加せず、既存の
 // requirement_items.statusをそのまま3色にマップする（下書き=グレー／要レビュー=琥珀／確定=緑）。
@@ -46,14 +46,11 @@ export function KpiTreePane({
 
   function handleAddRoot() {
     startTransition(async () => {
-      try {
-        const newId = goal
-          ? await createKpiNode(projectId, tenantId, goal.id, "目標")
-          : await createKpiNode(projectId, tenantId, null, "ゴール");
-        onCreated(newId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(
+        () => (goal ? createKpiNode(projectId, tenantId, goal.id, "目標") : createKpiNode(projectId, tenantId, null, "ゴール")),
+        show
+      );
+      if (r) onCreated(r.data);
     });
   }
 

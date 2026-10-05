@@ -1,5 +1,6 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useMemo, useState, useTransition } from "react";
 import {
   adoptMasterAspect,
@@ -14,7 +15,6 @@ import { adoptedAspects, checkItemsOf, computeReorderOverrides } from "@/lib/non
 import { AspectCatalogPane } from "@/components/domain/nonfunctional-checklist/AspectCatalogPane";
 import { AspectDetailPane } from "@/components/domain/nonfunctional-checklist/AspectDetailPane";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 
 // nonfunctional_ux_phase1.md：10章を、観点カードが常設で並ぶ形式から、標準観点マスタに
 // 基づく採用中/未採用カタログ（左）＋観点詳細（右）の2ペイン構成に置き換える。
@@ -58,34 +58,22 @@ export function NonfunctionalScreen({
 
   function handleAdoptMaster(masterId: string, name: string) {
     startTransition(async () => {
-      try {
-        const newId = await adoptMasterAspect(projectId, tenantId, masterId, name);
-        setSelectedId(newId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => adoptMasterAspect(projectId, tenantId, masterId, name), show);
+      if (r) setSelectedId(r.data);
     });
   }
 
   function handleReactivate(aspectId: string) {
     startTransition(async () => {
-      try {
-        await reactivateAspect(aspectId, projectId);
-        setSelectedId(aspectId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => reactivateAspect(aspectId, projectId), show);
+      if (r) setSelectedId(aspectId);
     });
   }
 
   function handleCreateCustom(name: string) {
     startTransition(async () => {
-      try {
-        const newId = await createCustomAspect(projectId, tenantId, name);
-        setSelectedId(newId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => createCustomAspect(projectId, tenantId, name), show);
+      if (r) setSelectedId(r.data);
     });
   }
 
@@ -109,12 +97,9 @@ export function NonfunctionalScreen({
     const overrides = computeReorderOverrides(orderedIds, aspectId, insertBeforeAspectId);
     applyOverrides(overrides);
     startTransition(async () => {
-      try {
-        await reorderAspect(projectId, aspectId, insertBeforeAspectId);
-      } catch (e) {
-        clearOverrides([...overrides.keys()]);
-        show(errorMessage(e), "error");
-      }
+      // 失敗（{ok:false}・通信エラーとも）のときは、楽観的な上書きを外して元へ戻す。トーストはrunActionが1件だけ出す
+      const r = await runAction(() => reorderAspect(projectId, aspectId, insertBeforeAspectId), show);
+      if (!r) clearOverrides([...overrides.keys()]);
     });
   }
 
@@ -123,12 +108,8 @@ export function NonfunctionalScreen({
     const overrides = computeReorderOverrides(orderedIds, itemId, insertBeforeItemId);
     applyOverrides(overrides);
     startTransition(async () => {
-      try {
-        await reorderCheckItem(aspectId, projectId, itemId, insertBeforeItemId);
-      } catch (e) {
-        clearOverrides([...overrides.keys()]);
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => reorderCheckItem(aspectId, projectId, itemId, insertBeforeItemId), show);
+      if (!r) clearOverrides([...overrides.keys()]);
     });
   }
 

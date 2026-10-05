@@ -1,5 +1,6 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useTransition } from "react";
 import { updateProgressTaskField, deleteProgressTask, setPredecessor, type ProgressTaskField } from "@/actions/progress-tasks";
 import { childrenOf, rollupRange, wouldCreateCycle, type ProgressTask } from "@/lib/gantt/layout";
@@ -8,7 +9,6 @@ import { Input, Select } from "@/components/ui/input";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 
 export function ProgressDetailPanel({
   projectId,
@@ -52,32 +52,20 @@ export function ProgressDetailPanel({
 
   function handleField(field: ProgressTaskField, value: string) {
     startTransition(async () => {
-      try {
-        await updateProgressTaskField(selectedNode!.id, projectId, field, value);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => updateProgressTaskField(selectedNode!.id, projectId, field, value), show);
     });
   }
 
   function handlePredecessorChange(value: string) {
     startTransition(async () => {
-      try {
-        await setPredecessor(selectedNode!.id, projectId, value || null);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => setPredecessor(selectedNode!.id, projectId, value || null), show);
     });
   }
 
   function handleDelete() {
     if (!confirm("この項目を削除しますか？この操作は取り消せません。")) return;
     startTransition(async () => {
-      try {
-        await deleteProgressTask(selectedNode!.id, projectId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => deleteProgressTask(selectedNode!.id, projectId), show);
     });
   }
 

@@ -1,11 +1,11 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { suggestKpiCandidates, adoptKpiCandidate, type KpiNode } from "@/actions/kpi-tree";
 import { KPI_LEVELS, type KpiLevel } from "@/lib/kpi-levels";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 
 function childLevelLabel(level: KpiLevel): string {
   const idx = KPI_LEVELS.indexOf(level);
@@ -41,11 +41,11 @@ export function KpiCandidatePanel({
     setGenerating(true);
     startTransition(async () => {
       try {
-        const result = await suggestKpiCandidates(node.id, projectId, excludeTexts);
-        setCandidates(result);
-        setHasGenerated(true);
-      } catch (e) {
-        show(errorMessage(e), "error");
+        const r = await runAction(() => suggestKpiCandidates(node.id, projectId, excludeTexts), show);
+        if (r) {
+          setCandidates(r.data);
+          setHasGenerated(true);
+        }
       } finally {
         setGenerating(false);
       }
@@ -54,12 +54,10 @@ export function KpiCandidatePanel({
 
   function handleAdopt(candidate: Candidate) {
     startTransition(async () => {
-      try {
-        const newNodeId = await adoptKpiCandidate(node.id, projectId, tenantId, candidate.text);
+      const r = await runAction(() => adoptKpiCandidate(node.id, projectId, tenantId, candidate.text), show);
+      if (r) {
         setCandidates((prev) => prev.filter((c) => c !== candidate));
-        onAdopted(newNodeId);
-      } catch (e) {
-        show(errorMessage(e), "error");
+        onAdopted(r.data);
       }
     });
   }
@@ -71,16 +69,14 @@ export function KpiCandidatePanel({
 
   function handleAdoptAll() {
     startTransition(async () => {
-      try {
-        let lastNewNodeId: string | null = null;
-        for (const candidate of candidates) {
-          lastNewNodeId = await adoptKpiCandidate(node.id, projectId, tenantId, candidate.text);
-        }
-        setCandidates([]);
-        onAdopted(lastNewNodeId);
-      } catch (e) {
-        show(errorMessage(e), "error");
+      let lastNewNodeId: string | null = null;
+      for (const candidate of candidates) {
+        const r = await runAction(() => adoptKpiCandidate(node.id, projectId, tenantId, candidate.text), show);
+        if (!r) return; // 失敗はトースト表示済み。以降の候補は採用せず中断する
+        lastNewNodeId = r.data;
       }
+      setCandidates([]);
+      onAdopted(lastNewNodeId);
     });
   }
 

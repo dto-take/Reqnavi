@@ -1,5 +1,6 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import {
   addCheckItem,
@@ -21,7 +22,6 @@ import { Input, Select, Textarea } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 import { isItemLocked } from "@/lib/item-lock";
 
 const JUDGEMENT_LABEL: Record<CheckItemContent["judgement"], string> = { yes: "該当", no: "非該当", unknown: "未判定" };
@@ -122,11 +122,7 @@ export function AspectDetailPane({
 
   function savePolicy(policy: string) {
     startTransition(async () => {
-      try {
-        await updateAspectPolicy(selectedAspect!.id, projectId, policy);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => updateAspectPolicy(selectedAspect!.id, projectId, policy), show);
     });
   }
 
@@ -134,43 +130,27 @@ export function AspectDetailPane({
     const text = newItemText.trim();
     if (!text) return;
     startTransition(async () => {
-      try {
-        await addCheckItem(selectedAspect!.id, projectId, tenantId, text);
-        setNewItemText("");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => addCheckItem(selectedAspect!.id, projectId, tenantId, text), show);
+      if (r) setNewItemText("");
     });
   }
 
   function handleJudgement(itemId: string, judgement: CheckItemContent["judgement"]) {
     startTransition(async () => {
-      try {
-        await setCheckItemJudgement(itemId, projectId, judgement);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => setCheckItemJudgement(itemId, projectId, judgement), show);
     });
   }
 
   function handleDeleteItem(itemId: string) {
     startTransition(async () => {
-      try {
-        await deleteCheckItem(itemId, projectId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => deleteCheckItem(itemId, projectId), show);
     });
   }
 
   function handleUnadopt() {
     startTransition(async () => {
-      try {
-        await unadoptAspect(selectedAspect!.id, projectId);
-        onUnadopted();
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => unadoptAspect(selectedAspect!.id, projectId), show);
+      if (r) onUnadopted();
     });
   }
 
@@ -190,12 +170,10 @@ export function AspectDetailPane({
       return;
     }
     startTransition(async () => {
-      try {
-        await importMasterCheckItems(selectedAspect!.id, projectId, tenantId, texts);
+      const r = await runAction(() => importMasterCheckItems(selectedAspect!.id, projectId, tenantId, texts), show);
+      if (r) {
         setSelectedStandard(new Set());
         setStandardOpen(false);
-      } catch (e) {
-        show(errorMessage(e), "error");
       }
     });
   }
@@ -204,11 +182,7 @@ export function AspectDetailPane({
   function handleConfirm() {
     if (stats.unknown > 0 && !confirm(`未判定 ${stats.unknown}件が残っていますが確定しますか？`)) return;
     startTransition(async () => {
-      try {
-        await confirmAspect(selectedAspect!.id, projectId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => confirmAspect(selectedAspect!.id, projectId), show);
     });
   }
 
@@ -217,21 +191,13 @@ export function AspectDetailPane({
     if (stats.unknown === 0) return;
     if (!confirm(`未判定 ${stats.unknown}件を非該当に変更します。よろしいですか？`)) return;
     startTransition(async () => {
-      try {
-        await bulkSetUnknownToNo(selectedAspect!.id, projectId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => bulkSetUnknownToNo(selectedAspect!.id, projectId), show);
     });
   }
 
   function handleMoveItem(itemId: string, toAspectId: string) {
     startTransition(async () => {
-      try {
-        await moveCheckItem(itemId, projectId, toAspectId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => moveCheckItem(itemId, projectId, toAspectId), show);
     });
   }
 

@@ -1,12 +1,12 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useCallback, useMemo, useReducer, useState, useSyncExternalStore } from "react";
 import { createPhase, createTask, shiftTaskDates } from "@/actions/progress-tasks";
 import { visibleRows, computeGanttWindow, type ProgressTask, type GanttScale } from "@/lib/gantt/layout";
 import { WbsGanttPane } from "@/components/domain/progress/WbsGanttPane";
 import { ProgressDetailPanel } from "@/components/domain/progress/ProgressDetailPanel";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 
 // progress_ux_phase1.md：15章を、フラットなタスク一覧＋進捗スライダーから、
 // 大工程／中工程の2階層＋WBS/ガント（左）＋詳細パネル（右）の2ペイン構成に置き換える。
@@ -115,21 +115,13 @@ export function ProgressChart({
   }
 
   async function handleAddPhase() {
-    try {
-      const newId = await createPhase(projectId, tenantId);
-      setSelectedId(newId);
-    } catch (e) {
-      show(errorMessage(e), "error");
-    }
+    const r = await runAction(() => createPhase(projectId, tenantId), show);
+    if (r) setSelectedId(r.data);
   }
 
   async function handleAddTask(phaseId: string) {
-    try {
-      const newId = await createTask(projectId, tenantId, phaseId);
-      setSelectedId(newId);
-    } catch (e) {
-      show(errorMessage(e), "error");
-    }
+    const r = await runAction(() => createTask(projectId, tenantId, phaseId), show);
+    if (r) setSelectedId(r.data);
   }
 
   function handleToggleOwnerFocus(name: string) {
@@ -146,15 +138,14 @@ export function ProgressChart({
       next.set(taskId, { week_start: newStart, week_end: newEnd });
       return next;
     });
-    try {
-      await shiftTaskDates(taskId, projectId, newStart, newEnd);
-    } catch (e) {
+    // 失敗（{ok:false}・通信エラーとも）のときは上書きを取り除いて元の表示へ戻す。トーストはrunActionが1件だけ出す
+    const r = await runAction(() => shiftTaskDates(taskId, projectId, newStart, newEnd), show);
+    if (!r) {
       setOverrides((prev) => {
         const next = new Map(prev);
         next.delete(taskId);
         return next;
       });
-      show(errorMessage(e), "error");
     }
   }
 

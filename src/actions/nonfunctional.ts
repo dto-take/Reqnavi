@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAction, type ActionResult } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
@@ -95,6 +96,15 @@ export async function adoptMasterAspect(
   tenantId: string,
   masterId: string,
   name: string
+): Promise<ActionResult<string>> {
+  return safeAction("adoptMasterAspect", () => adoptMasterAspectInner(projectId, tenantId, masterId, name));
+}
+
+async function adoptMasterAspectInner(
+  projectId: string,
+  tenantId: string,
+  masterId: string,
+  name: string
 ): Promise<string> {
   const supabase = await createServerActionClient();
   const orderIndex = await countAspects(supabase, projectId, false);
@@ -119,7 +129,11 @@ export async function adoptMasterAspect(
 
 // 未採用リストのうち「rejectedの復活」（Step3：過去に採用解除された観点。標準観点由来・
 // 独自観点のどちらも対象）。既存行のstatusを戻すだけで、方針・チェック項目はそのまま保持される。
-export async function reactivateAspect(aspectId: string, projectId: string) {
+export async function reactivateAspect(aspectId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("reactivateAspect", () => reactivateAspectInner(aspectId, projectId));
+}
+
+async function reactivateAspectInner(aspectId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { error } = await supabase
     .from("requirement_items")
@@ -131,7 +145,11 @@ export async function reactivateAspect(aspectId: string, projectId: string) {
 }
 
 // 独自の観点を作る。標準マスタには追加せず、案件固有のmaster_id:nullの観点行として作成する。
-export async function createCustomAspect(projectId: string, tenantId: string, name: string): Promise<string> {
+export async function createCustomAspect(projectId: string, tenantId: string, name: string): Promise<ActionResult<string>> {
+  return safeAction("createCustomAspect", () => createCustomAspectInner(projectId, tenantId, name));
+}
+
+async function createCustomAspectInner(projectId: string, tenantId: string, name: string): Promise<string> {
   const trimmed = name.trim();
   if (!trimmed) throw new UserFacingError("観点名を入力してください");
   const supabase = await createServerActionClient();
@@ -157,7 +175,11 @@ export async function createCustomAspect(projectId: string, tenantId: string, na
 
 // 採用解除＝未採用リストへ戻す。方針・チェック項目は削除しない（指示書の「やってはいけないこと」）。
 // 採用中の観点が0件になる操作は不可（Interactions #3）。
-export async function unadoptAspect(aspectId: string, projectId: string) {
+export async function unadoptAspect(aspectId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("unadoptAspect", () => unadoptAspectInner(aspectId, projectId));
+}
+
+async function unadoptAspectInner(aspectId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const adoptedCount = await countAspects(supabase, projectId, true);
   if (adoptedCount <= 1) throw new UserFacingError("採用中の観点を0件にはできません。");
@@ -170,7 +192,11 @@ export async function unadoptAspect(aspectId: string, projectId: string) {
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 
-export async function updateAspectPolicy(aspectId: string, projectId: string, policy: string) {
+export async function updateAspectPolicy(aspectId: string, projectId: string, policy: string): Promise<ActionResult> {
+  return safeAction("updateAspectPolicy", () => updateAspectPolicyInner(aspectId, projectId, policy));
+}
+
+async function updateAspectPolicyInner(aspectId: string, projectId: string, policy: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: current, error: fetchError } = await supabase
     .from("requirement_items")
@@ -204,6 +230,16 @@ async function assertAspectEditable(
 // nonfunctional_ux_phase3.md Step3：AI候補の採用もこの関数を再利用する
 // （source: 'ai'・judgement: 'unknown'のチェック項目として追加する）。
 export async function addCheckItem(
+  aspectId: string,
+  projectId: string,
+  tenantId: string,
+  text: string,
+  source: CheckItemContent["source"] = "human"
+): Promise<ActionResult<string>> {
+  return safeAction("addCheckItem", () => addCheckItemInner(aspectId, projectId, tenantId, text, source));
+}
+
+async function addCheckItemInner(
   aspectId: string,
   projectId: string,
   tenantId: string,
@@ -247,7 +283,16 @@ export async function importMasterCheckItems(
   projectId: string,
   tenantId: string,
   texts: string[]
-) {
+): Promise<ActionResult> {
+  return safeAction("importMasterCheckItems", () => importMasterCheckItemsInner(aspectId, projectId, tenantId, texts));
+}
+
+async function importMasterCheckItemsInner(
+  aspectId: string,
+  projectId: string,
+  tenantId: string,
+  texts: string[]
+): Promise<void> {
   if (texts.length === 0) return;
   const supabase = await createServerActionClient();
   await assertAspectEditable(supabase, aspectId);
@@ -278,7 +323,15 @@ export async function setCheckItemJudgement(
   itemId: string,
   projectId: string,
   judgement: "yes" | "no" | "unknown"
-) {
+): Promise<ActionResult> {
+  return safeAction("setCheckItemJudgement", () => setCheckItemJudgementInner(itemId, projectId, judgement));
+}
+
+async function setCheckItemJudgementInner(
+  itemId: string,
+  projectId: string,
+  judgement: "yes" | "no" | "unknown"
+): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: current, error: fetchError } = await supabase
     .from("requirement_items")
@@ -296,7 +349,11 @@ export async function setCheckItemJudgement(
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 
-export async function deleteCheckItem(itemId: string, projectId: string) {
+export async function deleteCheckItem(itemId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("deleteCheckItem", () => deleteCheckItemInner(itemId, projectId));
+}
+
+async function deleteCheckItemInner(itemId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: current, error: fetchError } = await supabase
     .from("requirement_items")
@@ -316,7 +373,11 @@ export async function deleteCheckItem(itemId: string, projectId: string) {
 // nonfunctional_ux_phase2.md：「新しいステータス概念は作らない」＝確定は既存status列の
 // confirmedをそのまま使う。確認ダイアログ（未判定N件が残っています…）はクライアント側
 // （AspectDetailPane）で行い、ここでは同意後の確定処理のみを行う。
-export async function confirmAspect(aspectId: string, projectId: string) {
+export async function confirmAspect(aspectId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("confirmAspect", () => confirmAspectInner(aspectId, projectId));
+}
+
+async function confirmAspectInner(aspectId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { error } = await supabase
     .from("requirement_items")
@@ -329,7 +390,11 @@ export async function confirmAspect(aspectId: string, projectId: string) {
 
 // Step2：選択中観点のjudgement:'unknown'を全て'no'へ一括更新する。対象件数の確認は
 // クライアント側（AspectDetailPane）で行う。
-export async function bulkSetUnknownToNo(aspectId: string, projectId: string) {
+export async function bulkSetUnknownToNo(aspectId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("bulkSetUnknownToNo", () => bulkSetUnknownToNoInner(aspectId, projectId));
+}
+
+async function bulkSetUnknownToNoInner(aspectId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   await assertAspectEditable(supabase, aspectId);
 
@@ -399,7 +464,11 @@ async function fetchOrderedCheckItemIds(
 
 // Step3：左カタログ「採用中」リストのドラッグ並べ替え。未採用（rejected）の観点は表示されて
 // いないため並べ替えの対象に含めない（採用中の中でのみ順序を振り直す）。
-export async function reorderAspect(projectId: string, aspectId: string, insertBeforeAspectId: string | null) {
+export async function reorderAspect(projectId: string, aspectId: string, insertBeforeAspectId: string | null): Promise<ActionResult> {
+  return safeAction("reorderAspect", () => reorderAspectInner(projectId, aspectId, insertBeforeAspectId));
+}
+
+async function reorderAspectInner(projectId: string, aspectId: string, insertBeforeAspectId: string | null): Promise<void> {
   const supabase = await createServerActionClient();
   const ids = await fetchOrderedAdoptedAspectIds(supabase, projectId);
   const without = ids.filter((id) => id !== aspectId);
@@ -418,7 +487,16 @@ export async function reorderCheckItem(
   projectId: string,
   itemId: string,
   insertBeforeItemId: string | null
-) {
+): Promise<ActionResult> {
+  return safeAction("reorderCheckItem", () => reorderCheckItemInner(aspectId, projectId, itemId, insertBeforeItemId));
+}
+
+async function reorderCheckItemInner(
+  aspectId: string,
+  projectId: string,
+  itemId: string,
+  insertBeforeItemId: string | null
+): Promise<void> {
   const supabase = await createServerActionClient();
   await assertAspectEditable(supabase, aspectId);
   const ids = await fetchOrderedCheckItemIds(supabase, aspectId);
@@ -433,7 +511,11 @@ export async function reorderCheckItem(
 
 // Step4：チェック項目を別の観点へ移動する。isItemLockedは'rejected'も含むため、確定済み・
 // 未採用のどちらへも移動できない（assertAspectEditableの再利用でこの制約が自動的に付く）。
-export async function moveCheckItem(itemId: string, projectId: string, toAspectId: string) {
+export async function moveCheckItem(itemId: string, projectId: string, toAspectId: string): Promise<ActionResult> {
+  return safeAction("moveCheckItem", () => moveCheckItemInner(itemId, projectId, toAspectId));
+}
+
+async function moveCheckItemInner(itemId: string, projectId: string, toAspectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: current, error: fetchError } = await supabase
     .from("requirement_items")
@@ -464,6 +546,14 @@ const CandidateSchema = z.object({ candidates: z.array(z.object({ text: z.string
 // 作らない）。「見送り」も画面（AspectCandidatePanel）側でリストから消すだけで済み、
 // ここには対応する処理を作らない。
 export async function suggestNonfunctionalCandidates(
+  aspectId: string,
+  projectId: string,
+  excludeTexts: string[]
+): Promise<ActionResult<{ text: string; why: string }[]>> {
+  return safeAction("suggestNonfunctionalCandidates", () => suggestNonfunctionalCandidatesInner(aspectId, projectId, excludeTexts));
+}
+
+async function suggestNonfunctionalCandidatesInner(
   aspectId: string,
   projectId: string,
   excludeTexts: string[]

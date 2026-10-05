@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAction, type ActionResult } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
@@ -105,6 +106,17 @@ export async function createKpiNode(
   level: KpiLevel,
   text: string = "",
   status: "ai_draft" | "se_reviewing" = "se_reviewing"
+): Promise<ActionResult<string>> {
+  return safeAction("createKpiNode", () => createKpiNodeInner(projectId, tenantId, parentId, level, text, status));
+}
+
+async function createKpiNodeInner(
+  projectId: string,
+  tenantId: string,
+  parentId: string | null,
+  level: KpiLevel,
+  text: string = "",
+  status: "ai_draft" | "se_reviewing" = "se_reviewing"
 ): Promise<string> {
   const supabase = await createServerActionClient();
   // フェーズ4：兄弟の末尾に追加されるよう、既存の兄弟数をそのまま次のorder_indexとして使う
@@ -140,7 +152,16 @@ export async function updateKpiNodeField(
   projectId: string,
   field: "text" | "metric" | "owner" | "due_date",
   value: string
-) {
+): Promise<ActionResult> {
+  return safeAction("updateKpiNodeField", () => updateKpiNodeFieldInner(nodeId, projectId, field, value));
+}
+
+async function updateKpiNodeFieldInner(
+  nodeId: string,
+  projectId: string,
+  field: "text" | "metric" | "owner" | "due_date",
+  value: string
+): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: current, error: fetchError } = await supabase
     .from("requirement_items")
@@ -167,7 +188,11 @@ export async function updateKpiNodeField(
 // フェーズ2：確定して次へ（Step3）。confirmed自体はロック済みステータスの1つなので、
 // 呼び出し側（KpiDetailPane）でisItemLocked(selectedNode.status)により既に確定済みの
 // ノードにはボタン自体を表示しない設計にする。
-export async function confirmKpiNode(nodeId: string, projectId: string) {
+export async function confirmKpiNode(nodeId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("confirmKpiNode", () => confirmKpiNodeInner(nodeId, projectId));
+}
+
+async function confirmKpiNodeInner(nodeId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { error } = await supabase
     .from("requirement_items")
@@ -182,6 +207,14 @@ export async function confirmKpiNode(nodeId: string, projectId: string) {
 // KpiDetailPane側でReactのuseStateとして一時的に保持するだけにする。
 // 「見送り」も画面上でリストから消すのみでDBには何も記録しない。
 export async function suggestKpiCandidates(
+  nodeId: string,
+  projectId: string,
+  excludeTexts: string[]
+): Promise<ActionResult<{ text: string; why: string }[]>> {
+  return safeAction("suggestKpiCandidates", () => suggestKpiCandidatesInner(nodeId, projectId, excludeTexts));
+}
+
+async function suggestKpiCandidatesInner(
   nodeId: string,
   projectId: string,
   excludeTexts: string[]
@@ -266,6 +299,15 @@ export async function adoptKpiCandidate(
   projectId: string,
   tenantId: string,
   candidateText: string
+): Promise<ActionResult<string | null>> {
+  return safeAction("adoptKpiCandidate", () => adoptKpiCandidateInner(nodeId, projectId, tenantId, candidateText));
+}
+
+async function adoptKpiCandidateInner(
+  nodeId: string,
+  projectId: string,
+  tenantId: string,
+  candidateText: string
 ): Promise<string | null> {
   const supabase = await createServerActionClient();
   const { data: node, error: nodeError } = await supabase
@@ -278,18 +320,22 @@ export async function adoptKpiCandidate(
   const currentLevel = (node.content as KpiNodeContent).level;
 
   if (currentLevel === "戦術") {
-    await updateKpiNodeField(nodeId, projectId, "metric", candidateText);
+    await updateKpiNodeFieldInner(nodeId, projectId, "metric", candidateText);
     return null;
   }
 
   const targetLevel = LEVEL_ORDER[LEVEL_ORDER.indexOf(currentLevel) + 1] as KpiLevel;
-  const newNodeId = await createKpiNode(projectId, tenantId, nodeId, targetLevel, candidateText, "ai_draft");
+  const newNodeId = await createKpiNodeInner(projectId, tenantId, nodeId, targetLevel, candidateText, "ai_draft");
   return newNodeId;
 }
 
 // フェーズ4：兄弟ノード内での並べ替え（上へ/下へ移動）。範囲外（先頭で上へ／末尾で下へ）は
 // 何もしない。確定済みノードは並べ替え不可（規約：確定済みへの操作経路を残さない）。
-export async function moveKpiNodeUpDown(nodeId: string, projectId: string, direction: "up" | "down") {
+export async function moveKpiNodeUpDown(nodeId: string, projectId: string, direction: "up" | "down"): Promise<ActionResult> {
+  return safeAction("moveKpiNodeUpDown", () => moveKpiNodeUpDownInner(nodeId, projectId, direction));
+}
+
+async function moveKpiNodeUpDownInner(nodeId: string, projectId: string, direction: "up" | "down"): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: node, error: nodeError } = await supabase
     .from("requirement_items")
@@ -346,7 +392,11 @@ async function collectDescendants(supabase: OrderedSupabase, nodeId: string): Pr
 // いずれの場合も対象ノードと配下すべてのcontent.levelを深さのズレ分だけシフトするが、
 // 配下のどれか1つでもKPI_LEVELSの範囲（ゴール〜戦術）を外れる場合は、一部だけ適用される
 // 中途半端な状態を避けるため、書き込み前に全件を検証してから一括で適用する。
-export async function changeKpiNodeLevel(nodeId: string, projectId: string, direction: "promote" | "demote") {
+export async function changeKpiNodeLevel(nodeId: string, projectId: string, direction: "promote" | "demote"): Promise<ActionResult> {
+  return safeAction("changeKpiNodeLevel", () => changeKpiNodeLevelInner(nodeId, projectId, direction));
+}
+
+async function changeKpiNodeLevelInner(nodeId: string, projectId: string, direction: "promote" | "demote"): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: node, error: nodeError } = await supabase
     .from("requirement_items")
@@ -423,7 +473,11 @@ export async function changeKpiNodeLevel(nodeId: string, projectId: string, dire
 // フェーズ4：複製。対象ノード単体（子孫は複製しない、指示書の指定通り）を、同じ親・
 // 直後の位置に、ステータスse_reviewingでコピーする。text以外のmetric/owner/due_dateも
 // 含めた全content（levelは当然そのまま）をコピーする（「複製」の実装として自然なため）。
-export async function duplicateKpiNode(nodeId: string, projectId: string, tenantId: string): Promise<string> {
+export async function duplicateKpiNode(nodeId: string, projectId: string, tenantId: string): Promise<ActionResult<string>> {
+  return safeAction("duplicateKpiNode", () => duplicateKpiNodeInner(nodeId, projectId, tenantId));
+}
+
+async function duplicateKpiNodeInner(nodeId: string, projectId: string, tenantId: string): Promise<string> {
   const supabase = await createServerActionClient();
   const { data: node, error: nodeError } = await supabase
     .from("requirement_items")
@@ -460,7 +514,11 @@ export async function duplicateKpiNode(nodeId: string, projectId: string, tenant
   return newId;
 }
 
-export async function deleteKpiNode(nodeId: string, projectId: string) {
+export async function deleteKpiNode(nodeId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("deleteKpiNode", () => deleteKpiNodeInner(nodeId, projectId));
+}
+
+async function deleteKpiNodeInner(nodeId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   // parent_idの外部キーにon delete cascadeが無いため、子が残っている状態で削除すると
   // 23503（外部キー制約違反）になる。既存の挙動は変えず（フェーズ1の対象外）、

@@ -1,5 +1,6 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useTransition } from "react";
 import {
   updateKpiNodeField,
@@ -17,7 +18,6 @@ import { Menu, MenuItem } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
 import { KpiCandidatePanel } from "@/components/domain/kpi-tree/KpiCandidatePanel";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 import { isItemLocked } from "@/lib/item-lock";
 
 function nextLevel(level: KpiLevel): KpiLevel | null {
@@ -101,11 +101,7 @@ export function KpiDetailPane({
     const node = selectedNode;
     if (!node) return;
     startTransition(async () => {
-      try {
-        await updateKpiNodeField(node.id, projectId, field, value);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => updateKpiNodeField(node.id, projectId, field, value), show);
     });
   }
 
@@ -113,12 +109,8 @@ export function KpiDetailPane({
     const node = selectedNode;
     if (!node || !childLevel) return;
     startTransition(async () => {
-      try {
-        const newId = await createKpiNode(projectId, tenantId, node.id, childLevel);
-        onCreated(newId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => createKpiNode(projectId, tenantId, node.id, childLevel), show);
+      if (r) onCreated(r.data);
     });
   }
 
@@ -131,11 +123,7 @@ export function KpiDetailPane({
       return;
     }
     startTransition(async () => {
-      try {
-        await deleteKpiNode(node.id, projectId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => deleteKpiNode(node.id, projectId), show);
     });
   }
 
@@ -145,11 +133,7 @@ export function KpiDetailPane({
     const node = selectedNode;
     if (!node) return;
     startTransition(async () => {
-      try {
-        await moveKpiNodeUpDown(node.id, projectId, "up");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => moveKpiNodeUpDown(node.id, projectId, "up"), show);
     });
   }
 
@@ -157,11 +141,7 @@ export function KpiDetailPane({
     const node = selectedNode;
     if (!node) return;
     startTransition(async () => {
-      try {
-        await moveKpiNodeUpDown(node.id, projectId, "down");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => moveKpiNodeUpDown(node.id, projectId, "down"), show);
     });
   }
 
@@ -169,11 +149,7 @@ export function KpiDetailPane({
     const node = selectedNode;
     if (!node) return;
     startTransition(async () => {
-      try {
-        await changeKpiNodeLevel(node.id, projectId, "promote");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => changeKpiNodeLevel(node.id, projectId, "promote"), show);
     });
   }
 
@@ -181,11 +157,7 @@ export function KpiDetailPane({
     const node = selectedNode;
     if (!node) return;
     startTransition(async () => {
-      try {
-        await changeKpiNodeLevel(node.id, projectId, "demote");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => changeKpiNodeLevel(node.id, projectId, "demote"), show);
     });
   }
 
@@ -193,12 +165,8 @@ export function KpiDetailPane({
     const node = selectedNode;
     if (!node) return;
     startTransition(async () => {
-      try {
-        const newId = await duplicateKpiNode(node.id, projectId, tenantId);
-        onSelect(newId);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => duplicateKpiNode(node.id, projectId, tenantId), show);
+      if (r) onSelect(r.data);
     });
   }
 

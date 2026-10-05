@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAction, type ActionResult } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
@@ -34,7 +35,11 @@ async function nextOrderIndex(
 }
 
 // 末尾に大工程を追加する（＋ 大工程）。作成後は選択状態にしてインライン編集にフォーカスする想定。
-export async function createPhase(projectId: string, tenantId: string): Promise<string> {
+export async function createPhase(projectId: string, tenantId: string): Promise<ActionResult<string>> {
+  return safeAction("createPhase", () => createPhaseInner(projectId, tenantId));
+}
+
+async function createPhaseInner(projectId: string, tenantId: string): Promise<string> {
   const supabase = await createServerActionClient();
   const orderIndex = await nextOrderIndex(supabase, projectId, null);
   const { data, error } = await supabase
@@ -55,7 +60,11 @@ export async function createPhase(projectId: string, tenantId: string): Promise<
 
 // 選択中の大工程の末尾に中工程を追加する。開始日は、直前の中工程があればその翌日、
 // 無ければ今日を初期値とする（1日分のプレースホルダ期間）。
-export async function createTask(projectId: string, tenantId: string, phaseId: string): Promise<string> {
+export async function createTask(projectId: string, tenantId: string, phaseId: string): Promise<ActionResult<string>> {
+  return safeAction("createTask", () => createTaskInner(projectId, tenantId, phaseId));
+}
+
+async function createTaskInner(projectId: string, tenantId: string, phaseId: string): Promise<string> {
   const supabase = await createServerActionClient();
   const { data: siblingsData, error: siblingsError } = await supabase
     .from("progress_tasks")
@@ -108,7 +117,16 @@ export async function updateProgressTaskField(
   projectId: string,
   field: ProgressTaskField,
   value: string
-) {
+): Promise<ActionResult> {
+  return safeAction("updateProgressTaskField", () => updateProgressTaskFieldInner(taskId, projectId, field, value));
+}
+
+async function updateProgressTaskFieldInner(
+  taskId: string,
+  projectId: string,
+  field: ProgressTaskField,
+  value: string
+): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: current, error: fetchError } = await supabase
     .from("progress_tasks")
@@ -137,7 +155,11 @@ export async function updateProgressTaskField(
 
 // 大工程を削除する場合、配下に中工程が残っていると外部キー制約で失敗する。
 // KPIツリー等と同じ方針で、事前に子の有無を確認しユーザー向けの分かりやすいエラーにする。
-export async function deleteProgressTask(taskId: string, projectId: string) {
+export async function deleteProgressTask(taskId: string, projectId: string): Promise<ActionResult> {
+  return safeAction("deleteProgressTask", () => deleteProgressTaskInner(taskId, projectId));
+}
+
+async function deleteProgressTaskInner(taskId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: node, error: fetchError } = await supabase
     .from("progress_tasks")
@@ -165,7 +187,11 @@ export async function deleteProgressTask(taskId: string, projectId: string) {
 
 // progress_ux_phase3.md Step2：先行工程を設定する。中工程にのみ設定可能で、循環参照になる
 // 設定は拒否する（対象タスクの祖先方向にpredecessorIdを遡り、自分自身に戻ってこないか確認する）。
-export async function setPredecessor(taskId: string, projectId: string, predecessorId: string | null) {
+export async function setPredecessor(taskId: string, projectId: string, predecessorId: string | null): Promise<ActionResult> {
+  return safeAction("setPredecessor", () => setPredecessorInner(taskId, projectId, predecessorId));
+}
+
+async function setPredecessorInner(taskId: string, projectId: string, predecessorId: string | null): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: currentData, error: fetchError } = await supabase
     .from("progress_tasks")
@@ -211,7 +237,11 @@ export async function setPredecessor(taskId: string, projectId: string, predeces
 // 変更後の終了日が後続工程（このタスクをpredecessor_idとする中工程）の開始日を追い越す場合、
 // 後続の開始日を「終了日の翌日」に繰り下げ、期間の長さを保ったまま終了日も同じ日数だけ後ろへずらす。
 // 後続の後続へも同じ判定を再帰的に適用する（カスケード）。
-export async function shiftTaskDates(taskId: string, projectId: string, newStart: string, newEnd: string) {
+export async function shiftTaskDates(taskId: string, projectId: string, newStart: string, newEnd: string): Promise<ActionResult> {
+  return safeAction("shiftTaskDates", () => shiftTaskDatesInner(taskId, projectId, newStart, newEnd));
+}
+
+async function shiftTaskDatesInner(taskId: string, projectId: string, newStart: string, newEnd: string): Promise<void> {
   if (newEnd < newStart) throw new UserFacingError("終了日は開始日以降にしてください");
 
   const supabase = await createServerActionClient();

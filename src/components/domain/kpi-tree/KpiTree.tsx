@@ -1,11 +1,11 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { confirmKpiNode, type KpiNode } from "@/actions/kpi-tree";
 import { KpiTreePane } from "@/components/domain/kpi-tree/KpiTreePane";
 import { KpiDetailPane } from "@/components/domain/kpi-tree/KpiDetailPane";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 import { isItemLocked } from "@/lib/item-lock";
 
 // kpi_ux_phase1.md：単一ツリー表示（階層が深いほど入力欄が狭くなる）を、
@@ -83,12 +83,8 @@ export function KpiTree({
   // （確定後の「次のノードへ移動」は元々ここが持っていたため、両方を1箇所に統合する）。
   function handleConfirmNode(nodeId: string) {
     startTransition(async () => {
-      try {
-        await confirmKpiNode(nodeId, projectId);
-        setSelectedId(getNextVisibleId(visibleFlatList, nodeId));
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => confirmKpiNode(nodeId, projectId), show);
+      if (r) setSelectedId(getNextVisibleId(visibleFlatList, nodeId));
     });
   }
 
