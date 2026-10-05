@@ -64,15 +64,15 @@ export default async function ChapterPage({
             <InlineErrorForm action={draftItems} successMessage="AI素案を生成しました">
               <AiGenerateButton />
             </InlineErrorForm>
-            <form action={runAmbiguousCheck.bind(null, id, chapterNum)}>
+            <InlineErrorForm action={runAmbiguousCheck.bind(null, id, chapterNum)}>
               <SubmitButton variant="secondary" size="sm" pendingText="チェック中...">曖昧表現チェック</SubmitButton>
-            </form>
+            </InlineErrorForm>
             <InlineErrorForm action={runAmbiguousCheckAI.bind(null, id, chapterNum)} successMessage="AI曖昧判定が完了しました">
               <SubmitButton variant="secondary" size="sm" pendingText="AIが判定中...">AI曖昧判定（詳細）</SubmitButton>
             </InlineErrorForm>
-            <form action={addItem}>
+            <InlineErrorForm action={addItem}>
               <Button type="submit" variant="secondary" size="sm">+ 行を追加</Button>
-            </form>
+            </InlineErrorForm>
           </div>
         }
       />

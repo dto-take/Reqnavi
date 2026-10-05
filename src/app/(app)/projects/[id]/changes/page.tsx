@@ -1,4 +1,5 @@
 import { getDiffFromBaseline, raiseChangeRequest, listChangeRequests } from "@/actions/change-detection";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export default async function ChangesPage({ params }: { params: Promise<{ id: st
                   {raisedItemIds.has(d.itemId) && <span className="text-[10px] text-secondary">申請済み</span>}
                 </div>
                 {canRaise && !raisedItemIds.has(d.itemId) && (
-                  <form action={raiseChangeRequest.bind(null, id)} className="flex flex-col gap-1.5">
+                  <InlineErrorForm action={raiseChangeRequest.bind(null, id)} className="flex flex-col gap-1.5">
                     <input type="hidden" name="item_id" value={d.itemId} />
                     <input type="hidden" name="chapter_no" value={d.chapterNo} />
                     <input type="hidden" name="change_type" value={d.changeType} />
@@ -46,7 +47,7 @@ export default async function ChangesPage({ params }: { params: Promise<{ id: st
                     <Input name="reason" placeholder="変更理由（必須）" required />
                     <Input name="estimation_impact" placeholder="見積りへの影響（任意）" />
                     <Button type="submit" variant="primary" size="md" className="self-start">変更申請として登録</Button>
-                  </form>
+                  </InlineErrorForm>
                 )}
               </div>
             ))}

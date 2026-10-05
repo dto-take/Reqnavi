@@ -1,4 +1,5 @@
 import { getActiveBaseline, createBaseline } from "@/actions/baseline";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/input";
@@ -37,7 +38,7 @@ export default async function BaselinePage({ params }: { params: Promise<{ id: s
       )}
 
       {canApprove ? (
-        <form action={createBaseline.bind(null, id)} className="flex flex-col gap-2">
+        <InlineErrorForm action={createBaseline.bind(null, id)} className="flex flex-col gap-2">
           <Textarea name="approval_note" placeholder="確定メモ（任意）" rows={2} />
           <Button type="submit" variant="primary" size="md">
             {baseline ? "新しいベースラインとして再確定" : "ベースラインを確定"}
@@ -45,7 +46,7 @@ export default async function BaselinePage({ params }: { params: Promise<{ id: s
           <p className="text-[11px] text-faint">
             現在の充足率に関わらず確定できます。事前に確定判定ダッシュボード・整合性チェックの確認を推奨します。
           </p>
-        </form>
+        </InlineErrorForm>
       ) : (
         <p className="text-xs text-faint">ベースラインの確定にはPM以上の権限が必要です</p>
       )}

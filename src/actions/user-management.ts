@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UserFacingError } from "@/lib/user-error";
@@ -55,7 +56,12 @@ export async function listAllUsers(): Promise<AdminUserRow[]> {
   }));
 }
 
-export async function updateUserRole(userId: string, formData: FormData) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function updateUserRole(userId: string, _prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("updateUserRole", () => updateUserRoleInner(userId, formData));
+}
+
+async function updateUserRoleInner(userId: string, formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const claims = await assertAdmin(supabase);
 

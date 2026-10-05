@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { scanContentForAmbiguousPhrases, type AmbiguousFlag } from "@/lib/ambiguous-phrases";
 import { getActivePrompt } from "@/lib/ai/prompts";
@@ -12,7 +13,12 @@ import { fetchAllPages } from "@/lib/paged-select";
 
 type ItemRow = { id: string; content: Record<string, string | null>; ambiguous_flags: AmbiguousFlag[] | null };
 
-export async function runAmbiguousCheck(projectId: string, chapterNo: number) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function runAmbiguousCheck(projectId: string, chapterNo: number, _prevState: FormActionState, _formData: FormData): Promise<FormActionState> {
+  return safeFormAction("runAmbiguousCheck", () => runAmbiguousCheckInner(projectId, chapterNo));
+}
+
+async function runAmbiguousCheckInner(projectId: string, chapterNo: number): Promise<void> {
   const supabase = await createServerActionClient();
   const items = await fetchAllPages<ItemRow>((from, to) =>
     supabase

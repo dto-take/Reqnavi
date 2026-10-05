@@ -1,5 +1,6 @@
 "use client";
 
+import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import {
   moveItemToGroup,
@@ -124,12 +125,11 @@ export function RequirementTable({
       return;
     }
     startTransition(async () => {
-      try {
-        const r = await bulkConfirm(projectId, chapterNo, targets);
+      const res = await runAction(() => bulkConfirm(projectId, chapterNo, targets), show);
+      if (res) {
+        const r = res.data;
         show(r.skipped > 0 ? `${r.updated}件を確定しました（${r.skipped}件は確定済みのため対象外）` : `${r.updated}件を確定しました`);
         clearSelection();
-      } catch (err) {
-        show(errorMessage(err), "error");
       }
     });
   }
@@ -141,12 +141,11 @@ export function RequirementTable({
       return;
     }
     startTransition(async () => {
-      try {
-        const r = await bulkReject(projectId, chapterNo, targets);
+      const res = await runAction(() => bulkReject(projectId, chapterNo, targets), show);
+      if (res) {
+        const r = res.data;
         show(r.skipped > 0 ? `${r.updated}件を不採用にしました（${r.skipped}件は確定済みのため対象外）` : `${r.updated}件を不採用にしました`);
         clearSelection();
-      } catch (err) {
-        show(errorMessage(err), "error");
       }
     });
   }
@@ -155,12 +154,11 @@ export function RequirementTable({
     const targets = Array.from(selectedIds);
     if (targets.length === 0) return;
     startTransition(async () => {
-      try {
-        const r = await bulkSetCategory(projectId, chapterNo, targets, category);
+      const res = await runAction(() => bulkSetCategory(projectId, chapterNo, targets, category), show);
+      if (res) {
+        const r = res.data;
         show(r.skipped > 0 ? `${r.updated}件を「${category}」に移動しました（${r.skipped}件は確定済み・不採用のため対象外）` : `${r.updated}件を「${category}」に移動しました`);
         clearSelection();
-      } catch (err) {
-        show(errorMessage(err), "error");
       }
     });
   }
@@ -213,11 +211,7 @@ export function RequirementTable({
     if (insertBeforeItemId === sourceId) return;
 
     startTransition(async () => {
-      try {
-        await moveItemToGroup(projectId, chapterNo, sourceId, targetCategory, insertBeforeItemId);
-      } catch (err) {
-        show(errorMessage(err), "error");
-      }
+      await runAction(() => moveItemToGroup(projectId, chapterNo, sourceId, targetCategory, insertBeforeItemId), show);
     });
   }
 
@@ -265,11 +259,7 @@ export function RequirementTable({
       reordered.splice(insertIndex, 0, sourceCategory);
 
       startTransition(async () => {
-        try {
-          await reorderGroups(projectId, chapterNo, reordered);
-        } catch (err) {
-          show(errorMessage(err), "error");
-        }
+        await runAction(() => reorderGroups(projectId, chapterNo, reordered), show);
       });
       return;
     }
@@ -282,11 +272,7 @@ export function RequirementTable({
       if (!sourceId || insertBeforeItemId === sourceId) return;
 
       startTransition(async () => {
-        try {
-          await moveItemToGroup(projectId, chapterNo, sourceId, targetCategory, insertBeforeItemId);
-        } catch (err) {
-          show(errorMessage(err), "error");
-        }
+        await runAction(() => moveItemToGroup(projectId, chapterNo, sourceId, targetCategory, insertBeforeItemId), show);
       });
     }
   }
@@ -304,11 +290,7 @@ export function RequirementTable({
     const prevItem = items[idx - 1];
     const targetCategory = prevItem.content.category?.trim() || UNCATEGORIZED_LABEL;
     startTransition(async () => {
-      try {
-        await moveItemToGroup(projectId, chapterNo, itemId, targetCategory, prevItem.id);
-      } catch (err) {
-        show(errorMessage(err), "error");
-      }
+      await runAction(() => moveItemToGroup(projectId, chapterNo, itemId, targetCategory, prevItem.id), show);
     });
   }
 
@@ -320,11 +302,7 @@ export function RequirementTable({
     const targetCategory = nextItem.content.category?.trim() || UNCATEGORIZED_LABEL;
     const insertBeforeItemId = items[idx + 2]?.id ?? null;
     startTransition(async () => {
-      try {
-        await moveItemToGroup(projectId, chapterNo, itemId, targetCategory, insertBeforeItemId);
-      } catch (err) {
-        show(errorMessage(err), "error");
-      }
+      await runAction(() => moveItemToGroup(projectId, chapterNo, itemId, targetCategory, insertBeforeItemId), show);
     });
   }
 

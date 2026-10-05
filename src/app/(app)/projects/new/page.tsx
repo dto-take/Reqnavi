@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { canCreateProject } from "@/lib/permissions";
 
@@ -21,8 +22,7 @@ const CHAPTERS = [
   { no: 15, label: "進捗" },
 ];
 
-export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+export default async function NewProjectPage() {
   const supabase = await createServerActionClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (!canCreateProject(claims?.claims?.user_role as string | undefined)) {
@@ -40,8 +40,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
     <Card className="max-w-md mx-auto mt-10">
       <PageHeader title="新規案件を作成" />
 
-      {error && <p role="alert" className="text-sm text-(--status-needhearing-text) mb-2">{error}</p>}
-      <form action={createProject} className="flex flex-col gap-3">
+      <InlineErrorForm action={createProject} className="flex flex-col gap-3">
         <div>
           <Label>案件名</Label>
           <Input name="name" required className="w-full" />
@@ -82,7 +81,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
         <Button type="submit" variant="primary" size="md" className="mt-2">
           作成する
         </Button>
-      </form>
+      </InlineErrorForm>
     </Card>
   );
 }

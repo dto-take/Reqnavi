@@ -66,12 +66,12 @@ export default async function BusinessFlowPage({
         />
       </div>
 
-      <form action={addStep} className="grid grid-cols-4 gap-2 mb-5 items-end">
+      <InlineErrorForm action={addStep} className="grid grid-cols-4 gap-2 mb-5 items-end">
         <Input name="role_lane" placeholder="担当者" required />
         <Input name="label" placeholder="処理内容" required />
         <Input name="system_used" placeholder="使用システム" />
         <Button type="submit" variant="primary" size="md">+ ステップ追加</Button>
-      </form>
+      </InlineErrorForm>
 
       <div className="flex flex-col">
         {steps.map((step, i) => (
@@ -79,9 +79,9 @@ export default async function BusinessFlowPage({
             <span className="text-secondary">{i + 1}. {step.role_lane}</span>
             <span>{step.label}</span>
             <span className="text-secondary text-xs">{step.system_used}</span>
-            <form action={deleteFlowStep.bind(null, step.id, id, flowType)} className="justify-self-end">
+            <InlineErrorForm action={deleteFlowStep.bind(null, step.id, id, flowType)} className="justify-self-end">
               <ConfirmDeleteButton />
-            </form>
+            </InlineErrorForm>
           </div>
         ))}
       </div>

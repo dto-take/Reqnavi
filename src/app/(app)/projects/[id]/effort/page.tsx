@@ -53,9 +53,9 @@ export default async function EffortPage({ params }: { params: Promise<{ id: str
             <div className="flex justify-between items-center gap-2">
               <span className="text-secondary text-xs break-words min-w-0">{log.note}</span>
               {log.recorded_by === currentUserId && (
-                <form action={deleteEffortLog.bind(null, log.id, id)}>
+                <InlineErrorForm action={deleteEffortLog.bind(null, log.id, id)}>
                   <ConfirmDeleteButton />
-                </form>
+                </InlineErrorForm>
               )}
             </div>
           </div>

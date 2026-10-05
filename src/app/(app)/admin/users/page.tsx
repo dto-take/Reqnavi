@@ -31,12 +31,12 @@ export default async function AdminUsersPage() {
               {u.id === currentUserId ? (
                 <span className="text-xs text-faint">{u.profile?.user_role ?? "-"}（自分自身）</span>
               ) : (
-                <form action={updateUserRole.bind(null, u.id)} className="flex gap-1 items-center">
+                <InlineErrorForm action={updateUserRole.bind(null, u.id)} className="flex gap-1 items-center">
                   <Select name="user_role" defaultValue={u.profile?.user_role ?? "member"}>
                     {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                   </Select>
                   <SubmitButton size="sm" pendingText="...">変更</SubmitButton>
-                </form>
+                </InlineErrorForm>
               )}
             </div>
           ))}

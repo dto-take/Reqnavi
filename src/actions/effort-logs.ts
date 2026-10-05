@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { errorMessage } from "@/lib/error-message";
 import { fetchAllPages } from "@/lib/paged-select";
@@ -77,7 +78,12 @@ export async function createEffortLog(
   }
 }
 
-export async function deleteEffortLog(logId: string, projectId: string) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function deleteEffortLog(logId: string, projectId: string, _prevState: FormActionState, _formData: FormData): Promise<FormActionState> {
+  return safeFormAction("deleteEffortLog", () => deleteEffortLogInner(logId, projectId));
+}
+
+async function deleteEffortLogInner(logId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { error } = await supabase.from("effort_logs").delete().eq("id", logId);
   if (error) throw error;

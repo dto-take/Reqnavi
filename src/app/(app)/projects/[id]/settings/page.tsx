@@ -1,4 +1,5 @@
 import { createServerActionClient } from "@/lib/supabase/server";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { toggleCrossProjectReference, updateSelectedChapters } from "@/actions/project-settings";
 import { CHAPTER_NAMES } from "@/lib/chapters";
 import { Card } from "@/components/ui/card";
@@ -39,12 +40,12 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
         </div>
 
         {canEdit ? (
-          <form action={toggleCrossProjectReference.bind(null, id)}>
+          <InlineErrorForm action={toggleCrossProjectReference.bind(null, id)}>
             <input type="hidden" name="enabled" value={project?.allow_cross_project_reference ? "false" : "true"} />
             <Button type="submit" variant="secondary" size="md">
               {project?.allow_cross_project_reference ? "無効にする" : "有効にする"}
             </Button>
-          </form>
+          </InlineErrorForm>
         ) : (
           <p className="text-xs text-faint">変更にはPM以上の権限が必要です</p>
         )}
@@ -56,7 +57,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
           チェックを外した章はサイドバー・各種集計から除外されます（データ自体は削除されません。再度チェックすれば復元されます）。
         </p>
         {canEdit ? (
-          <form action={updateSelectedChapters.bind(null, id)} className="flex flex-col gap-2">
+          <InlineErrorForm action={updateSelectedChapters.bind(null, id)} className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
               {Object.entries(CHAPTER_NAMES).map(([n, name]) => (
                 <label key={n} className="text-xs px-2 py-1 rounded bg-hover text-primary flex items-center gap-1">
@@ -66,7 +67,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
               ))}
             </div>
             <SubmitButton size="sm" pendingText="更新中...">更新</SubmitButton>
-          </form>
+          </InlineErrorForm>
         ) : (
           <p className="text-xs text-faint">変更にはPM以上の権限が必要です</p>
         )}

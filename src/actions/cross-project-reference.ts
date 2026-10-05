@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
@@ -73,7 +74,12 @@ export async function listCrossProjectReferences(currentProjectId: string, chapt
 
 // 取り込みは、クライアントから渡された内容ではなく、参照元の項目のidだけを受け取り、
 // 上記の条件をすべて確認したうえで、参照元の内容をサーバー側で読んで複製する。
-export async function copyReferenceItem(currentProjectId: string, chapterNo: number, sourceItemId: string) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function copyReferenceItem(currentProjectId: string, chapterNo: number, sourceItemId: string, _prevState: FormActionState, _formData: FormData): Promise<FormActionState> {
+  return safeFormAction("copyReferenceItem", () => copyReferenceItemInner(currentProjectId, chapterNo, sourceItemId));
+}
+
+async function copyReferenceItemInner(currentProjectId: string, chapterNo: number, sourceItemId: string): Promise<void> {
   const supabase = await createServerActionClient();
   const tenantId = await getTenantId(supabase);
   if (!tenantId) throw new UserFacingError("認証が必要です");

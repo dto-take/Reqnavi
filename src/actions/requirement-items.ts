@@ -3,7 +3,7 @@
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
-import { safeAction, type ActionResult } from "@/lib/action-result";
+import { safeAction, safeFormAction, type ActionResult, type FormActionState } from "@/lib/action-result";
 import { fetchAllPages, fetchAllPagesByKeys } from "@/lib/paged-select";
 import { groupByCategory, UNCATEGORIZED_LABEL } from "@/lib/requirement-grouping";
 import { revalidatePath } from "next/cache";
@@ -153,13 +153,11 @@ async function applyOrder(supabase: Awaited<ReturnType<typeof createServerAction
 // 配列全体のorder_indexを0から振り直す。同時にitemIdのcontent.categoryを更新する。
 // targetCategoryがUNCATEGORIZED_LABEL（「未分類」プレースホルダ）の場合は空文字として保存する
 // （実データに「未分類」という文字列自体を書き込まないようにするため）。
-export async function moveItemToGroup(
-  projectId: string,
-  chapterNo: number,
-  itemId: string,
-  targetCategory: string,
-  insertBeforeItemId: string | null
-) {
+export async function moveItemToGroup(projectId: string, chapterNo: number, itemId: string, targetCategory: string, insertBeforeItemId: string | null): Promise<ActionResult> {
+  return safeAction("moveItemToGroup", () => moveItemToGroupInner(projectId, chapterNo, itemId, targetCategory, insertBeforeItemId));
+}
+
+async function moveItemToGroupInner(projectId: string, chapterNo: number, itemId: string, targetCategory: string, insertBeforeItemId: string | null): Promise<void> {
   const supabase = await createServerActionClient();
   const all = await fetchOrderedItems(supabase, projectId, chapterNo);
 
@@ -195,7 +193,11 @@ export async function moveItemToGroup(
 
 // グループ見出し自体の並び替え。既存のグループ内相対順序は維持したまま、
 // orderedCategoriesの順にグループを並べ直し、章全体のorder_indexを0から振り直す。
-export async function reorderGroups(projectId: string, chapterNo: number, orderedCategories: string[]) {
+export async function reorderGroups(projectId: string, chapterNo: number, orderedCategories: string[]): Promise<ActionResult> {
+  return safeAction("reorderGroups", () => reorderGroupsInner(projectId, chapterNo, orderedCategories));
+}
+
+async function reorderGroupsInner(projectId: string, chapterNo: number, orderedCategories: string[]): Promise<void> {
   const supabase = await createServerActionClient();
   const all = await fetchOrderedItems(supabase, projectId, chapterNo);
   const grouped = groupByCategory(all);
@@ -216,12 +218,12 @@ export async function reorderGroups(projectId: string, chapterNo: number, ordere
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }
 
-export async function createRequirementItem(
-  projectId: string,
-  tenantId: string,
-  chapterNo: number,
-  templateType: string
-) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function createRequirementItem(projectId: string, tenantId: string, chapterNo: number, templateType: string, _prevState: FormActionState, _formData: FormData): Promise<FormActionState> {
+  return safeFormAction("createRequirementItem", () => createRequirementItemInner(projectId, tenantId, chapterNo, templateType));
+}
+
+async function createRequirementItemInner(projectId: string, tenantId: string, chapterNo: number, templateType: string): Promise<void> {
   const supabase = await createServerActionClient();
   const { error } = await supabase.from("requirement_items").insert({
     project_id: projectId,
@@ -256,12 +258,11 @@ export async function updateRequirementItemContent(
   });
 }
 
-export async function markAsExceptionApproved(
-  itemId: string,
-  projectId: string,
-  chapterNo: number,
-  reason: string
-) {
+export async function markAsExceptionApproved(itemId: string, projectId: string, chapterNo: number, reason: string): Promise<ActionResult> {
+  return safeAction("markAsExceptionApproved", () => markAsExceptionApprovedInner(itemId, projectId, chapterNo, reason));
+}
+
+async function markAsExceptionApprovedInner(itemId: string, projectId: string, chapterNo: number, reason: string): Promise<void> {
   const supabase = await createServerActionClient();
   if (!reason.trim()) throw new UserFacingError("理由の入力が必須です");
 
@@ -277,7 +278,11 @@ export async function markAsExceptionApproved(
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }
 
-export async function markAsRejected(itemId: string, projectId: string, chapterNo: number) {
+export async function markAsRejected(itemId: string, projectId: string, chapterNo: number): Promise<ActionResult> {
+  return safeAction("markAsRejected", () => markAsRejectedInner(itemId, projectId, chapterNo));
+}
+
+async function markAsRejectedInner(itemId: string, projectId: string, chapterNo: number): Promise<void> {
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
     .from("requirement_items")
@@ -291,7 +296,11 @@ export async function markAsRejected(itemId: string, projectId: string, chapterN
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }
 
-export async function deleteRequirementItem(itemId: string, projectId: string, chapterNo: number) {
+export async function deleteRequirementItem(itemId: string, projectId: string, chapterNo: number): Promise<ActionResult> {
+  return safeAction("deleteRequirementItem", () => deleteRequirementItemInner(itemId, projectId, chapterNo));
+}
+
+async function deleteRequirementItemInner(itemId: string, projectId: string, chapterNo: number): Promise<void> {
   const supabase = await createServerActionClient();
   const { error } = await supabase
     .from("requirement_items")
@@ -310,7 +319,11 @@ export async function deleteRequirementItem(itemId: string, projectId: string, c
 // 一括操作は、ロックされた項目だけを除外して他を実行し、処理件数と除外件数を返す。
 export type BulkResult = { updated: number; skipped: number };
 
-export async function bulkConfirm(projectId: string, chapterNo: number, itemIds: string[]): Promise<BulkResult> {
+export async function bulkConfirm(projectId: string, chapterNo: number, itemIds: string[]): Promise<ActionResult<BulkResult>> {
+  return safeAction("bulkConfirm", () => bulkConfirmInner(projectId, chapterNo, itemIds));
+}
+
+async function bulkConfirmInner(projectId: string, chapterNo: number, itemIds: string[]): Promise<BulkResult> {
   if (itemIds.length === 0) return { updated: 0, skipped: 0 };
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
@@ -327,7 +340,11 @@ export async function bulkConfirm(projectId: string, chapterNo: number, itemIds:
   return { updated, skipped: itemIds.length - updated };
 }
 
-export async function bulkReject(projectId: string, chapterNo: number, itemIds: string[]): Promise<BulkResult> {
+export async function bulkReject(projectId: string, chapterNo: number, itemIds: string[]): Promise<ActionResult<BulkResult>> {
+  return safeAction("bulkReject", () => bulkRejectInner(projectId, chapterNo, itemIds));
+}
+
+async function bulkRejectInner(projectId: string, chapterNo: number, itemIds: string[]): Promise<BulkResult> {
   if (itemIds.length === 0) return { updated: 0, skipped: 0 };
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
@@ -351,12 +368,11 @@ export async function bulkReject(projectId: string, chapterNo: number, itemIds: 
 // 振り直す（フェーズ2のreorderGroupsと同じ「章全体を一旦グループ化してから並べ直す」考え方）。
 // 区分の変更は内容の変更なので、確定済み・例外承認・不採用の項目は除外する（規約33）。
 // ロックされた項目だけを除外して他を実行し、移動件数と除外件数を返す。
-export async function bulkSetCategory(
-  projectId: string,
-  chapterNo: number,
-  itemIds: string[],
-  targetCategory: string
-): Promise<BulkResult> {
+export async function bulkSetCategory(projectId: string, chapterNo: number, itemIds: string[], targetCategory: string): Promise<ActionResult<BulkResult>> {
+  return safeAction("bulkSetCategory", () => bulkSetCategoryInner(projectId, chapterNo, itemIds, targetCategory));
+}
+
+async function bulkSetCategoryInner(projectId: string, chapterNo: number, itemIds: string[], targetCategory: string): Promise<BulkResult> {
   if (itemIds.length === 0) return { updated: 0, skipped: 0 };
   const supabase = await createServerActionClient();
   const all = await fetchOrderedItems(supabase, projectId, chapterNo);

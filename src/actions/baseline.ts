@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { getReadinessSummary } from "@/actions/readiness";
 import { UserFacingError } from "@/lib/user-error";
@@ -26,7 +27,12 @@ export async function getActiveBaseline(projectId: string): Promise<ActiveBaseli
   return data as unknown as ActiveBaseline | null;
 }
 
-export async function createBaseline(projectId: string, formData: FormData) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function createBaseline(projectId: string, _prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("createBaseline", () => createBaselineInner(projectId, formData));
+}
+
+async function createBaselineInner(projectId: string, formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (!["admin", "pm"].includes(claims?.claims?.user_role as string)) {

@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
@@ -84,7 +85,12 @@ export async function getDiffFromBaseline(projectId: string): Promise<ItemDiff[]
   return diffs;
 }
 
-export async function raiseChangeRequest(projectId: string, formData: FormData) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function raiseChangeRequest(projectId: string, _prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("raiseChangeRequest", () => raiseChangeRequestInner(projectId, formData));
+}
+
+async function raiseChangeRequestInner(projectId: string, formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const tenantId = await getTenantId(supabase);
   if (!tenantId) throw new UserFacingError("認証が必要です");

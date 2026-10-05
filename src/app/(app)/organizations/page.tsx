@@ -1,4 +1,5 @@
 import { createServerActionClient } from "@/lib/supabase/server";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { redirect } from "next/navigation";
 import { listOrganizationsWithProjectCount, createOrganization } from "@/actions/organizations";
 import { Card } from "@/components/ui/card";
@@ -31,7 +32,7 @@ export default async function OrganizationsPage() {
 
       <Card>
         <h2 className="text-sm font-semibold text-primary mb-3">新規顧客を追加</h2>
-        <form action={createOrganization} className="flex gap-2">
+        <InlineErrorForm action={createOrganization} className="flex gap-2">
           <div className="flex-1">
             <Label>顧客名</Label>
             <Input name="name" required className="w-full" />
@@ -41,7 +42,7 @@ export default async function OrganizationsPage() {
             <Input name="industry" className="w-full" />
           </div>
           <SubmitButton pendingText="追加中...">追加</SubmitButton>
-        </form>
+        </InlineErrorForm>
       </Card>
     </div>
   );

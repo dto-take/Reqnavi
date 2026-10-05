@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { getFlowDiff, proposeFunctionalRequirements } from "@/actions/flow-diff";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ export default async function FlowDiffPage({ params }: { params: Promise<{ id: s
         {newSteps.length === 0 ? (
           <p className="text-sm text-secondary">新設されたステップはありません</p>
         ) : (
-          <form action={propose}>
+          <InlineErrorForm action={propose}>
             <div className="flex flex-col gap-2 mb-4">
               {newSteps.map((step) => (
                 <label key={step.id} className="flex items-center gap-2 text-sm">
@@ -40,7 +41,7 @@ export default async function FlowDiffPage({ params }: { params: Promise<{ id: s
               ))}
             </div>
             <Button type="submit" variant="primary" size="md">機能要件へ反映</Button>
-          </form>
+          </InlineErrorForm>
         )}
       </Card>
 

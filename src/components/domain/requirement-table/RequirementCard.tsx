@@ -153,36 +153,26 @@ export function RequirementCard({
     const reason = exceptionReason.trim();
     if (!reason) return;
     startTransition(async () => {
-      try {
-        await markAsExceptionApproved(item.id, projectId, chapterNo, reason);
+      const r = await runAction(() => markAsExceptionApproved(item.id, projectId, chapterNo, reason), show);
+      if (r) {
         setExceptionOpen(false);
         show("リスク許容で確定しました");
-      } catch (e) {
-        show(errorMessage(e), "error");
       }
     });
   }
 
   function handleReject() {
     startTransition(async () => {
-      try {
-        await markAsRejected(item.id, projectId, chapterNo);
-        show("不採用にしました");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => markAsRejected(item.id, projectId, chapterNo), show);
+      if (r) show("不採用にしました");
     });
   }
 
   function handleDelete() {
     if (!confirm("この項目を削除しますか？この操作は取り消せません。")) return;
     startTransition(async () => {
-      try {
-        await deleteRequirementItem(item.id, projectId, chapterNo);
-        show("削除しました");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => deleteRequirementItem(item.id, projectId, chapterNo), show);
+      if (r) show("削除しました");
     });
   }
 

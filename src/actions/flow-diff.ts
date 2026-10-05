@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { listFlowSteps } from "@/actions/business-flow";
 import { diffFlowSteps } from "@/lib/business-flow/diff";
@@ -16,10 +17,12 @@ export async function getFlowDiff(projectId: string) {
 
 type SelectedStep = { id: string; label: string };
 
-export async function proposeFunctionalRequirements(
-  projectId: string,
-  formData: FormData
-) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function proposeFunctionalRequirements(projectId: string, _prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("proposeFunctionalRequirements", () => proposeFunctionalRequirementsInner(projectId, formData));
+}
+
+async function proposeFunctionalRequirementsInner(projectId: string, formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const tenantId = await getTenantId(supabase);
   if (!tenantId) throw new UserFacingError("認証が必要です");

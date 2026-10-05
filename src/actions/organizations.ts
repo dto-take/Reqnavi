@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { revalidatePath } from "next/cache";
@@ -21,7 +22,12 @@ export async function listOrganizationsWithProjectCount(): Promise<OrganizationW
   return data as unknown as OrganizationWithProjectCount[];
 }
 
-export async function createOrganization(formData: FormData) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function createOrganization(_prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("createOrganization", () => createOrganizationInner(formData));
+}
+
+async function createOrganizationInner(formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (!["admin", "pm"].includes(claims?.claims?.user_role as string)) {

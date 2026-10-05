@@ -97,12 +97,16 @@ export async function listOrganizations() {
   return data;
 }
 
-export async function createProject(formData: FormData) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。成功時はredirect）
+export async function createProject(_prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("createProject", () => createProjectInner(formData));
+}
+
+async function createProjectInner(formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (!canCreateProject(claims?.claims?.user_role as string | undefined)) {
-    // throwすると本番では文言が汎用エラーに潰れるため、画面にエラーを渡して案内する
-    redirect(`/projects/new?error=${encodeURIComponent("案件を作成する権限がありません")}`);
+    throw new UserFacingError("案件を作成する権限がありません");
   }
 
   const name = formData.get("name") as string;
@@ -127,7 +131,7 @@ export async function createProject(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/projects/new?error=${encodeURIComponent(errorMessage(error))}`);
+    throw new UserFacingError(errorMessage(error));
   }
 
   // 作成者を自動的にproject_membersへ登録。

@@ -1,5 +1,6 @@
 "use server";
 
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { revalidatePath } from "next/cache";
@@ -48,11 +49,12 @@ export async function listFlowEdges(projectId: string, flowType: FlowType): Prom
   return data as unknown as FlowEdge[];
 }
 
-export async function addFlowStep(
-  projectId: string,
-  flowType: FlowType,
-  formData: FormData
-) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function addFlowStep(projectId: string, flowType: FlowType, _prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("addFlowStep", () => addFlowStepInner(projectId, flowType, formData));
+}
+
+async function addFlowStepInner(projectId: string, flowType: FlowType, formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const tenantId = await getTenantId(supabase);
   if (!tenantId) throw new UserFacingError("認証が必要です");
@@ -109,7 +111,12 @@ export async function moveFlowStep(
   revalidatePath(`/projects/${projectId}/business-flow`);
 }
 
-export async function deleteFlowStep(stepId: string, projectId: string, flowType: FlowType) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。本番ビルドではthrowの文言が消えるため）
+export async function deleteFlowStep(stepId: string, projectId: string, flowType: FlowType, _prevState: FormActionState, _formData: FormData): Promise<FormActionState> {
+  return safeFormAction("deleteFlowStep", () => deleteFlowStepInner(stepId, projectId, flowType));
+}
+
+async function deleteFlowStepInner(stepId: string, projectId: string, flowType: FlowType): Promise<void> {
   const supabase = await createServerActionClient();
   const { error } = await supabase.from("flow_nodes").delete().eq("id", stepId);
   if (error) throw error;

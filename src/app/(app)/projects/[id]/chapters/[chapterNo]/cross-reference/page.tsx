@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { listCrossProjectReferences, copyReferenceItem } from "@/actions/cross-project-reference";
 import { CHAPTER_NAMES } from "@/lib/chapters";
 import { Card } from "@/components/ui/card";
@@ -39,9 +40,9 @@ export default async function CrossReferencePage({
             <div key={r.id} className="border border-border rounded-md p-3">
               <div className="text-xs text-faint mb-1">{r.projects?.name}</div>
               <div className="text-sm mb-2">{JSON.stringify(r.content)}</div>
-              <form action={copyReferenceItem.bind(null, id, chapterNum, r.id)}>
+              <InlineErrorForm action={copyReferenceItem.bind(null, id, chapterNum, r.id)}>
                 <Button type="submit" variant="ghost" size="sm">この案件に取り込む（AI素案として）</Button>
-              </form>
+              </InlineErrorForm>
             </div>
           ))}
         </div>
