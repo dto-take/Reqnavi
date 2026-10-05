@@ -129,6 +129,14 @@ async function fetchOrderedItems(
   );
 }
 
+// 規約33：確定（confirmed）・例外承認（exception_approved）・不採用（rejected）の項目は、内容・区分・状態を
+// 変更できない。UIの無効化だけでなくサーバー側で必ず拒否する。更新のWHEREにもstatusを含め
+// （確認と更新の間に別の操作で確定されても守れるように）、更新件数が0ならロックとみなして拒否する。
+//   内容の変更 … 未確定のみ許可 ／ 状態の遷移 … 未確定からのみ許可（確定の解除は設けない）
+//   削除・同じグループ内の並べ替え（order_indexのみ）・曖昧表現フラグの書き込み … ロックを問わず許可
+const UNLOCKED_STATUSES = ["ai_draft", "se_reviewing"];
+const LOCKED_MESSAGE = "確定済み・例外承認・不採用の項目は変更できません";
+
 async function applyOrder(supabase: Awaited<ReturnType<typeof createServerActionClient>>, orderedIds: string[]) {
   for (let i = 0; i < orderedIds.length; i++) {
     const { error } = await supabase.from("requirement_items").update({ order_index: i }).eq("id", orderedIds[i]);
@@ -160,11 +168,19 @@ export async function moveItemToGroup(
   const normalizedCategory = targetCategory === UNCATEGORIZED_LABEL ? "" : targetCategory;
   const nextContent = { ...target.content, category: normalizedCategory };
 
-  const { error: contentError } = await supabase
-    .from("requirement_items")
-    .update({ content: nextContent, updated_at: new Date().toISOString() })
-    .eq("id", itemId);
-  if (contentError) throw new UserFacingError(errorMessage(contentError));
+  // 区分（category）の変更は内容の変更。別のグループへの移動は未確定の項目のみ許可する
+  // （同じグループ内の並べ替えは、order_indexだけを変える配置なので、ロックを問わず許可）
+  if ((target.content.category ?? "") !== normalizedCategory) {
+    const { data: moved, error: contentError } = await supabase
+      .from("requirement_items")
+      .update({ content: nextContent, updated_at: new Date().toISOString() })
+      .eq("id", itemId)
+      .eq("project_id", projectId)
+      .in("status", UNLOCKED_STATUSES)
+      .select("id");
+    if (contentError) throw new UserFacingError(errorMessage(contentError));
+    if (!moved || moved.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
+  }
 
   const withoutItem = all.filter((i) => i.id !== itemId).map((i) => i.id);
   const insertAt = insertBeforeItemId ? withoutItem.indexOf(insertBeforeItemId) : -1;
@@ -225,11 +241,15 @@ export async function updateRequirementItemContent(
   content: Record<string, string>
 ) {
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("requirement_items")
     .update({ content, updated_at: new Date().toISOString() })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("project_id", projectId)
+    .in("status", UNLOCKED_STATUSES)
+    .select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!data || data.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }
 
@@ -242,21 +262,29 @@ export async function markAsExceptionApproved(
   const supabase = await createServerActionClient();
   if (!reason.trim()) throw new UserFacingError("理由の入力が必須です");
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("requirement_items")
     .update({ status: "exception_approved", exception_reason: reason })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("project_id", projectId)
+    .in("status", UNLOCKED_STATUSES)
+    .select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!data || data.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }
 
 export async function markAsRejected(itemId: string, projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("requirement_items")
     .update({ status: "rejected" })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("project_id", projectId)
+    .in("status", UNLOCKED_STATUSES)
+    .select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!data || data.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }
 
@@ -276,34 +304,41 @@ export async function deleteRequirementItem(itemId: string, projectId: string, c
 // ＝confirmed/exception_approved/rejectedは再確定できない）。一括確定は「全選択」やグループ
 // 選択で選択集合にロック済み項目が紛れうるため、単票確定と矛盾しないようサーバー側でも
 // 同じ条件（status in ai_draft/se_reviewing）に絞り込む（指示書Step3の注意書き対応）。
-const UNLOCKED_STATUSES = ["ai_draft", "se_reviewing"];
+// 一括操作は、ロックされた項目だけを除外して他を実行し、処理件数と除外件数を返す。
+export type BulkResult = { updated: number; skipped: number };
 
-export async function bulkConfirm(projectId: string, chapterNo: number, itemIds: string[]) {
-  if (itemIds.length === 0) return;
+export async function bulkConfirm(projectId: string, chapterNo: number, itemIds: string[]): Promise<BulkResult> {
+  if (itemIds.length === 0) return { updated: 0, skipped: 0 };
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("requirement_items")
     .update({ status: "confirmed" })
     .in("id", itemIds)
     .eq("project_id", projectId)
     .eq("chapter_no", chapterNo)
-    .in("status", UNLOCKED_STATUSES);
+    .in("status", UNLOCKED_STATUSES)
+    .select("id");
   if (error) throw new UserFacingError(errorMessage(error));
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+  const updated = data?.length ?? 0;
+  return { updated, skipped: itemIds.length - updated };
 }
 
-export async function bulkReject(projectId: string, chapterNo: number, itemIds: string[]) {
-  if (itemIds.length === 0) return;
+export async function bulkReject(projectId: string, chapterNo: number, itemIds: string[]): Promise<BulkResult> {
+  if (itemIds.length === 0) return { updated: 0, skipped: 0 };
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("requirement_items")
     .update({ status: "rejected" })
     .in("id", itemIds)
     .eq("project_id", projectId)
     .eq("chapter_no", chapterNo)
-    .in("status", UNLOCKED_STATUSES);
+    .in("status", UNLOCKED_STATUSES)
+    .select("id");
   if (error) throw new UserFacingError(errorMessage(error));
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+  const updated = data?.length ?? 0;
+  return { updated, skipped: itemIds.length - updated };
 }
 
 // 選択項目のcontent.categoryを一括変更する。フェーズ2のmoveItemToGroupと違い対象が複数件の
@@ -311,31 +346,40 @@ export async function bulkReject(projectId: string, chapterNo: number, itemIds: 
 // （指示書Step3のコメント通り、対象行を取得してcontentを組み直し、個別UPDATEするループで
 // 実装する）。並び替えは移動対象を対象グループの末尾にまとめて配置する形でorder_indexを
 // 振り直す（フェーズ2のreorderGroupsと同じ「章全体を一旦グループ化してから並べ直す」考え方）。
-// カテゴリ変更自体はフェーズ2のmoveItemToGroup（ドラッグでの単票移動）でもロック状態を
-// 問わず行えるため、一括版でも同じくロック状態による制限は設けない（既存動作との整合）。
+// 区分の変更は内容の変更なので、確定済み・例外承認・不採用の項目は除外する（規約33）。
+// ロックされた項目だけを除外して他を実行し、移動件数と除外件数を返す。
 export async function bulkSetCategory(
   projectId: string,
   chapterNo: number,
   itemIds: string[],
   targetCategory: string
-) {
-  if (itemIds.length === 0) return;
+): Promise<BulkResult> {
+  if (itemIds.length === 0) return { updated: 0, skipped: 0 };
   const supabase = await createServerActionClient();
   const all = await fetchOrderedItems(supabase, projectId, chapterNo);
   const idSet = new Set(itemIds);
   const normalizedCategory = targetCategory === UNCATEGORIZED_LABEL ? "" : targetCategory;
 
+  const movedSet = new Set<string>();
   for (const item of all) {
     if (!idSet.has(item.id)) continue;
-    const { error } = await supabase
+    // WHEREにもstatusを含め、更新件数が0（ロック済み、または確認後に確定された）なら除外として扱う
+    const { data, error } = await supabase
       .from("requirement_items")
       .update({ content: { ...item.content, category: normalizedCategory }, updated_at: new Date().toISOString() })
-      .eq("id", item.id);
+      .eq("id", item.id)
+      .eq("project_id", projectId)
+      .in("status", UNLOCKED_STATUSES)
+      .select("id");
     if (error) throw new UserFacingError(errorMessage(error));
+    if (data && data.length > 0) movedSet.add(item.id);
   }
+  const skipped = itemIds.length - movedSet.size;
+  if (movedSet.size === 0) return { updated: 0, skipped };
 
-  const remaining = all.filter((i) => !idSet.has(i.id));
-  const movedIds = all.filter((i) => idSet.has(i.id)).map((i) => i.id);
+  // 並べ替えの対象は、実際に移動できた項目のみ（除外された項目は元の位置のまま）
+  const remaining = all.filter((i) => !movedSet.has(i.id));
+  const movedIds = all.filter((i) => movedSet.has(i.id)).map((i) => i.id);
   const grouped = groupByCategory(remaining);
 
   const reordered: string[] = [];
@@ -352,6 +396,7 @@ export async function bulkSetCategory(
 
   await applyOrder(supabase, reordered);
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+  return { updated: movedSet.size, skipped };
 }
 
 export async function updateRequirementItemStatus(
@@ -361,10 +406,15 @@ export async function updateRequirementItemStatus(
   status: RequirementItem["status"]
 ) {
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  // 状態の遷移は未確定の項目からのみ（確定の解除は設けない）。更新件数が0ならロックとみなして拒否する
+  const { data, error } = await supabase
     .from("requirement_items")
     .update({ status })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("project_id", projectId)
+    .in("status", UNLOCKED_STATUSES)
+    .select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!data || data.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }

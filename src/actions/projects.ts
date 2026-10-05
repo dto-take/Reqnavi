@@ -161,6 +161,40 @@ export async function listProjectMembers(projectId: string) {
 
 // 案件自体の削除（極めて破壊的な操作のためadmin限定）。DB側はON DELETE CASCADEで
 // 関連テーブルが連鎖削除されるが、Storage上のファイルはFKの対象外のため別途削除する。
+const DOCUMENTS_BUCKET = "project-documents";
+const STORAGE_PAGE = 100;
+
+// {prefix}配下のファイルをサブフォルダを含めてすべて列挙する（100件ずつページング）
+async function listAllFiles(
+  storage: ReturnType<ReturnType<typeof createAdminClient>["storage"]["from"]>,
+  prefix: string
+): Promise<string[]> {
+  const files: string[] = [];
+  for (let offset = 0; ; offset += STORAGE_PAGE) {
+    const { data, error } = await storage.list(prefix, { limit: STORAGE_PAGE, offset, sortBy: { column: "name", order: "asc" } });
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const entry of data) {
+      // フォルダはidがnull
+      if (entry.id === null) files.push(...(await listAllFiles(storage, `${prefix}/${entry.name}`)));
+      else files.push(`${prefix}/${entry.name}`);
+    }
+    if (data.length < STORAGE_PAGE) break;
+  }
+  return files;
+}
+
+async function purgeProjectFiles(projectId: string) {
+  const storage = createAdminClient().storage.from(DOCUMENTS_BUCKET);
+  const paths = await listAllFiles(storage, projectId);
+  for (let i = 0; i < paths.length; i += STORAGE_PAGE) {
+    const { error } = await storage.remove(paths.slice(i, i + STORAGE_PAGE));
+    if (error) throw error;
+  }
+  const remaining = await listAllFiles(storage, projectId);
+  if (remaining.length > 0) throw new Error(`storage files remain: ${remaining.length}`);
+}
+
 export async function deleteProject(projectId: string, formData: FormData) {
   const supabase = await createServerActionClient();
   const { data: claims } = await supabase.auth.getClaims();
@@ -180,15 +214,14 @@ export async function deleteProject(projectId: string, formData: FormData) {
     throw new UserFacingError("入力された案件名が一致しません");
   }
 
-  // storage.list()は1回あたり最大100件までしか返さない。現状の運用規模（1案件あたりの
-  // 資料数）ではまず問題にならない想定だが、将来的に100件を超える案件が出てきた場合は
-  // offsetを使ったページネーションが必要になる。
-  const { data: files } = await supabase.storage
-    .from("project-documents")
-    .list(`${projectId}/uploads`, { limit: 1000 });
-  if (files && files.length > 0) {
-    const paths = files.map((f) => `${projectId}/uploads/${f.name}`);
-    await supabase.storage.from("project-documents").remove(paths);
+  // Storageの資料ファイルを先に、service-roleで確実に消す。利用者のクライアントで列挙すると、
+  // StorageのSELECTポリシー（案件メンバーのみ）により、メンバーではない管理者には空に見える。
+  // 削除と残存確認に成功してからDB行を消す。失敗時はDBを残し、再試行できる状態を保つ。
+  try {
+    await purgeProjectFiles(projectId);
+  } catch (e) {
+    console.error("deleteProject: storage purge failed", e);
+    throw new UserFacingError("資料ファイルの削除に失敗したため、案件は削除されていません。時間をおいて再度お試しください");
   }
 
   const { error: deleteError } = await supabase.from("projects").delete().eq("id", projectId);

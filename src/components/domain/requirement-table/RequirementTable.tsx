@@ -125,8 +125,8 @@ export function RequirementTable({
     }
     startTransition(async () => {
       try {
-        await bulkConfirm(projectId, chapterNo, targets);
-        show(`${targets.length}件を確定しました`);
+        const r = await bulkConfirm(projectId, chapterNo, targets);
+        show(r.skipped > 0 ? `${r.updated}件を確定しました（${r.skipped}件は確定済みのため対象外）` : `${r.updated}件を確定しました`);
         clearSelection();
       } catch (err) {
         show(errorMessage(err), "error");
@@ -142,8 +142,8 @@ export function RequirementTable({
     }
     startTransition(async () => {
       try {
-        await bulkReject(projectId, chapterNo, targets);
-        show(`${targets.length}件を不採用にしました`);
+        const r = await bulkReject(projectId, chapterNo, targets);
+        show(r.skipped > 0 ? `${r.updated}件を不採用にしました（${r.skipped}件は確定済みのため対象外）` : `${r.updated}件を不採用にしました`);
         clearSelection();
       } catch (err) {
         show(errorMessage(err), "error");
@@ -156,8 +156,8 @@ export function RequirementTable({
     if (targets.length === 0) return;
     startTransition(async () => {
       try {
-        await bulkSetCategory(projectId, chapterNo, targets, category);
-        show(`${targets.length}件を「${category}」に移動しました`);
+        const r = await bulkSetCategory(projectId, chapterNo, targets, category);
+        show(r.skipped > 0 ? `${r.updated}件を「${category}」に移動しました（${r.skipped}件は確定済み・不採用のため対象外）` : `${r.updated}件を「${category}」に移動しました`);
         clearSelection();
       } catch (err) {
         show(errorMessage(err), "error");

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { GoogleGenAI } from "@google/genai";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
 import { errorMessage } from "@/lib/error-message";
+import { isItemLocked } from "@/lib/item-lock";
 
 type FeatureMappingRow = {
   requirement_pattern: string;
@@ -26,11 +27,13 @@ export async function suggestPlatformFeature(
 
     const { data: itemData, error: itemError } = await supabase
       .from("requirement_items")
-      .select("content")
+      .select("content, status")
       .eq("id", itemId)
       .single();
     if (itemError) throw itemError;
-    const item = itemData as unknown as { content: Record<string, string | null> };
+    const item = itemData as unknown as { content: Record<string, string | null>; status: string };
+    // 規約33：確定済み・例外承認・不採用の項目は、この経路でも内容を変更しない
+    if (isItemLocked(item.status)) return { error: "確定済み・例外承認・不採用の項目は変更できません" };
 
     const { data: projectData } = await supabase
       .from("projects")
@@ -73,11 +76,15 @@ export async function suggestPlatformFeature(
     }
 
     const nextContent = { ...item.content, platform_feature: resultText };
-    const { error: updateError } = await supabase
+    // 確認後に別の操作で確定された場合も守れるよう、WHEREにもstatusを含める
+    const { data: updated, error: updateError } = await supabase
       .from("requirement_items")
       .update({ content: nextContent })
-      .eq("id", itemId);
+      .eq("id", itemId)
+      .in("status", ["ai_draft", "se_reviewing"])
+      .select("id");
     if (updateError) throw updateError;
+    if (!updated || updated.length === 0) return { error: "確定済み・例外承認・不採用の項目は変更できません" };
 
     revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
     return { error: null };

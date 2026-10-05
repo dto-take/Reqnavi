@@ -520,6 +520,9 @@ create policy "progress_tasks_delete" on progress_tasks for delete using (is_pro
   充足率・章状態の定義を変えるときは、SQL関数と`chapter-stats.ts`の2か所だけを直す。案件一覧の「確定章数／対象章数」の分母は、15章を除いた対象章の数。
 - **1000行上限への対応（規約62）**：件数に上限が無い複数行の取得は、共通のページング処理`fetchAllPages`／`fetchAllPagesByKeys`（`src/lib/paged-select.ts`。並びの最後のキーはid）を通す。ベースラインの確定は、DB関数`create_baseline_snapshot()`（1トランザクション。項目スナップショットを`insert … select`で作り、保存件数が元の件数と一致しなければ例外でロールバック）で行い、項目の行をアプリに通さない。
 
+- **他案件の参照（横断参照）の仕様**：参照・取り込みできるのは、①同じ顧客（organization）の案件で、②**自案件と参照元の双方が`allow_cross_project_reference`をオンにしている**場合の、③**確定済み（confirmed・exception_approved）の項目のみ**。この条件は、利用者が参照元の案件のメンバーであるかどうかに関わらず、`listCrossProjectReferences`・`copyReferenceItem`（`src/actions/cross-project-reference.ts`）が明示的に課す。RLS`requirement_items_cross_project_select`は非メンバー向けの同条件だが、メンバー用ポリシーとの論理和で効くため、メンバーには効かない（変更しない）。`copyReferenceItem`は参照元の項目idだけを受け取り、内容はサーバー側で読み直して複製する。
+- **案件削除とStorage**：`deleteProject`は、service-roleで`project-documents/{projectId}/`配下を再帰的・ページング（100件）で列挙→削除→再列挙して0件を確認してから、DB行を削除する。失敗時はDBを残してエラーを返す（メンバーではない管理者は、利用者のクライアントではStorageの一覧が空に見えるため）。
+
 ## 5. AI呼び出しフロー
 
 ### 5.1 Flow 1（初期構築）／Flow 2（差分最適化）

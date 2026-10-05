@@ -1,0 +1,20 @@
+09:59:20  extract_requirements  {"chapter_no": 1, "document_count": 3, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+09:59:30  extract_requirements  {"chapter_no": 2, "document_count": 3, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+09:59:37  extract_requirements  {"chapter_no": 3, "document_count": 2, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+09:59:55  extract_requirements  {"chapter_no": 5, "document_count": 2, "pdf_attachments_included": ["06_システム要件補足.pdf"], "pdf_attachments_skipped_too_large": []}
+10:00:06  extract_requirements  {"chapter_no": 6, "document_count": 3, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+10:00:19  extract_requirements  {"chapter_no": 7, "document_count": 4, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+10:00:38  extract_requirements  {"chapter_no": 8, "document_count": 4, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+10:00:56  extract_requirements  {"chapter_no": 9, "document_count": 3, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+10:01:06  extract_requirements  {"chapter_no": 11, "document_count": 2, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+10:01:16  extract_requirements  {"chapter_no": 13, "document_count": 1, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+10:03:45  extract_kpi_tree  {"chapter_no": 4, "document_count": 2}
+10:04:00  suggest_kpi_children  {"node_id": "2a811f14-6bef-441e-a897-a46f275890ac", "target_level": "目標"}
+10:05:08  suggest_kpi_children  {"node_id": "2a811f14-6bef-441e-a897-a46f275890ac", "target_level": "目標"}
+10:05:22  suggest_kpi_children  {"node_id": "2a811f14-6bef-441e-a897-a46f275890ac", "target_level": "目標"}
+10:06:29  suggest_nonfunctional_checkitems  {"aspect_id": "4b7a6ae0-4702-40f6-a6dc-298793304718"}
+10:08:03  extract_business_flow  {"flow_type": "business_asis", "document_count": 4}
+10:08:22  extract_business_flow  {"flow_type": "business_tobe", "document_count": 3}
+10:09:38  suggest_screen_flow_diff  {"flow_type": "screen_transition", "edge_count": 0, "node_count": 0, "function_count": 4, "rejected_count": 0}
+10:18:24  extract_requirements  {"chapter_no": 3, "document_count": 2, "pdf_attachments_included": [], "pdf_attachments_skipped_too_large": []}
+10:19:24  ambiguity_check_l2  {"item_id": "57f0c9c8-9b4f-45f9-9fed-c8f5dc8b6f74"}
