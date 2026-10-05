@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerActionClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { classifyDocument } from "@/lib/ai/classify-document";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
@@ -14,7 +15,30 @@ import { revalidatePath } from "next/cache";
 // 分類・DB登録のみを担当する軽量な処理にする。
 // 注意：storage_pathからのdownloadはBlobを返す（Fileではない）。classifyDocumentは
 // 元々Blobを受け取る設計（reclassifyDocumentInternal参照）のため、不要なキャストはしない。
-export async function registerUploadedDocument(projectId: string, storagePath: string, fileName: string) {
+// 同じ案件に、同じ名前かつ同じサイズの資料が登録済みか（名前が同じでもサイズが違う更新版は重複ではない）
+async function isDuplicateDocument(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  projectId: string,
+  fileName: string,
+  fileSize: number
+): Promise<boolean> {
+  const { count, error } = await supabase
+    .from("source_documents")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId)
+    .eq("file_name", fileName)
+    .eq("file_size", fileSize);
+  if (error) throw new UserFacingError(errorMessage(error));
+  return (count ?? 0) > 0;
+}
+
+// アップロード前の確認（ブラウザはStorageへ送る前に呼ぶ。重複なら送らずにスキップする）
+export async function checkDuplicateDocument(projectId: string, fileName: string, fileSize: number): Promise<boolean> {
+  const supabase = await createServerActionClient();
+  return isDuplicateDocument(supabase, projectId, fileName, fileSize);
+}
+
+export async function registerUploadedDocument(projectId: string, storagePath: string, fileName: string): Promise<"done" | "skipped"> {
   const supabase = await createServerActionClient();
 
   const { data: file, error: downloadError } = await supabase.storage
@@ -24,17 +48,28 @@ export async function registerUploadedDocument(projectId: string, storagePath: s
     throw new UserFacingError(downloadError ? errorMessage(downloadError) : "アップロードしたファイルの取得に失敗しました");
   }
 
+  // アップロード前の確認をすり抜けた重複（同時アップロード等）は、ここで登録せず、送られたファイルも消す。
+  // Storageの削除はadminのみ許可のため、対象をこの案件のuploads配下の1件に限り、service-roleで消す。
+  if (await isDuplicateDocument(supabase, projectId, fileName, file.size)) {
+    if (storagePath.startsWith(`${projectId}/uploads/`)) {
+      await createAdminClient().storage.from("project-documents").remove([storagePath]);
+    }
+    return "skipped";
+  }
+
   const classification = await classifyDocument(file, fileName);
 
   const { error: insertError } = await supabase.from("source_documents").insert({
     project_id: projectId,
     file_name: fileName,
+    file_size: file.size,
     storage_path: storagePath,
     classified_tags: classification.tags,
   });
   if (insertError) throw new UserFacingError(errorMessage(insertError));
 
   revalidatePath(`/projects/${projectId}/documents`);
+  return "done";
 }
 
 // 分類プロンプトのカテゴリ一覧を修正した際など、既存資料を再アップロードせずに

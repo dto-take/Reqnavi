@@ -19,7 +19,7 @@ export type ProjectSummary = {
   rate: number; // 表示用（四捨五入）
   fraction: number; // 並べ替え用（確定／総数）
   state: ProjectState;
-  chapters: { chapterNo: number; status: ChapterStatus }[];
+  chapters: { chapterNo: number; status: ChapterStatus; hidden?: boolean }[];
   // 「確定章数／対象章数」の分母は、確定の概念を持たない15章を除いた対象章の数
   confirmableChapters: number;
   confirmedChapters: number;
@@ -36,8 +36,10 @@ export function projectStateOf(total: number, confirmed: number): ProjectState {
   return confirmed > 0 ? "in_progress" : "not_started";
 }
 
-export function summarizeProject(selectedChapters: number[], stats: ChapterStat[]): ProjectSummary {
-  const targets = [...new Set(selectedChapters)].filter((n) => CHAPTER_NAMES[n]).sort((a, b) => a - b);
+export function summarizeProject(selectedChapters: number[], stats: ChapterStat[], hiddenChapters: number[] = []): ProjectSummary {
+  // 非公開の章は、確定率・章数・最終更新の集計に含めない（セグメントには「非公開」として並べる）
+  const allTargets = [...new Set(selectedChapters)].filter((n) => CHAPTER_NAMES[n]).sort((a, b) => a - b);
+  const targets = allTargets.filter((n) => !hiddenChapters.includes(n));
   const byChapter = new Map(stats.map((s) => [s.chapterNo, s]));
 
   // 確定率の定義は chapter-stats.ts の overallRate（案件トップ・サイドバー・PowerPointと共通）
@@ -73,7 +75,9 @@ export function summarizeProject(selectedChapters: number[], stats: ChapterStat[
     rate,
     fraction,
     state,
-    chapters,
+    chapters: allTargets.map((n) =>
+      hiddenChapters.includes(n) ? { chapterNo: n, status: "not_started" as const, hidden: true } : chapters.find((c) => c.chapterNo === n)!
+    ),
     confirmableChapters: chapters.filter((c) => isConfirmableChapter(c.chapterNo)).length,
     confirmedChapters: chapters.filter((c) => c.status === "confirmed").length,
     workingChapters: chapters.filter((c) => c.status === "in_progress" && isConfirmableChapter(c.chapterNo)).length,

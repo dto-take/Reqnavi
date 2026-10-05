@@ -3,6 +3,7 @@ import { createServerActionClient } from "@/lib/supabase/server";
 import { getAmbiguousCounts, getChapterStats } from "@/actions/readiness";
 import { chapterRates, chapterStatuses, overallRate, type ChapterRate, type ChapterStat, type OverallRate } from "@/lib/chapter-stats";
 import type { ChapterStatus } from "@/lib/chapter-status";
+import { getHiddenChapterNos } from "@/lib/hidden-chapters";
 
 // 案件配下の画面で、サイドバー（layout）とページ本体が同じリクエスト内で同じデータを二重に取得しないよう、
 // React.cacheでリクエスト単位に共有する。cache()の関数は"use server"ファイルからはexportできないため、
@@ -61,14 +62,17 @@ export type ProjectProgressData = {
   statuses: Record<number, ChapterStatus>;
   overall: OverallRate; // 案件全体の確定率（確定項目数 ÷ 総項目数）
   ambiguous: Record<number, number>;
+  hiddenChapters: number[]; // このロールに非公開の対象章（集計に含めない）
 };
 
 // 章ごとの総数・確定数・状態（list_project_chapter_stats）と曖昧表現の件数。
 // 定義は確定判定ダッシュボードと同じ（chapter-stats.ts／getAmbiguousCounts）。
 export const getProjectProgressData = cache(async (projectId: string): Promise<ProjectProgressData> => {
   const header = await getProjectHeader(projectId);
-  const selected = header?.selectedChapters ?? [];
+  const hidden = await getHiddenChapterNos();
+  const hiddenChapters = (header?.selectedChapters ?? []).filter((n) => hidden.includes(n));
+  const selected = (header?.selectedChapters ?? []).filter((n) => !hidden.includes(n)); // 非公開の章は集計に含めない
   const [stats, ambiguous] = await Promise.all([getChapterStats(projectId), getAmbiguousCounts(projectId, selected)]);
   const rates = chapterRates(selected, stats);
-  return { stats, rates, statuses: chapterStatuses(selected, stats), overall: overallRate(selected, stats), ambiguous };
+  return { stats, rates, statuses: chapterStatuses(selected, stats), overall: overallRate(selected, stats), ambiguous, hiddenChapters };
 });

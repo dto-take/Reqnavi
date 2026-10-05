@@ -103,7 +103,7 @@ export default async function ProjectHomePage({ params }: { params: Promise<{ id
   const nameIds = progress.stats.map((s) => s.updatedBy).filter((x): x is string => !!x);
   const [top, names] = await Promise.all([getProjectTopData(id), getUserDisplayNames(nameIds)]);
 
-  const cards = buildChapterCards(selected, progress.stats, progress.ambiguous, names);
+  const cards = buildChapterCards(selected, progress.stats, progress.ambiguous, names, progress.hiddenChapters);
   const next = decideNextChapter(cards, top.hasBaseline);
   const overall = progress.overall;
 
@@ -122,6 +122,9 @@ export default async function ProjectHomePage({ params }: { params: Promise<{ id
               確定率 ・ 確定 {overall.confirmed} / {overall.total} 項目 ・ メンバー {top.memberCount}名
             </span>
           </p>
+          {progress.hiddenChapters.length > 0 && (
+            <p data-hidden-note className="mt-0.5 text-[11px] text-faint">一部の章は非公開のため、集計に含まれません</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/projects/${id}/bulk-generate`} className={`${buttonClasses("secondary", "md")} ${FOCUS}`}>

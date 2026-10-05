@@ -11,6 +11,7 @@ export type SidebarChapter = {
   name: string;
   status: ChapterStatus | null; // nullは進捗を表示しない（メンバーではない案件）
   ambiguous: number | null; // 4・10・15章は対象外（null）
+  hidden?: boolean; // このロールに非公開の章
 };
 
 // 状態ドット：9pxで、確定・作成中・未着手（白抜き）の3段階を区別しやすくする
@@ -104,7 +105,13 @@ export function ProjectSidebar({
       <details open>
         <summary className="text-[11px] text-faint mb-1 cursor-pointer select-none">要件定義</summary>
         <div className="flex flex-col gap-0.5 mb-4">
-          {chapters.map((c) => (
+          {chapters.map((c) =>
+            c.hidden ? (
+              <span key={c.no} data-sidebar-hidden={c.no} className="flex items-center gap-2 rounded border-l-[3px] border-l-transparent px-2 py-1 text-sm text-faint">
+                <span className="min-w-0 flex-1 truncate">{c.no}. {c.name}</span>
+                <span className="text-[9.5px]">非公開</span>
+              </span>
+            ) : (
             <NavLink key={c.no} href={chapterHref(projectId, c.no)} active={pathname === chapterHref(projectId, c.no) || pathname.startsWith(`${chapterHref(projectId, c.no)}/`)}>
               {c.status && <Dot status={c.status} />}
               <span className="min-w-0 flex-1 truncate">
@@ -120,7 +127,8 @@ export function ProjectSidebar({
                 </span>
               ) : null}
             </NavLink>
-          ))}
+            )
+          )}
         </div>
       </details>
 

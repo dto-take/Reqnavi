@@ -86,6 +86,10 @@ export async function addProjectMemberByEmail(projectId: string, formData: FormD
     project_id: projectId,
     user_id: targetUser.id,
   });
-  if (error) throw error;
+  if (error) {
+    // 重複登録は一意制約違反。それ以外（RLS拒否など）も日本語で返す
+    if (error.code === "23505") throw new UserFacingError("すでにこの案件のメンバーです");
+    throw new UserFacingError(errorMessage(error));
+  }
   revalidatePath(`/projects/${projectId}/members`);
 }

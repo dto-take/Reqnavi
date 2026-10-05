@@ -4,6 +4,9 @@ import { RoleBadge, type Role } from "@/components/ui/role-badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { createServerActionClient } from "@/lib/supabase/server";
+import { getIsProjectMember } from "@/lib/project-data";
+import { canAddProjectMember } from "@/lib/permissions";
 
 type ProjectDetail = {
   id: string;
@@ -25,6 +28,10 @@ export default async function ProjectMembersPage({ params }: { params: Promise<{
   const { id } = await params;
   const project = (await getProjectDetail(id)) as unknown as ProjectDetail;
   const members = (await listProjectMembers(id)) as unknown as ProjectMember[] | null;
+  const supabase = await createServerActionClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  // メンバーの追加は、案件のメンバーであるadmin・pmのみ（project_members_insert）
+  const canAdd = canAddProjectMember(claims?.claims?.user_role as string | undefined, await getIsProjectMember(id));
 
   return (
     <Card className="max-w-2xl mx-auto mt-10">
@@ -35,10 +42,12 @@ export default async function ProjectMembersPage({ params }: { params: Promise<{
 
       <div className="flex justify-between items-center mb-2">
         <span className="text-xs text-faint">{members?.length ?? 0}名</span>
-        <form action={addProjectMemberByEmail.bind(null, id)} className="flex gap-2">
-          <Input name="email" type="email" placeholder="メールアドレス" required />
-          <Button type="submit" variant="secondary" size="md">追加</Button>
-        </form>
+        {canAdd && (
+          <form action={addProjectMemberByEmail.bind(null, id)} className="flex gap-2">
+            <Input name="email" type="email" placeholder="メールアドレス" required />
+            <Button type="submit" variant="secondary" size="md">追加</Button>
+          </form>
+        )}
       </div>
 
       <div className="flex flex-col">

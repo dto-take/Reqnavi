@@ -2,6 +2,7 @@ import { getDiffFromBaseline, raiseChangeRequest, listChangeRequests } from "@/a
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { createServerActionClient } from "@/lib/supabase/server";
 
 const CHANGE_TYPE_LABEL: Record<string, string> = { added: "追加", modified: "変更", deleted: "削除" };
 
@@ -11,6 +12,10 @@ export default async function ChangesPage({ params }: { params: Promise<{ id: st
     getDiffFromBaseline(id),
     listChangeRequests(id),
   ]);
+  const supabase = await createServerActionClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  // 変更申請の登録はpartnerには許可されていない（change_requests_insert）
+  const canRaise = claims?.claims?.user_role !== "partner";
   const raisedItemIds = new Set(changeRequests.map((c) => c.item_id));
 
   return (
@@ -31,7 +36,7 @@ export default async function ChangesPage({ params }: { params: Promise<{ id: st
                   </span>
                   {raisedItemIds.has(d.itemId) && <span className="text-[10px] text-secondary">申請済み</span>}
                 </div>
-                {!raisedItemIds.has(d.itemId) && (
+                {canRaise && !raisedItemIds.has(d.itemId) && (
                   <form action={raiseChangeRequest.bind(null, id)} className="flex flex-col gap-1.5">
                     <input type="hidden" name="item_id" value={d.itemId} />
                     <input type="hidden" name="chapter_no" value={d.chapterNo} />

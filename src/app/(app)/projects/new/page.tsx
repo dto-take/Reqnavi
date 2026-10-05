@@ -4,6 +4,9 @@ import { Input, Select } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import Link from "next/link";
+import { createServerActionClient } from "@/lib/supabase/server";
+import { canCreateProject } from "@/lib/permissions";
 
 type Organization = { id: string; name: string };
 
@@ -18,13 +21,26 @@ const CHAPTERS = [
   { no: 15, label: "進捗" },
 ];
 
-export default async function NewProjectPage() {
+export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
+  const supabase = await createServerActionClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!canCreateProject(claims?.claims?.user_role as string | undefined)) {
+    return (
+      <Card className="max-w-md mx-auto mt-10">
+        <PageHeader title="新規案件を作成" />
+        <p data-no-permission className="text-sm text-secondary mb-3">案件を作成する権限がありません。案件の作成は、管理者・PMのみが行えます。</p>
+        <Link href="/projects" className="text-sm underline">案件一覧へ戻る</Link>
+      </Card>
+    );
+  }
   const organizations = (await listOrganizations()) as Organization[] | null;
 
   return (
     <Card className="max-w-md mx-auto mt-10">
       <PageHeader title="新規案件を作成" />
 
+      {error && <p role="alert" className="text-sm text-(--status-needhearing-text) mb-2">{error}</p>}
       <form action={createProject} className="flex flex-col gap-3">
         <div>
           <Label>案件名</Label>

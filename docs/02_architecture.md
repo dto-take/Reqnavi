@@ -312,6 +312,27 @@ DB制約: `(auth_provider = 'google' AND user_role != 'partner') OR (auth_provid
 | member | 案件担当SE。通常の素案生成・リファインメント操作 |
 | partner | 外注SE。制限付きアクセス |
 
+### 作成・追加の操作権限（UIの表示とサーバー側の拒否は同じ条件。実装は`src/lib/permissions.ts`）
+
+| 操作 | 許可するロール | 根拠 |
+|---|---|---|
+| 顧客（organizations）の作成・編集 | admin（画面は admin 専用。案件作成画面では既存の顧客を選ぶだけ） | `/organizations`は admin 以外を案件一覧へ戻す |
+| 案件の作成 | admin・pm | RLS`projects_insert`。member・partnerには「+ 新規案件」を出さず、`/projects/new`は案内を表示 |
+| 案件メンバーの追加 | その案件のメンバーである admin・pm | RLS`project_members_insert` |
+| 変更申請の登録 | partner 以外の案件メンバー | RLS`change_requests_insert` |
+| 案件の削除 | admin | RLS`projects_delete_admin` |
+
+RLSで拒否された書き込みは、`errorMessage()`が「この操作を行う権限がありません」に変換する。
+
+### ロールに非公開の章（RLS`reqnavi_*`ポリシーから読み取った実際の条件）
+
+| ロール | 非公開の章 | 表示 |
+|---|---|---|
+| partner | 7章（ビジネス要件）。`requirement_items`の参照・登録・更新・削除すべてで不可 | 案件トップ・サイドバー・案件一覧のセグメントに「非公開」と表示。確定率・「N/M章」の分母・分子から除く |
+| admin・exec・pmo・pm・member | なし | 通常どおり |
+
+非公開の章は、確定判定ダッシュボード・案件トップ・サイドバー・案件一覧・PowerPoint概要の集計から除き、案件トップのヘッダーに「一部の章は非公開のため、集計に含まれません」と添える（`getHiddenChapterNos`／`hiddenChaptersFor`）。
+
 ### パートナー制限（アプリ側・DB側の両方で実装）
 
 - アサインされた案件（`project_members`）のみ参照可

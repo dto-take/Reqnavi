@@ -24,10 +24,10 @@ export function ChapterSegments({ summary, className = "" }: { summary: ProjectS
       {summary.chapters.map((c) => (
         <span
           key={c.chapterNo}
-          data-chapter-segment={c.status}
-          title={`${c.chapterNo}. ${CHAPTER_NAMES[c.chapterNo]}：${LABEL[c.status]}${isConfirmableChapter(c.chapterNo) ? "" : "（確定の対象外）"}`}
-          className="flex-1 h-1.5 rounded-sm min-w-0.5"
-          style={{ backgroundColor: COLOR[c.status] }}
+          data-chapter-segment={c.hidden ? "hidden" : c.status}
+          title={`${c.chapterNo}. ${CHAPTER_NAMES[c.chapterNo]}：${c.hidden ? "非公開" : LABEL[c.status]}${isConfirmableChapter(c.chapterNo) ? "" : "（確定の対象外）"}`}
+          className={`flex-1 h-1.5 rounded-sm min-w-0.5 ${c.hidden ? "border border-dashed border-border" : ""}`}
+          style={c.hidden ? undefined : { backgroundColor: COLOR[c.status] }}
         />
       ))}
     </div>

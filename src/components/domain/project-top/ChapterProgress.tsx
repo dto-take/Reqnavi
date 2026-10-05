@@ -34,6 +34,7 @@ const FILTERS: { key: ChapterFilter; label: string }[] = [
 ];
 
 function StatusLabel({ card }: { card: ChapterCardData }) {
+  if (card.hidden) return <span data-hidden-chapter className="text-[10.5px] font-medium text-faint">非公開</span>;
   if (card.status === "confirmed") return <span className="text-[10.5px] font-medium text-brand">✓ 確定済</span>;
   if (card.status === "in_progress") return <span className="text-[10.5px] font-medium" style={{ color: "var(--status-review-text)" }}>作成中</span>;
   return <span className="text-[10.5px] font-medium text-secondary">未着手</span>;
@@ -53,6 +54,7 @@ function AmbiguousBadge({ count }: { count: number | null }) {
 }
 
 function Segments({ card }: { card: ChapterCardData }) {
+  if (card.hidden) return <div className="h-[5px] rounded-sm border border-dashed border-border" aria-hidden="true" />;
   return (
     <div className="flex gap-0.5" aria-hidden="true">
       {segmentsFor(card).map((c, i) => (
@@ -64,6 +66,7 @@ function Segments({ card }: { card: ChapterCardData }) {
 
 // 確定数の表示。15章（進捗）は確定の概念が無いため「工程 N 件」
 function CountText({ card }: { card: ChapterCardData }) {
+  if (card.hidden) return <>―</>;
   if (card.isProgress) return <>工程 {card.total} 件</>;
   return (
     <>
@@ -87,9 +90,13 @@ function ChapterCard({ card, projectId, next }: { card: ChapterCardData; project
         <StatusLabel card={card} />
       </div>
       <h3 className="text-[14px] font-semibold leading-snug text-primary">
-        <Link href={chapterHref(projectId, card.chapterNo)} data-stretch className="outline-none after:absolute after:inset-0 after:content-['']">
-          {card.chapterNo}. {card.name}
-        </Link>
+        {card.hidden ? (
+          <span className="text-faint">{card.chapterNo}. {card.name}</span>
+        ) : (
+          <Link href={chapterHref(projectId, card.chapterNo)} data-stretch className="outline-none after:absolute after:inset-0 after:content-['']">
+            {card.chapterNo}. {card.name}
+          </Link>
+        )}
       </h3>
       <Segments card={card} />
       <div className="flex items-center gap-2 text-[11px] tabular-nums text-secondary">
@@ -114,9 +121,13 @@ function ChapterRow({ card, projectId, next }: { card: ChapterCardData; projectI
         next ? "border-l-[3px] border-l-brand bg-page" : ""
       }`}
     >
-      <Link href={chapterHref(projectId, card.chapterNo)} data-stretch className="truncate font-medium text-primary outline-none after:absolute after:inset-0 after:content-['']">
-        {card.chapterNo}. {card.name}
-      </Link>
+      {card.hidden ? (
+        <span className="truncate font-medium text-faint">{card.chapterNo}. {card.name}</span>
+      ) : (
+        <Link href={chapterHref(projectId, card.chapterNo)} data-stretch className="truncate font-medium text-primary outline-none after:absolute after:inset-0 after:content-['']">
+          {card.chapterNo}. {card.name}
+        </Link>
+      )}
       <StatusLabel card={card} />
       <span className="font-mono text-[11px] tabular-nums text-secondary">
         <CountText card={card} />

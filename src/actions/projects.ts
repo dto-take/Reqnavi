@@ -4,9 +4,11 @@ import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
+import { canCreateProject } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { fetchAllPages } from "@/lib/paged-select";
+import { hiddenChaptersFor } from "@/lib/permissions";
 import { summarizeProject, type ChapterStat, type ListedProject } from "@/lib/project-list/derive";
 
 export type ListedProjectRow = ListedProject & { lastUpdatedByName: string | null };
@@ -72,7 +74,7 @@ export async function listProjectsForList(): Promise<ListedProjectRow[]> {
     customerId: p.organizations?.id ?? null,
     customerName: p.organizations?.name ?? "―",
     platform: p.platform_knowledge_sets?.platform_name ?? null,
-    summary: summarizeProject(p.selected_chapters ?? [], statsByProject.get(p.id) ?? []),
+    summary: summarizeProject(p.selected_chapters ?? [], statsByProject.get(p.id) ?? [], hiddenChaptersFor(claims?.claims?.user_role as string | undefined)),
     isMember: memberIds.has(p.id),
   }));
 
@@ -96,6 +98,11 @@ export async function listOrganizations() {
 
 export async function createProject(formData: FormData) {
   const supabase = await createServerActionClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!canCreateProject(claims?.claims?.user_role as string | undefined)) {
+    // throwすると本番では文言が汎用エラーに潰れるため、画面にエラーを渡して案内する
+    redirect(`/projects/new?error=${encodeURIComponent("案件を作成する権限がありません")}`);
+  }
 
   const name = formData.get("name") as string;
   const organizationId = formData.get("organization_id") as string;
@@ -119,7 +126,7 @@ export async function createProject(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/projects/new?error=${encodeURIComponent(error.message)}`);
+    redirect(`/projects/new?error=${encodeURIComponent(errorMessage(error))}`);
   }
 
   // 作成者を自動的にproject_membersへ登録。

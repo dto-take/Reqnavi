@@ -4,6 +4,7 @@ import { createServerActionClient } from "@/lib/supabase/server";
 import { CHAPTER_TEMPLATE_MAP } from "@/lib/chapters";
 import type { ChapterStatus } from "@/lib/chapter-status";
 import { fetchAllPages } from "@/lib/paged-select";
+import { getHiddenChapterNos } from "@/lib/hidden-chapters";
 import {
   overallRate,
   chapterRates,
@@ -64,7 +65,8 @@ export async function getProjectProgress(projectId: string): Promise<{
   statuses: Record<number, ChapterStatus>;
   overall: OverallRate;
 }> {
-  const [selectedChapters, stats] = await Promise.all([getSelectedChapters(projectId), getChapterStats(projectId)]);
+  const [selectedAll, stats, hidden] = await Promise.all([getSelectedChapters(projectId), getChapterStats(projectId), getHiddenChapterNos()]);
+  const selectedChapters = selectedAll.filter((n) => !hidden.includes(n)); // 非公開の章は集計に含めない
   const rates = chapterRates(selectedChapters, stats);
   return { rates, statuses: chapterStatuses(selectedChapters, stats), overall: overallRate(selectedChapters, stats) };
 }
@@ -102,7 +104,8 @@ export async function getAmbiguousCounts(projectId: string, selectedChapters?: n
 // A/B/C章の項目の内容から数える（4章・10章は対象外）。
 export async function getReadinessSummary(projectId: string): Promise<ChapterReadiness[]> {
   const supabase = await createServerActionClient();
-  const [selectedChapters, stats] = await Promise.all([getSelectedChapters(projectId), getChapterStats(projectId)]);
+  const [selectedAll, stats, hidden] = await Promise.all([getSelectedChapters(projectId), getChapterStats(projectId), getHiddenChapterNos()]);
+  const selectedChapters = selectedAll.filter((n) => !hidden.includes(n)); // 非公開の章は集計に含めない
   const rates = chapterRates(selectedChapters, stats);
   const ambiguousCounts = await getAmbiguousCounts(projectId, selectedChapters);
 

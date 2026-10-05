@@ -42,9 +42,11 @@ const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-brand focus-
 export function ProjectListScreen({
   projects,
   initialCustomerId,
+  canCreate = false,
 }: {
   projects: ListedProjectRow[];
   initialCustomerId: string;
+  canCreate?: boolean;
 }) {
   const [viewRaw, setView] = usePersistedValue(VIEW_KEY, "card");
   const view: ViewMode = viewRaw === "list" ? "list" : "card";
@@ -73,9 +75,11 @@ export function ProjectListScreen({
     return (
       <Card className="text-center py-10">
         <p className="text-sm text-secondary mb-3">案件がありません</p>
-        <Link href="/projects/new" className={buttonClasses("primary", "sm")}>
-          最初の案件を作成
-        </Link>
+        {canCreate && (
+          <Link href="/projects/new" className={buttonClasses("primary", "sm")}>
+            最初の案件を作成
+          </Link>
+        )}
       </Card>
     );
   }

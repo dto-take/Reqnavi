@@ -16,21 +16,28 @@ export type ChapterCardData = {
   updatedBy: string | null;
   isProgress: boolean; // 15章（確定の概念が無い）
   unitLabel: string; // 件／観点／工程
+  hidden: boolean; // このロールに非公開の章（集計・状態の判定に含めない）
 };
+
+// 確定の集計・「次にやる章」の対象になる章（確定できる章で、非公開でないもの）
+const countable = (c: Pick<ChapterCardData, "chapterNo" | "hidden">) => isConfirmableChapter(c.chapterNo) && !c.hidden;
 
 export function buildChapterCards(
   selectedChapters: number[],
   stats: ChapterStat[],
   ambiguous: Record<number, number>,
-  userNames: Record<string, string> = {}
+  userNames: Record<string, string> = {},
+  hiddenChapters: number[] = []
 ): ChapterCardData[] {
   const byChapter = new Map(stats.map((s) => [s.chapterNo, s]));
   return [...new Set(selectedChapters)]
     .filter((n) => !!CHAPTER_NAMES[n])
     .sort((a, b) => a - b)
     .map((n) => {
-      const s = byChapter.get(n);
+      const hidden = hiddenChapters.includes(n);
+      const s = hidden ? undefined : byChapter.get(n);
       return {
+        hidden,
         chapterNo: n,
         name: CHAPTER_NAMES[n],
         status: chapterStatusOf(n, s),
@@ -57,7 +64,7 @@ export type NextChapter =
 // 3. 作成中が無ければ、最初の未着手章（章番号順）
 // 4. どちらも無ければ、すべて確定（ベースライン未確定か確定済みかを区別して返す）
 export function decideNextChapter(cards: ChapterCardData[], hasBaseline: boolean): NextChapter {
-  const confirmable = cards.filter((c) => isConfirmableChapter(c.chapterNo));
+  const confirmable = cards.filter((c) => countable(c));
   const working = confirmable.filter((c) => c.status === "in_progress");
   if (working.length > 0) {
     const sorted = [...working].sort((a, b) => {
@@ -103,13 +110,13 @@ export type ChapterFilter = "all" | "unconfirmed" | "ambiguous";
 export function filterCounts(cards: ChapterCardData[]): Record<ChapterFilter, number> {
   return {
     all: cards.length,
-    unconfirmed: cards.filter((c) => isConfirmableChapter(c.chapterNo) && c.status !== "confirmed").length,
+    unconfirmed: cards.filter((c) => countable(c) && c.status !== "confirmed").length,
     ambiguous: cards.filter((c) => (c.ambiguousCount ?? 0) > 0).length,
   };
 }
 
 export function applyFilter(cards: ChapterCardData[], filter: ChapterFilter): ChapterCardData[] {
-  if (filter === "unconfirmed") return cards.filter((c) => isConfirmableChapter(c.chapterNo) && c.status !== "confirmed");
+  if (filter === "unconfirmed") return cards.filter((c) => countable(c) && c.status !== "confirmed");
   if (filter === "ambiguous") return cards.filter((c) => (c.ambiguousCount ?? 0) > 0);
   return cards;
 }
@@ -133,7 +140,7 @@ export function buildPhases(cards: ChapterCardData[], filter: ChapterFilter): Ph
     const all = cards.filter((c) => g.chapters.includes(c.chapterNo));
     const shown = all.filter((c) => filtered.has(c.chapterNo));
     if (shown.length === 0) continue;
-    const confirmable = all.filter((c) => isConfirmableChapter(c.chapterNo));
+    const confirmable = all.filter((c) => countable(c));
     const total = confirmable.reduce((s, c) => s + c.total, 0);
     const confirmed = confirmable.reduce((s, c) => s + c.confirmed, 0);
     phases.push({

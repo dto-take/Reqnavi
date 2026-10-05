@@ -2,6 +2,7 @@
 
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
+import { errorMessage } from "@/lib/error-message";
 import { fetchAllPages } from "@/lib/paged-select";
 import { revalidatePath } from "next/cache";
 
@@ -89,6 +90,8 @@ export async function raiseChangeRequest(projectId: string, formData: FormData) 
   if (!tenantId) throw new UserFacingError("認証が必要です");
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new UserFacingError("認証が必要です");
+  const { data: claims } = await supabase.auth.getClaims();
+  if (claims?.claims?.user_role === "partner") throw new UserFacingError("変更申請を登録する権限がありません");
 
   const { data: baselineData } = await supabase
     .from("baseline_snapshots")
@@ -122,7 +125,7 @@ export async function raiseChangeRequest(projectId: string, formData: FormData) 
     raised_by: userData.user.id,
     status: "open",
   });
-  if (error) throw error;
+  if (error) throw new UserFacingError(errorMessage(error));
   revalidatePath(`/projects/${projectId}/changes`);
 }
 
