@@ -422,6 +422,8 @@ async function adoptAllScreenSuggestionsInner(projectId: string): Promise<AdoptA
   const tenantId = await getTenantId(supabase);
   if (!tenantId) throw new UserFacingError("認証が必要です");
   const open = await fetchRows(supabase, projectId, "open");
+  // 対象が1件も見えない（既に処理済み、または権限が無くRLSで見えない）場合は、「0件を採用」と成功扱いにしない
+  if (open.length === 0) throw new UserFacingError("提案が見つかりません（既に処理済みの可能性があります）");
   const ordered = [...open.filter((r) => r.kind === "node"), ...open.filter((r) => r.kind === "transition")];
   let adopted = 0;
   const failedByReason = new Map<string, number>();
@@ -452,6 +454,8 @@ async function rejectAllScreenSuggestionsInner(projectId: string): Promise<{ rej
     .eq("state", "open")
     .select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  // 規約47：RLSで拒否された更新は error:null・0件になる。0件は「見送れる提案が無かった」として失敗にする
+  if (!data || data.length === 0) throw new UserFacingError("提案が見つかりません（既に処理済みの可能性があります）");
   revalidatePath(path(projectId));
-  return { rejected: data?.length ?? 0 };
+  return { rejected: data.length };
 }

@@ -101,11 +101,12 @@ async function reclassifyDocumentInternal(documentId: string, projectId: string)
 
   const classification = await classifyDocument(file, doc.file_name);
 
-  const { error: updateError } = await supabase
+  const { data: affected1, error: updateError } = await supabase
     .from("source_documents")
     .update({ classified_tags: classification.tags, updated_at: new Date().toISOString() })
-    .eq("id", documentId);
+    .eq("id", documentId).select("id");
   if (updateError) throw updateError;
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
 
   revalidatePath(`/projects/${projectId}/documents`);
 }

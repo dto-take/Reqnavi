@@ -26,7 +26,6 @@ import { BulkActionBar } from "@/components/domain/requirement-table/BulkActionB
 import { FilterBar } from "@/components/domain/requirement-table/FilterBar";
 import { Checkbox, type CheckedState } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/toast";
-import { errorMessage } from "@/lib/error-message";
 import { isItemLocked } from "@/lib/item-lock";
 
 // ドラッグされているデータが「カード」なのか「グループ見出し」なのかをdataTransferの

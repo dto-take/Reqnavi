@@ -37,6 +37,14 @@ const NODE_COLUMNS =
 
 type MinimalNode = { id: string; node_type: string; branch: "main" | "yes" | "no"; parent_condition_id: string | null; order_index: number };
 
+
+// 更新の結果（エラー・更新件数）を確認する。RLSで拒否された更新は error:null・0件になる（規約47）
+async function expectAffected(query: PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>): Promise<void> {
+  const { data, error } = await query;
+  if (error) throw new UserFacingError(errorMessage(error));
+  if (!data || data.length === 0) throw new UserFacingError("対象が見つかりません");
+}
+
 export async function listWorkflowNodes(projectId: string): Promise<WorkflowNodeRow[]> {
   const supabase = await createServerActionClient();
   const { data, error } = await supabase
@@ -61,8 +69,9 @@ export async function updateFlowNode(
     const tenantId = await getTenantId(supabase);
     if (!tenantId) throw new UserFacingError("認証が必要です");
 
-    const { error } = await supabase.from("flow_nodes").update(patch).eq("id", nodeId);
+    const { data: affected1, error } = await supabase.from("flow_nodes").update(patch).eq("id", nodeId).select("id");
     if (error) throw error;
+    if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
 
     revalidatePath(`/projects/${projectId}/business-flow/builder`);
     return { error: null };
@@ -177,7 +186,7 @@ export async function insertWorkflowNodeAfter(
           .eq("branch", "yes")
           .order("order_index", { ascending: false });
         for (const child of yesChildren ?? []) {
-          await supabase.from("flow_nodes").update({ order_index: child.order_index + 1 }).eq("id", child.id);
+          await expectAffected(supabase.from("flow_nodes").update({ order_index: child.order_index + 1 }).eq("id", child.id).select("id"));
         }
         const { data, error } = await supabase
           .from("flow_nodes")
@@ -211,11 +220,11 @@ export async function insertWorkflowNodeAfter(
       if (nodeType === "condition") {
         for (let i = 0; i < (siblingsAfter ?? []).length; i++) {
           const s = siblingsAfter![i];
-          await supabase.from("flow_nodes").update({ parent_condition_id: inserted.id, branch: "yes", order_index: i }).eq("id", s.id);
+          await expectAffected(supabase.from("flow_nodes").update({ parent_condition_id: inserted.id, branch: "yes", order_index: i }).eq("id", s.id).select("id"));
         }
       } else {
         for (const s of siblingsAfter ?? []) {
-          await supabase.from("flow_nodes").update({ order_index: s.order_index + 1 }).eq("id", s.id);
+          await expectAffected(supabase.from("flow_nodes").update({ order_index: s.order_index + 1 }).eq("id", s.id).select("id"));
         }
       }
 
@@ -258,8 +267,9 @@ export async function deleteWorkflowNode(nodeId: string, projectId: string): Pro
       throw new UserFacingError("条件分岐ノードの削除にはdeleteConditionNodeを使ってください");
     }
 
-    const { error } = await supabase.from("flow_nodes").delete().eq("id", nodeId);
+    const { data: affected2, error } = await supabase.from("flow_nodes").delete().eq("id", nodeId).select("id");
     if (error) throw error;
+    if (!affected2 || affected2.length === 0) throw new UserFacingError("対象が見つかりません");
 
     revalidatePath(`/projects/${projectId}/business-flow/builder`);
     return { error: null };
@@ -306,22 +316,26 @@ export async function deleteConditionNode(nodeId: string, projectId: string): Pr
     const shift = yes.length - 1; // 1件（条件分岐自身）がyes.length件に置き換わる差分
     if (shift !== 0) {
       for (const s of siblingsAfter) {
-        await supabase.from("flow_nodes").update({ order_index: s.order_index + shift }).eq("id", s.id);
+        await expectAffected(supabase.from("flow_nodes").update({ order_index: s.order_index + shift }).eq("id", s.id).select("id"));
       }
     }
 
     // Yes配下を、条件分岐が居た位置から順番に親のchainへ展開する
     for (let i = 0; i < yes.length; i++) {
-      await supabase
-        .from("flow_nodes")
-        .update({ parent_condition_id: nodeData.parent_condition_id, branch: nodeData.branch, order_index: nodeData.order_index + i })
-        .eq("id", yes[i].id);
+      await expectAffected(
+        supabase
+          .from("flow_nodes")
+          .update({ parent_condition_id: nodeData.parent_condition_id, branch: nodeData.branch, order_index: nodeData.order_index + i })
+          .eq("id", yes[i].id)
+          .select("id")
+      );
     }
 
     // 条件分岐本体を削除。Noルート配下はparent_condition_idのon delete cascadeでまとめて削除される
     // （Yes配下は上で既に親のchainへ退避済みのため、このcascadeの影響を受けない）
-    const { error: deleteError } = await supabase.from("flow_nodes").delete().eq("id", nodeId);
+    const { data: affected3, error: deleteError } = await supabase.from("flow_nodes").delete().eq("id", nodeId).select("id");
     if (deleteError) throw deleteError;
+    if (!affected3 || affected3.length === 0) throw new UserFacingError("対象が見つかりません");
 
     revalidatePath(`/projects/${projectId}/business-flow/builder`);
     return { error: null };

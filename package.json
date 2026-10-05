@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:actions": "node scripts/check-action-errors.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.15.0",

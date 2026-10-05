@@ -87,8 +87,9 @@ async function fetchOrderedSiblingIds(
 // 一度も設定されておらずすべて0のままだった既存データに対しても正しく機能する。
 async function applySiblingOrder(supabase: OrderedSupabase, orderedIds: string[]) {
   for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await supabase.from("requirement_items").update({ order_index: i }).eq("id", orderedIds[i]);
+    const { data: affected1, error } = await supabase.from("requirement_items").update({ order_index: i }).eq("id", orderedIds[i]).select("id");
     if (error) throw new UserFacingError(errorMessage(error));
+    if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
   }
 }
 
@@ -177,11 +178,12 @@ async function updateKpiNodeFieldInner(
   const newContent = { ...(current.content as KpiNodeContent), [field]: value };
   const newStatus = current.status === "ai_draft" ? "se_reviewing" : current.status;
 
-  const { error } = await supabase
+  const { data: affected2, error } = await supabase
     .from("requirement_items")
     .update({ content: newContent, status: newStatus })
-    .eq("id", nodeId);
+    .eq("id", nodeId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected2 || affected2.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/4`);
 }
 
@@ -194,11 +196,12 @@ export async function confirmKpiNode(nodeId: string, projectId: string): Promise
 
 async function confirmKpiNodeInner(nodeId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  const { data: affected3, error } = await supabase
     .from("requirement_items")
     .update({ status: "confirmed" })
-    .eq("id", nodeId);
+    .eq("id", nodeId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected3 || affected3.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/4`);
 }
 
@@ -449,18 +452,20 @@ async function changeKpiNodeLevelInner(nodeId: string, projectId: string, direct
 
   for (const item of subtree) {
     const newLevel = KPI_LEVELS[KPI_LEVELS.indexOf(item.content.level) + delta];
-    const { error } = await supabase
+    const { data: affected4, error } = await supabase
       .from("requirement_items")
       .update({ content: { ...item.content, level: newLevel } })
-      .eq("id", item.id);
+      .eq("id", item.id).select("id");
     if (error) throw new UserFacingError(errorMessage(error));
+    if (!affected4 || affected4.length === 0) throw new UserFacingError("対象が見つかりません");
   }
 
-  const { error: parentUpdateError } = await supabase
+  const { data: affected5, error: parentUpdateError } = await supabase
     .from("requirement_items")
     .update({ parent_id: newParentId })
-    .eq("id", nodeId);
+    .eq("id", nodeId).select("id");
   if (parentUpdateError) throw new UserFacingError(errorMessage(parentUpdateError));
+  if (!affected5 || affected5.length === 0) throw new UserFacingError("対象が見つかりません");
 
   // 新しい兄弟グループの末尾に付け直す（元の兄弟内でのorder_indexをそのまま引き継ぐと、
   // 新しい兄弟グループの中で意図しない位置に紛れ込む可能性があるため）
@@ -523,7 +528,8 @@ async function deleteKpiNodeInner(nodeId: string, projectId: string): Promise<vo
   // parent_idの外部キーにon delete cascadeが無いため、子が残っている状態で削除すると
   // 23503（外部キー制約違反）になる。既存の挙動は変えず（フェーズ1の対象外）、
   // エラーメッセージだけユーザーに伝わる形にする（規約43：生のPostgrestErrorをthrowしない）。
-  const { error } = await supabase.from("requirement_items").delete().eq("id", nodeId);
+  const { data: affected6, error } = await supabase.from("requirement_items").delete().eq("id", nodeId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected6 || affected6.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/4`);
 }

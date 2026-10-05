@@ -20,7 +20,6 @@ import { Menu, MenuItem } from "@/components/ui/menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
-import { errorMessage } from "@/lib/error-message";
 import { highlightAmbiguousPhrases } from "@/lib/highlight-ambiguous";
 import { pickBodyColumnKey, hasTitleColumn } from "@/lib/requirement-body-field";
 

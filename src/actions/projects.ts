@@ -241,8 +241,9 @@ async function deleteProjectInner(projectId: string, formData: FormData): Promis
     throw new UserFacingError("資料ファイルの削除に失敗したため、案件は削除されていません。時間をおいて再度お試しください");
   }
 
-  const { error: deleteError } = await supabase.from("projects").delete().eq("id", projectId);
+  const { data: affected1, error: deleteError } = await supabase.from("projects").delete().eq("id", projectId).select("id");
   if (deleteError) throw new UserFacingError(errorMessage(deleteError));
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
 
   revalidatePath("/projects");
   redirect("/projects");

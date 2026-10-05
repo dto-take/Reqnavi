@@ -1,5 +1,6 @@
 "use server";
 
+import { UserFacingError } from "@/lib/user-error";
 import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { errorMessage } from "@/lib/error-message";
@@ -85,7 +86,8 @@ export async function deleteEffortLog(logId: string, projectId: string, _prevSta
 
 async function deleteEffortLogInner(logId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
-  const { error } = await supabase.from("effort_logs").delete().eq("id", logId);
+  const { data: affected1, error } = await supabase.from("effort_logs").delete().eq("id", logId).select("id");
   if (error) throw error;
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/effort`);
 }

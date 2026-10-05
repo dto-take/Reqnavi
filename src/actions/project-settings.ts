@@ -19,11 +19,12 @@ async function toggleCrossProjectReferenceInner(projectId: string, formData: For
 
   const enabled = formData.get("enabled") === "true";
 
-  const { error } = await supabase
+  const { data: affected1, error } = await supabase
     .from("projects")
     .update({ allow_cross_project_reference: enabled })
-    .eq("id", projectId);
+    .eq("id", projectId).select("id");
   if (error) throw error;
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/settings`);
 }
 
@@ -40,11 +41,12 @@ async function updateSelectedChaptersInner(projectId: string, formData: FormData
   }
 
   const selectedChapters = formData.getAll("chapters").map(Number);
-  const { error } = await supabase
+  const { data: affected2, error } = await supabase
     .from("projects")
     .update({ selected_chapters: selectedChapters })
-    .eq("id", projectId);
+    .eq("id", projectId).select("id");
   if (error) throw error;
+  if (!affected2 || affected2.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/settings`);
   revalidatePath(`/projects/${projectId}`);
 }

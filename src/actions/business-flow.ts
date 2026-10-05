@@ -133,8 +133,9 @@ export async function deleteFlowStep(stepId: string, projectId: string, flowType
 
 async function deleteFlowStepInner(stepId: string, projectId: string, flowType: FlowType): Promise<void> {
   const supabase = await createServerActionClient();
-  const { error } = await supabase.from("flow_nodes").delete().eq("id", stepId);
+  const { data: affected1, error } = await supabase.from("flow_nodes").delete().eq("id", stepId).select("id");
   if (error) throw error;
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
 
   await regenerateEdges(projectId, flowType);
   revalidatePath(`/projects/${projectId}/business-flow`);

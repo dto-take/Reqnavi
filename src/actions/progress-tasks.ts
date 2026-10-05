@@ -148,8 +148,9 @@ async function updateProgressTaskFieldInner(
     throw new UserFacingError("終了日は開始日以降にしてください");
   }
 
-  const { error } = await supabase.from("progress_tasks").update(nextValues).eq("id", taskId);
+  const { data: affected1, error } = await supabase.from("progress_tasks").update(nextValues).eq("id", taskId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/15`);
 }
 
@@ -180,8 +181,9 @@ async function deleteProgressTaskInner(taskId: string, projectId: string): Promi
     }
   }
 
-  const { error } = await supabase.from("progress_tasks").delete().eq("id", taskId);
+  const { data: affected2, error } = await supabase.from("progress_tasks").delete().eq("id", taskId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected2 || affected2.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/15`);
 }
 
@@ -228,8 +230,9 @@ async function setPredecessorInner(taskId: string, projectId: string, predecesso
     }
   }
 
-  const { error } = await supabase.from("progress_tasks").update({ predecessor_id: predecessorId }).eq("id", taskId);
+  const { data: affected3, error } = await supabase.from("progress_tasks").update({ predecessor_id: predecessorId }).eq("id", taskId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected3 || affected3.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/15`);
 }
 
@@ -288,8 +291,9 @@ async function shiftTaskDatesInner(taskId: string, projectId: string, newStart: 
   cascade(taskId);
 
   for (const [id, values] of updates) {
-    const { error } = await supabase.from("progress_tasks").update(values).eq("id", id);
+    const { data: affected4, error } = await supabase.from("progress_tasks").update(values).eq("id", id).select("id");
     if (error) throw new UserFacingError(errorMessage(error));
+    if (!affected4 || affected4.length === 0) throw new UserFacingError("対象が見つかりません");
   }
   revalidatePath(`/projects/${projectId}/chapters/15`);
 }

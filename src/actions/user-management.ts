@@ -76,11 +76,12 @@ async function updateUserRoleInner(userId: string, formData: FormData): Promise<
     throw new UserFacingError(`不正なロールです: ${newRole}`);
   }
 
-  const { error } = await supabase
+  const { data: affected1, error } = await supabase
     .from("user_profiles")
     .update({ user_role: newRole })
-    .eq("user_id", userId);
+    .eq("user_id", userId).select("user_id");
   if (error) throw error;
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath("/admin/users");
 }
 

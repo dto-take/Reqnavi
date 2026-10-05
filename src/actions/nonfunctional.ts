@@ -135,12 +135,13 @@ export async function reactivateAspect(aspectId: string, projectId: string): Pro
 
 async function reactivateAspectInner(aspectId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  const { data: affected1, error } = await supabase
     .from("requirement_items")
     .update({ status: "se_reviewing" })
     .eq("id", aspectId)
-    .is("parent_id", null);
+    .is("parent_id", null).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 
@@ -183,12 +184,13 @@ async function unadoptAspectInner(aspectId: string, projectId: string): Promise<
   const supabase = await createServerActionClient();
   const adoptedCount = await countAspects(supabase, projectId, true);
   if (adoptedCount <= 1) throw new UserFacingError("採用中の観点を0件にはできません。");
-  const { error } = await supabase
+  const { data: affected2, error } = await supabase
     .from("requirement_items")
     .update({ status: "rejected" })
     .eq("id", aspectId)
-    .is("parent_id", null);
+    .is("parent_id", null).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected2 || affected2.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 
@@ -208,8 +210,9 @@ async function updateAspectPolicyInner(aspectId: string, projectId: string, poli
   if (isItemLocked(current.status)) throw new UserFacingError("この観点は編集できません");
 
   const newContent = { ...(current.content as AspectContent), policy };
-  const { error } = await supabase.from("requirement_items").update({ content: newContent }).eq("id", aspectId);
+  const { data: affected3, error } = await supabase.from("requirement_items").update({ content: newContent }).eq("id", aspectId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected3 || affected3.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 
@@ -344,8 +347,9 @@ async function setCheckItemJudgementInner(
   await assertAspectEditable(supabase, current.parent_id);
 
   const newContent = { ...(current.content as CheckItemContent), judgement };
-  const { error } = await supabase.from("requirement_items").update({ content: newContent }).eq("id", itemId);
+  const { data: affected4, error } = await supabase.from("requirement_items").update({ content: newContent }).eq("id", itemId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected4 || affected4.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 
@@ -365,8 +369,9 @@ async function deleteCheckItemInner(itemId: string, projectId: string): Promise<
   }
   await assertAspectEditable(supabase, current.parent_id);
 
-  const { error } = await supabase.from("requirement_items").delete().eq("id", itemId);
+  const { data: affected5, error } = await supabase.from("requirement_items").delete().eq("id", itemId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected5 || affected5.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 
@@ -379,12 +384,13 @@ export async function confirmAspect(aspectId: string, projectId: string): Promis
 
 async function confirmAspectInner(aspectId: string, projectId: string): Promise<void> {
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  const { data: affected6, error } = await supabase
     .from("requirement_items")
     .update({ status: "confirmed" })
     .eq("id", aspectId)
-    .is("parent_id", null);
+    .is("parent_id", null).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected6 || affected6.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 
@@ -408,11 +414,12 @@ async function bulkSetUnknownToNoInner(aspectId: string, projectId: string): Pro
     (i) => i.content.judgement === "unknown"
   );
   for (const item of unknownItems) {
-    const { error } = await supabase
+    const { data: affected7, error } = await supabase
       .from("requirement_items")
       .update({ content: { ...item.content, judgement: "no" } })
-      .eq("id", item.id);
+      .eq("id", item.id).select("id");
     if (error) throw new UserFacingError(errorMessage(error));
+    if (!affected7 || affected7.length === 0) throw new UserFacingError("対象が見つかりません");
   }
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
@@ -425,8 +432,9 @@ async function applyOrder(
   orderedIds: string[]
 ) {
   for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await supabase.from("requirement_items").update({ order_index: i }).eq("id", orderedIds[i]);
+    const { data: affected8, error } = await supabase.from("requirement_items").update({ order_index: i }).eq("id", orderedIds[i]).select("id");
     if (error) throw new UserFacingError(errorMessage(error));
+    if (!affected8 || affected8.length === 0) throw new UserFacingError("対象が見つかりません");
   }
 }
 
@@ -530,11 +538,12 @@ async function moveCheckItemInner(itemId: string, projectId: string, toAspectId:
   await assertAspectEditable(supabase, toAspectId);
 
   const targetIds = await fetchOrderedCheckItemIds(supabase, toAspectId);
-  const { error } = await supabase
+  const { data: affected9, error } = await supabase
     .from("requirement_items")
     .update({ parent_id: toAspectId, order_index: targetIds.length })
-    .eq("id", itemId);
+    .eq("id", itemId).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected9 || affected9.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/10`);
 }
 

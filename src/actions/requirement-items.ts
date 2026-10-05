@@ -140,10 +140,11 @@ const LOCKED_MESSAGE = "確定済み・例外承認・不採用の項目は変�
 
 async function applyOrder(supabase: Awaited<ReturnType<typeof createServerActionClient>>, orderedIds: string[]) {
   for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await supabase.from("requirement_items").update({ order_index: i }).eq("id", orderedIds[i]);
+    const { data, error } = await supabase.from("requirement_items").update({ order_index: i }).eq("id", orderedIds[i]).select("id");
     // 生のPostgrestエラーをそのままthrowすると、onClick+startTransition側でtry/catchしても
     // Server Actionの境界を越える際にフィールド値が読めなくなる（規約43）。
     if (error) throw new UserFacingError(errorMessage(error));
+    if (!data || data.length === 0) throw new UserFacingError("対象が見つかりません"); // 規約47
   }
 }
 
@@ -302,13 +303,14 @@ export async function deleteRequirementItem(itemId: string, projectId: string, c
 
 async function deleteRequirementItemInner(itemId: string, projectId: string, chapterNo: number): Promise<void> {
   const supabase = await createServerActionClient();
-  const { error } = await supabase
+  const { data: affected1, error } = await supabase
     .from("requirement_items")
     .delete()
     .eq("id", itemId)
     .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo);
+    .eq("chapter_no", chapterNo).select("id");
   if (error) throw new UserFacingError(errorMessage(error));
+  if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
 }
 

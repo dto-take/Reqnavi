@@ -1,5 +1,6 @@
 "use server";
 
+import { UserFacingError } from "@/lib/user-error";
 import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { scanContentForAmbiguousPhrases, type AmbiguousFlag } from "@/lib/ambiguous-phrases";
@@ -36,11 +37,12 @@ async function runAmbiguousCheckInner(projectId: string, chapterNo: number): Pro
     );
     const nextFlags = [...existingOtherFlags, ...dictionaryFlags];
 
-    const { error: updateError } = await supabase
+    const { data: affected1, error: updateError } = await supabase
       .from("requirement_items")
       .update({ ambiguous_flags: nextFlags })
-      .eq("id", item.id);
+      .eq("id", item.id).select("id");
     if (updateError) throw updateError;
+    if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
   }
 
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
@@ -113,7 +115,13 @@ async function runAmbiguousCheckAIInternal(projectId: string, chapterNo: number)
       },
     ];
 
-    await supabase.from("requirement_items").update({ ambiguous_flags: nextFlags }).eq("id", item.id);
+    const { data: updated, error: updateError } = await supabase
+      .from("requirement_items")
+      .update({ ambiguous_flags: nextFlags })
+      .eq("id", item.id)
+      .select("id");
+    if (updateError) throw new UserFacingError(errorMessage(updateError));
+    if (!updated || updated.length === 0) throw new UserFacingError("対象が見つかりません"); // 規約47
   }
 
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
