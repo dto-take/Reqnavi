@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAction, type ActionResult } from "@/lib/action-result";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { classifyDocument } from "@/lib/ai/classify-document";
@@ -33,12 +34,20 @@ async function isDuplicateDocument(
 }
 
 // アップロード前の確認（ブラウザはStorageへ送る前に呼ぶ。重複なら送らずにスキップする）
-export async function checkDuplicateDocument(projectId: string, fileName: string, fileSize: number): Promise<boolean> {
+export async function checkDuplicateDocument(projectId: string, fileName: string, fileSize: number): Promise<ActionResult<boolean>> {
+  return safeAction("checkDuplicateDocument", () => checkDuplicateDocumentInner(projectId, fileName, fileSize));
+}
+
+async function checkDuplicateDocumentInner(projectId: string, fileName: string, fileSize: number): Promise<boolean> {
   const supabase = await createServerActionClient();
   return isDuplicateDocument(supabase, projectId, fileName, fileSize);
 }
 
-export async function registerUploadedDocument(projectId: string, storagePath: string, fileName: string): Promise<"done" | "skipped"> {
+export async function registerUploadedDocument(projectId: string, storagePath: string, fileName: string): Promise<ActionResult<"done" | "skipped">> {
+  return safeAction("registerUploadedDocument", () => registerUploadedDocumentInner(projectId, storagePath, fileName));
+}
+
+async function registerUploadedDocumentInner(projectId: string, storagePath: string, fileName: string): Promise<"done" | "skipped"> {
   const supabase = await createServerActionClient();
 
   const { data: file, error: downloadError } = await supabase.storage

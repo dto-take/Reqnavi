@@ -23,7 +23,10 @@ const DUPLICATE_MESSAGE = "同じ名前・サイズの資料が既に登録さ�
 // storagePathの組み立ては規約35（日本語ファイル名をStorageキーに含めない）を踏襲する。
 // 戻り値：登録したら"done"、同じ名前・サイズの資料が既にあれば（Storageへ送らず）"skipped"
 async function uploadOneFile(projectId: string, file: File): Promise<"done" | "skipped"> {
-  if (await checkDuplicateDocument(projectId, file.name, file.size)) return "skipped";
+  // Server Actionの失敗（{ok:false}）は、サーバーの日本語の文言のままErrorにして、呼び出し元の個別のcatchで扱う
+  const dup = await checkDuplicateDocument(projectId, file.name, file.size);
+  if (!dup.ok) throw new Error(dup.error);
+  if (dup.data) return "skipped";
   const supabase = createClient();
   const safeExtension = file.name.match(/\.[a-zA-Z0-9]+$/)?.[0] ?? "";
   const storagePath = `${projectId}/uploads/${crypto.randomUUID()}${safeExtension}`;
@@ -31,7 +34,9 @@ async function uploadOneFile(projectId: string, file: File): Promise<"done" | "s
   const { error: uploadError } = await supabase.storage.from("project-documents").upload(storagePath, file);
   if (uploadError) throw uploadError;
 
-  return registerUploadedDocument(projectId, storagePath, file.name);
+  const reg = await registerUploadedDocument(projectId, storagePath, file.name);
+  if (!reg.ok) throw new Error(reg.error);
+  return reg.data;
 }
 
 export function DocumentUploadZone({ projectId }: { projectId: string }) {
@@ -65,7 +70,7 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
         if (queue[i].status !== "pending") continue;
         setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: "uploading" } : item)));
 
-        // uploadOneFile・registerUploadedDocumentは、成功時にdone／skippedを返し、失敗時にthrowする
+        // uploadOneFileは、成功時にdone／skippedを返し、失敗時にthrowする（Server Actionの{ok:false}はErrorにして投げ直している）
         // 通常の非同期関数（useActionStateパターンではない）。onClick+startTransition経由の
         // 呼び出しなのでerror.tsxには届かず、ここで明示的にtry/catchする（規約44）。
         try {
