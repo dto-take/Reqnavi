@@ -4,6 +4,7 @@ import { RoleBadge, type Role } from "@/components/ui/role-badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { InlineErrorForm } from "@/components/ui/inline-error-form";
 import { createServerActionClient } from "@/lib/supabase/server";
 import { getIsProjectMember } from "@/lib/project-data";
 import { canAddProjectMember } from "@/lib/permissions";
@@ -43,10 +44,10 @@ export default async function ProjectMembersPage({ params }: { params: Promise<{
       <div className="flex justify-between items-center mb-2">
         <span className="text-xs text-faint">{members?.length ?? 0}名</span>
         {canAdd && (
-          <form action={addProjectMemberByEmail.bind(null, id)} className="flex gap-2">
+          <InlineErrorForm action={addProjectMemberByEmail.bind(null, id)} className="flex flex-wrap gap-2" successMessage="メンバーを追加しました">
             <Input name="email" type="email" placeholder="メールアドレス" required />
             <Button type="submit" variant="secondary" size="md">追加</Button>
-          </form>
+          </InlineErrorForm>
         )}
       </div>
 

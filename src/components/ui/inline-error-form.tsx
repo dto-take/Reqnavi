@@ -23,6 +23,8 @@ export function InlineErrorForm({
   const [state, formAction] = useActionState(action, { error: null });
   const { show } = useToast();
   const hasSubmitted = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitted = useRef<FormData | null>(null);
 
   useEffect(() => {
     if (!hasSubmitted.current) {
@@ -32,12 +34,26 @@ export function InlineErrorForm({
     if (!state.error && successMessage) {
       show(successMessage);
     }
+    // 失敗時は、リセットされた入力欄に、送信した値を戻す（入力した内容を消さない）
+    if (state.error && formRef.current && submitted.current) {
+      for (const [name, value] of submitted.current.entries()) {
+        const el = formRef.current.elements.namedItem(name);
+        if (typeof value === "string" && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el.type !== "hidden") el.value = value;
+      }
+    }
   }, [state, successMessage, show]);
 
   return (
-    <form action={formAction} className={className}>
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={(e) => {
+        submitted.current = new FormData(e.currentTarget);
+      }}
+      className={className}
+    >
       {children}
-      {state.error && <p className="text-xs text-[#A23B2E] mt-1 col-span-full">{state.error}</p>}
+      {state.error && <p role="alert" data-form-error className="text-xs text-[#A23B2E] mt-1 col-span-full">{state.error}</p>}
     </form>
   );
 }

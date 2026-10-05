@@ -3,6 +3,7 @@
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
+import { safeAction, type ActionResult } from "@/lib/action-result";
 import { fetchAllPages, fetchAllPagesByKeys } from "@/lib/paged-select";
 import { groupByCategory, UNCATEGORIZED_LABEL } from "@/lib/requirement-grouping";
 import { revalidatePath } from "next/cache";
@@ -239,18 +240,20 @@ export async function updateRequirementItemContent(
   projectId: string,
   chapterNo: number,
   content: Record<string, string>
-) {
-  const supabase = await createServerActionClient();
-  const { data, error } = await supabase
-    .from("requirement_items")
-    .update({ content, updated_at: new Date().toISOString() })
-    .eq("id", itemId)
-    .eq("project_id", projectId)
-    .in("status", UNLOCKED_STATUSES)
-    .select("id");
-  if (error) throw new UserFacingError(errorMessage(error));
-  if (!data || data.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
-  revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+): Promise<ActionResult> {
+  return safeAction("updateRequirementItemContent", async () => {
+    const supabase = await createServerActionClient();
+    const { data, error } = await supabase
+      .from("requirement_items")
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq("id", itemId)
+      .eq("project_id", projectId)
+      .in("status", UNLOCKED_STATUSES)
+      .select("id");
+    if (error) throw new UserFacingError(errorMessage(error));
+    if (!data || data.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
+    revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+  });
 }
 
 export async function markAsExceptionApproved(
@@ -404,17 +407,19 @@ export async function updateRequirementItemStatus(
   projectId: string,
   chapterNo: number,
   status: RequirementItem["status"]
-) {
-  const supabase = await createServerActionClient();
-  // 状態の遷移は未確定の項目からのみ（確定の解除は設けない）。更新件数が0ならロックとみなして拒否する
-  const { data, error } = await supabase
-    .from("requirement_items")
-    .update({ status })
-    .eq("id", itemId)
-    .eq("project_id", projectId)
-    .in("status", UNLOCKED_STATUSES)
-    .select("id");
-  if (error) throw new UserFacingError(errorMessage(error));
-  if (!data || data.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
-  revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+): Promise<ActionResult> {
+  return safeAction("updateRequirementItemStatus", async () => {
+    const supabase = await createServerActionClient();
+    // 状態の遷移は未確定の項目からのみ（確定の解除は設けない）。更新件数が0ならロックとみなして拒否する
+    const { data, error } = await supabase
+      .from("requirement_items")
+      .update({ status })
+      .eq("id", itemId)
+      .eq("project_id", projectId)
+      .in("status", UNLOCKED_STATUSES)
+      .select("id");
+    if (error) throw new UserFacingError(errorMessage(error));
+    if (!data || data.length === 0) throw new UserFacingError(LOCKED_MESSAGE);
+    revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
+  });
 }

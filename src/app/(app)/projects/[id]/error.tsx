@@ -23,6 +23,7 @@ export default function ProjectErrorBoundary({
       <Button type="button" variant="primary" size="md" onClick={reset}>
         再試行
       </Button>
+      {error.digest && <p data-error-id className="mt-3 text-[10px] text-faint">エラーID：{error.digest}</p>}
     </Card>
   );
 }

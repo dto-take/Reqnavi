@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { canCreateProject } from "@/lib/permissions";
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { fetchAllPages } from "@/lib/paged-select";
@@ -202,7 +203,12 @@ async function purgeProjectFiles(projectId: string) {
   if (remaining.length > 0) throw new Error(`storage files remain: ${remaining.length}`);
 }
 
-export async function deleteProject(projectId: string, formData: FormData) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する。成功時はredirect）
+export async function deleteProject(projectId: string, _prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("deleteProject", () => deleteProjectInner(projectId, formData));
+}
+
+async function deleteProjectInner(projectId: string, formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (claims?.claims?.user_role !== "admin") {

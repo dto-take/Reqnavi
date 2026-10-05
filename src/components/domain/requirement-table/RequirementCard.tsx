@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { runAction } from "@/lib/run-action";
 import {
   updateRequirementItemContent,
   updateRequirementItemStatus,
@@ -137,22 +138,14 @@ export function RequirementCard({
   function handleContentChange(key: string, value: string) {
     const nextContent = { ...item.content, [key]: value };
     startTransition(async () => {
-      try {
-        await updateRequirementItemContent(item.id, projectId, chapterNo, nextContent);
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      await runAction(() => updateRequirementItemContent(item.id, projectId, chapterNo, nextContent), show);
     });
   }
 
   function handleConfirm() {
     startTransition(async () => {
-      try {
-        await updateRequirementItemStatus(item.id, projectId, chapterNo, "confirmed");
-        show("確定しました");
-      } catch (e) {
-        show(errorMessage(e), "error");
-      }
+      const r = await runAction(() => updateRequirementItemStatus(item.id, projectId, chapterNo, "confirmed"), show);
+      if (r) show("確定しました");
     });
   }
 

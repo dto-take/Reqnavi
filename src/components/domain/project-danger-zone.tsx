@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import { deleteProject } from "@/actions/projects";
 import { Input } from "@/components/ui/input";
 
 export function ProjectDangerZone({ projectId, projectName }: { projectId: string; projectName: string }) {
   const [inputValue, setInputValue] = useState("");
   const canDelete = inputValue === projectName;
+  // 失敗は戻り値のerrorでフォーム内に表示する（入力した案件名は制御入力のため消えない）。成功時はredirect
+  const [state, formAction] = useActionState(deleteProject.bind(null, projectId), { error: null });
 
   return (
     <div className="border border-(--status-needhearing-text) rounded-lg p-4 mt-6">
@@ -14,7 +16,7 @@ export function ProjectDangerZone({ projectId, projectName }: { projectId: strin
       <p className="text-xs text-secondary mb-3">
         この案件と、紐づく全てのデータ（要件項目・資料・業務フロー・進捗記録・ベースライン・変更申請等）が完全に削除されます。この操作は取り消せません。
       </p>
-      <form action={deleteProject.bind(null, projectId)} className="flex flex-col gap-2">
+      <form action={formAction} className="flex flex-col gap-2">
         <label className="text-xs text-secondary">
           削除するには、案件名「{projectName}」を正確に入力してください
         </label>
@@ -34,6 +36,7 @@ export function ProjectDangerZone({ projectId, projectName }: { projectId: strin
         >
           この案件を完全に削除する
         </button>
+        {state.error && <p role="alert" data-form-error className="text-xs text-(--status-needhearing-text)">{state.error}</p>}
       </form>
     </div>
   );

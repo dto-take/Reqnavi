@@ -4,6 +4,7 @@ import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { errorMessage } from "@/lib/error-message";
 import { UserFacingError } from "@/lib/user-error";
+import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { revalidatePath } from "next/cache";
 
 async function assertAdmin(supabase: Awaited<ReturnType<typeof createServerActionClient>>) {
@@ -67,7 +68,12 @@ export async function createPartnerAccount(
   }
 }
 
-export async function addProjectMemberByEmail(projectId: string, formData: FormData) {
+// useActionStateの形（失敗は戻り値のerrorでフォーム内に表示する）
+export async function addProjectMemberByEmail(projectId: string, _prevState: FormActionState, formData: FormData): Promise<FormActionState> {
+  return safeFormAction("addProjectMemberByEmail", () => addProjectMemberByEmailInner(projectId, formData));
+}
+
+async function addProjectMemberByEmailInner(projectId: string, formData: FormData): Promise<void> {
   const supabase = await createServerActionClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (!["admin", "pm"].includes(claims?.claims?.user_role as string)) {

@@ -91,8 +91,13 @@ export function RequirementGroup({
     if (targets.length === 0) return;
     startTransition(async () => {
       try {
-        await Promise.all(targets.map((i) => updateRequirementItemStatus(i.id, projectId, chapterNo, "confirmed")));
-        show(`${targets.length}件を確定しました`);
+        const results = await Promise.all(targets.map((i) => updateRequirementItemStatus(i.id, projectId, chapterNo, "confirmed")));
+        const failed = results.filter((r) => !r.ok);
+        if (failed.length === 0) show(`${targets.length}件を確定しました`);
+        else {
+          const first = failed[0];
+          show(`${targets.length - failed.length}件を確定しました。${failed.length}件は確定できませんでした（${first.ok ? "" : first.error}）`, "error");
+        }
       } catch (e) {
         show(errorMessage(e), "error");
       }
