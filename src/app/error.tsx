@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { networkErrorMessage } from "@/lib/error-message";
 
 export default function GlobalErrorBoundary({
   error,
@@ -16,7 +17,7 @@ export default function GlobalErrorBoundary({
       <p className="text-sm text-secondary mb-4">
         {error.name === "AiCallError" || error.name === "UserFacingError"
           ? error.message
-          : "予期しないエラーが発生しました。しばらく時間を置いて再度お試しください。"}
+          : (networkErrorMessage(error) ?? "予期しないエラーが発生しました。しばらく時間を置いて再度お試しください。")}
       </p>
       <Button type="button" variant="primary" size="md" onClick={reset}>
         再試行

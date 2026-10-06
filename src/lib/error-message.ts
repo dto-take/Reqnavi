@@ -40,6 +40,11 @@ function rawMessage(e: unknown): string {
   return "エラーが発生しました";
 }
 
+// 通信エラー（Failed to fetch等）なら日本語の文言を返す。該当しなければnull（error.tsxが、通信エラーのときだけ原因を表示するために使う）
+export function networkErrorMessage(e: unknown): string | null {
+  return NETWORK_ERROR_MESSAGES.has(rawMessage(e).trim().toLowerCase()) ? NETWORK_ERROR_JA : null;
+}
+
 // 既知の英語メッセージ（対応表・通信エラー）なら日本語を返す。該当しなければnull
 export function knownErrorMessage(e: unknown): string | null {
   const message = rawMessage(e);

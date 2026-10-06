@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { runAction } from "@/lib/run-action";
+import { errorMessage } from "@/lib/error-message";
 import {
   updateRequirementItemContent,
   updateRequirementItemStatus,
@@ -178,9 +179,15 @@ export function RequirementCard({
   function handleSuggest() {
     setSuggesting(true);
     startTransition(async () => {
-      const result = await suggestPlatformFeature(item.id, projectId, chapterNo);
-      setSuggesting(false);
-      show(result.error ?? "提案を反映しました", result.error ? "error" : "success");
+      // 通信断（Actionの呼び出し自体の例外）も捕まえ、「処理中」の状態は必ず戻す
+      try {
+        const result = await suggestPlatformFeature(item.id, projectId, chapterNo);
+        show(result.error ?? "提案を反映しました", result.error ? "error" : "success");
+      } catch (e) {
+        show(errorMessage(e), "error");
+      } finally {
+        setSuggesting(false);
+      }
     });
   }
 

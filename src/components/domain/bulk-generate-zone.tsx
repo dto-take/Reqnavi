@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { generateDraft } from "@/actions/ai-draft";
 import { useToast } from "@/components/ui/toast";
+import { errorMessage } from "@/lib/error-message";
 import { Spinner } from "@/components/ui/spinner";
 
 type ChapterOption = { chapterNo: number; chapterName: string; templateType: "A" | "B" | "C" };
@@ -55,14 +56,13 @@ export function BulkGenerateZone({
         // generateDraftはuseActionState向けのシグネチャ（末尾にprevState・formDataを取り、
         // 失敗してもthrowせず{error: string}を返す設計。documents.tsのuploadDocumentと同様の
         // 理由：Server Action境界を越える際のエラーメッセージ欠落を避けるため）。
-        const result = await generateDraft(
-          projectId,
-          tenantId,
-          chapter.chapterNo,
-          chapter.templateType,
-          { error: null },
-          new FormData()
-        );
+        // 通信断（Actionの呼び出し自体の例外）は、その章の失敗として日本語で表示し、次の章へ進む
+        let result: { error: string | null };
+        try {
+          result = await generateDraft(projectId, tenantId, chapter.chapterNo, chapter.templateType, { error: null }, new FormData());
+        } catch (e) {
+          result = { error: errorMessage(e) };
+        }
         if (result.error) {
           setStatuses((s) => ({ ...s, [chapter.chapterNo]: { status: "error", error: result.error ?? undefined } }));
           errorCount++;

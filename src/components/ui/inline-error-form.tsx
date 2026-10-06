@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import { useSafeActionState } from "@/lib/use-safe-action-state";
 import { useToast } from "@/components/ui/toast";
 
 type ActionResult = { error: string | null };
@@ -20,7 +21,8 @@ export function InlineErrorForm({
   className?: string;
   successMessage?: string;
 }) {
-  const [state, formAction] = useActionState(action, { error: null });
+  // 通信断（Actionの呼び出し自体の例外）は、useSafeActionStateが{error: 日本語}に変換する
+  const [state, formAction] = useSafeActionState(action);
   const { show } = useToast();
   const hasSubmitted = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);

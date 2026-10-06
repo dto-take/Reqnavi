@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useSafeActionState } from "@/lib/use-safe-action-state";
 import { deleteProject } from "@/actions/projects";
 import { Input } from "@/components/ui/input";
 
@@ -8,7 +9,7 @@ export function ProjectDangerZone({ projectId, projectName }: { projectId: strin
   const [inputValue, setInputValue] = useState("");
   const canDelete = inputValue === projectName;
   // 失敗は戻り値のerrorでフォーム内に表示する（入力した案件名は制御入力のため消えない）。成功時はredirect
-  const [state, formAction] = useActionState(deleteProject.bind(null, projectId), { error: null });
+  const [state, formAction] = useSafeActionState(deleteProject.bind(null, projectId));
 
   return (
     <div className="border border-(--status-needhearing-text) rounded-lg p-4 mt-6">
