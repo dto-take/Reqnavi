@@ -4,6 +4,8 @@ import { safeAction, type ActionResult } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
+import { AI_OUTPUT_FORMAT_ERROR, parseAiJson } from "@/lib/ai/parse-ai-json";
+import { deleteRowsByIds } from "@/lib/delete-rows";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage, knownErrorMessage, GENERIC_ERROR_JA } from "@/lib/error-message";
 import { nodePosition } from "@/lib/screen-flow/derive";
@@ -167,6 +169,15 @@ async function generateScreenFlowSuggestionsInner(projectId: string): Promise<{ 
       ...rejectedTransitions.map((t) => `遷移：${t.from} → ${t.to}`),
     ].join("\n") || "（なし）";
 
+  // 置き換え前の未対応（open）の提案のidを控える。削除は、新しい提案の保存に成功してから行う
+  const { data: oldOpenRows, error: oldOpenError } = await supabase
+    .from("screen_flow_suggestions")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("state", "open");
+  if (oldOpenError) throw new UserFacingError(errorMessage(oldOpenError));
+  const oldOpenIds = ((oldOpenRows as unknown as { id: string }[] | null) ?? []).map((r) => r.id);
+
   const { id: promptId, body: promptBody } = await getActivePrompt("suggest_screen_flow_diff");
   const filledPrompt = promptBody
     .replace("{screens}", () => screensText)
@@ -184,10 +195,10 @@ async function generateScreenFlowSuggestionsInner(projectId: string): Promise<{ 
     })
   );
 
-  const cleaned = (response.text ?? "{}").replace(/```json|```/g, "").trim();
-  let json: unknown = {};
+  // JSONとして読めない出力も、構造の検証の失敗と同じ扱い（記録して、同じ文言で知らせる）
+  let json: unknown = null;
   try {
-    json = JSON.parse(cleaned);
+    json = parseAiJson(response.text);
   } catch {
     json = null;
   }
@@ -203,7 +214,7 @@ async function generateScreenFlowSuggestionsInner(projectId: string): Promise<{ 
     await supabase
       .from("ai_interactions")
       .insert({ project_id: projectId, prompt_id: promptId, input_summary: inputSummary, output: { error: "validation_failed" } });
-    throw new UserFacingError("AIの出力形式が不正でした。");
+    throw new UserFacingError(AI_OUTPUT_FORMAT_ERROR);
   }
 
   const normalized = normalizeSuggestions(parsed.data, {
@@ -239,48 +250,57 @@ async function generateScreenFlowSuggestionsInner(projectId: string): Promise<{ 
     },
   });
 
-  // 保存の前に、未対応（open）の提案を削除して置き換える。adopted/rejectedは履歴として残す。
-  const { error: delError } = await supabase
-    .from("screen_flow_suggestions")
-    .delete()
-    .eq("project_id", projectId)
-    .eq("state", "open");
-  if (delError) throw new UserFacingError(errorMessage(delError));
-
   const idByKey = new Map<string, string>();
-  for (const n of normalized.nodes) {
-    const pos = placed.get(n.key)!;
-    const { data, error } = await supabase
-      .from("screen_flow_suggestions")
-      .insert({
-        project_id: projectId,
-        tenant_id: tenantId,
-        kind: "node",
-        payload: { name: n.name, function_item_id: n.function_item_id, x: pos.x, y: pos.y } satisfies NodePayload,
-        why: n.why,
-      })
-      .select("id")
-      .single();
-    if (error || !data) throw new UserFacingError(error ? errorMessage(error) : "提案の保存に失敗しました");
-    idByKey.set(n.key, (data as unknown as { id: string }).id);
+  // 新しい提案を保存する。途中で失敗したら、保存済みの新しい行を消し、元の提案はそのまま残す（規約70）。
+  const newIds: string[] = [];
+  try {
+    for (const n of normalized.nodes) {
+      const pos = placed.get(n.key)!;
+      const { data, error } = await supabase
+        .from("screen_flow_suggestions")
+        .insert({
+          project_id: projectId,
+          tenant_id: tenantId,
+          kind: "node",
+          payload: { name: n.name, function_item_id: n.function_item_id, x: pos.x, y: pos.y } satisfies NodePayload,
+          why: n.why,
+        })
+        .select("id")
+        .single();
+      if (error || !data) throw new UserFacingError(error ? errorMessage(error) : "提案の保存に失敗しました");
+      const newId = (data as unknown as { id: string }).id;
+      idByKey.set(n.key, newId);
+      newIds.push(newId);
+    }
+
+    const nameOfNode = (id: string) => nodeById.get(id)?.label ?? "";
+    const nameOfKey = (key: string) => normalized.nodes.find((n) => n.key === key)?.name ?? "";
+    const toEndpoint = (r: EndpointRef): SuggestionEndpoint =>
+      r.ref === "node"
+        ? { ref: "node", id: r.id, name: nameOfNode(r.id) }
+        : { ref: "suggestion", id: idByKey.get(r.key)!, name: nameOfKey(r.key) };
+    const transitionRows = normalized.transitions.map((t) => ({
+      project_id: projectId,
+      tenant_id: tenantId,
+      kind: "transition",
+      payload: { from: toEndpoint(t.from), to: toEndpoint(t.to), label: t.label } satisfies TransitionPayload,
+      why: t.why,
+    }));
+    if (transitionRows.length > 0) {
+      const { data, error } = await supabase.from("screen_flow_suggestions").insert(transitionRows).select("id");
+      if (error) throw new UserFacingError(errorMessage(error));
+      for (const r of (data as unknown as { id: string }[] | null) ?? []) newIds.push(r.id);
+    }
+  } catch (e) {
+    await deleteRowsByIds(supabase, "screen_flow_suggestions", newIds, null);
+    throw e;
   }
 
-  const nameOfNode = (id: string) => nodeById.get(id)?.label ?? "";
-  const nameOfKey = (key: string) => normalized.nodes.find((n) => n.key === key)?.name ?? "";
-  const toEndpoint = (r: EndpointRef): SuggestionEndpoint =>
-    r.ref === "node"
-      ? { ref: "node", id: r.id, name: nameOfNode(r.id) }
-      : { ref: "suggestion", id: idByKey.get(r.key)!, name: nameOfKey(r.key) };
-  const transitionRows = normalized.transitions.map((t) => ({
-    project_id: projectId,
-    tenant_id: tenantId,
-    kind: "transition",
-    payload: { from: toEndpoint(t.from), to: toEndpoint(t.to), label: t.label } satisfies TransitionPayload,
-    why: t.why,
-  }));
-  if (transitionRows.length > 0) {
-    const { error } = await supabase.from("screen_flow_suggestions").insert(transitionRows);
-    if (error) throw new UserFacingError(errorMessage(error));
+  // 保存に成功したので、置き換え前の未対応（open）の提案を削除する。adopted/rejectedは履歴として残す。
+  // （その間に採用・見送りされたものは、stateがopenでなくなっているため消えない）
+  const delError = await deleteRowsByIds(supabase, "screen_flow_suggestions", oldOpenIds, { column: "state", value: "open" });
+  if (delError) {
+    throw new UserFacingError("新しい提案は保存しましたが、以前の提案の削除に失敗しました。重複している提案を確認してください。");
   }
 
   revalidatePath(path(projectId));

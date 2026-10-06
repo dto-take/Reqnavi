@@ -2,6 +2,7 @@ import { GoogleGenAI, type PartUnion } from "@google/genai";
 import { z } from "zod";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
+import { parseAiJson } from "@/lib/ai/parse-ai-json";
 import { extractContent } from "@/lib/ai/extract-content";
 import { DOCUMENT_EXCERPT_MAX_LENGTH } from "@/lib/ai/excerpt-limit";
 import type { createServerActionClient } from "@/lib/supabase/server";
@@ -80,7 +81,7 @@ export async function classifyDocument(file: Blob, fileName: string, record?: Cl
     })
   );
 
-  const parsed = ClassificationSchema.safeParse(JSON.parse(response.text ?? "{}"));
+  const parsed = ClassificationSchema.safeParse(parseAiJson(response.text));
   // 画像・テキスト以外の形式（PDF・Office等）で、文字を取り出せず、PDF本体も渡せなかった場合
   const isTextFormat = /.(txt|md)$/i.test(fileName);
   const textUnavailable = !pdfBase64 && extracted.kind !== "image" && !isTextFormat && textLength === 0;

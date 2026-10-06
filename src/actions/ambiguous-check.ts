@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
+import { parseAiJson } from "@/lib/ai/parse-ai-json";
 import { errorMessage } from "@/lib/error-message";
 import { fetchAllPages } from "@/lib/paged-select";
 import { CHAPTER_NAMES } from "@/lib/chapters";
@@ -105,7 +106,7 @@ async function runAmbiguousCheckAIInternal(projectId: string, chapterNo: number)
       })
     );
 
-    const parsed = AiAmbiguitySchema.safeParse(JSON.parse(response.text ?? "{}"));
+    const parsed = AiAmbiguitySchema.safeParse(parseAiJson(response.text));
     await supabase.from("ai_interactions").insert({
       project_id: projectId,
       prompt_id: promptId,

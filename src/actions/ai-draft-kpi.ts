@@ -3,6 +3,9 @@
 import { createServerActionClient } from "@/lib/supabase/server";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
+import { AI_OUTPUT_FORMAT_ERROR, parseAiJson } from "@/lib/ai/parse-ai-json";
+import { fetchAllPages } from "@/lib/paged-select";
+import { deleteRowsByIds } from "@/lib/delete-rows";
 import { extractContent } from "@/lib/ai/extract-content";
 import { DOCUMENT_EXCERPT_MAX_LENGTH } from "@/lib/ai/excerpt-limit";
 import { UserFacingError } from "@/lib/user-error";
@@ -45,6 +48,20 @@ async function generateKpiDraftInternal(projectId: string, tenantId: string) {
     })
   );
 
+  // 置き換え前のAI素案（ai_draft）のidを控える。削除は、新しいKPIの保存に成功してから行う（規約70）。
+  // se_reviewing・confirmed等の人が触れた項目は対象外。
+  const oldDrafts = await fetchAllPages<{ id: string }>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("chapter_no", 4)
+      .eq("status", "ai_draft")
+      .order("id")
+      .range(from, to)
+  );
+  const oldDraftIds = oldDrafts.map((d) => d.id);
+
   const { id: promptId, body: promptBody } = await getActivePrompt("extract_kpi_tree");
   const filledPrompt = promptBody.replace("{document_excerpts}", excerpts.join("\n\n"));
 
@@ -58,8 +75,7 @@ async function generateKpiDraftInternal(projectId: string, tenantId: string) {
     })
   );
 
-  const cleaned = (response.text ?? "{}").replace(/```json|```/g, "").trim();
-  const parsed = KpiTreeResponseSchema.safeParse(JSON.parse(cleaned));
+  const parsed = KpiTreeResponseSchema.safeParse(parseAiJson(response.text));
 
   await supabase.from("ai_interactions").insert({
     project_id: projectId,
@@ -68,28 +84,38 @@ async function generateKpiDraftInternal(projectId: string, tenantId: string) {
     output: parsed.success ? parsed.data : { error: "validation_failed" },
   });
 
-  if (!parsed.success) throw new UserFacingError("AIの出力形式が不正でした。");
+  if (!parsed.success) throw new UserFacingError(AI_OUTPUT_FORMAT_ERROR);
 
-  // 再生成＝作り直しの意図。se_reviewing・confirmed等の人が触れた項目は対象外
-  const { error: deleteDraftError } = await supabase
-    .from("requirement_items")
-    .delete()
-    .eq("project_id", projectId)
-    .eq("chapter_no", 4)
-    .eq("status", "ai_draft");
-  if (deleteDraftError) throw deleteDraftError;
-
-  for (const goal of parsed.data.goals) {
-    const goalId = await insertKpiNode(supabase, projectId, tenantId, null, "ゴール", goal.text);
-    for (const objective of goal.objectives) {
-      const objectiveId = await insertKpiNode(supabase, projectId, tenantId, goalId, "目標", objective.text);
-      for (const strategy of objective.strategies) {
-        const strategyId = await insertKpiNode(supabase, projectId, tenantId, objectiveId, "戦略", strategy.text);
-        for (const tactic of strategy.tactics) {
-          await insertKpiNode(supabase, projectId, tenantId, strategyId, "戦術", tactic);
+  // 新しいKPIを保存する。途中で失敗したら、保存済みの新しい行を消し、元の素案はそのまま残す。
+  const newIds: string[] = [];
+  const insert = async (parentId: string | null, level: KpiLevel, text: string) => {
+    const id = await insertKpiNode(supabase, projectId, tenantId, parentId, level, text);
+    newIds.push(id);
+    return id;
+  };
+  try {
+    for (const goal of parsed.data.goals) {
+      const goalId = await insert(null, "ゴール", goal.text);
+      for (const objective of goal.objectives) {
+        const objectiveId = await insert(goalId, "目標", objective.text);
+        for (const strategy of objective.strategies) {
+          const strategyId = await insert(objectiveId, "戦略", strategy.text);
+          for (const tactic of strategy.tactics) {
+            await insert(strategyId, "戦術", tactic);
+          }
         }
       }
     }
+  } catch (e) {
+    // 親子の外部キー（on delete cascadeなし）があるため、全件を1回の文で消す
+    await deleteRowsByIds(supabase, "requirement_items", newIds, null, Infinity);
+    throw e;
+  }
+
+  // 保存に成功したので、置き換え前のAI素案を削除する（statusがai_draftのままのものだけ）
+  const deleteError = await deleteRowsByIds(supabase, "requirement_items", oldDraftIds, { column: "status", value: "ai_draft" }, Infinity);
+  if (deleteError) {
+    throw new UserFacingError("新しいKPIは保存しましたが、以前のAI素案の削除に失敗しました。重複している項目を確認してください。");
   }
 
   revalidatePath(`/projects/${projectId}/chapters/4`);

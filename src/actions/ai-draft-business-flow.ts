@@ -3,6 +3,7 @@
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
+import { AI_OUTPUT_FORMAT_ERROR, parseAiJson } from "@/lib/ai/parse-ai-json";
 import { extractContent } from "@/lib/ai/extract-content";
 import { DOCUMENT_EXCERPT_MAX_LENGTH } from "@/lib/ai/excerpt-limit";
 import { regenerateEdges, type FlowType } from "@/actions/business-flow";
@@ -79,8 +80,7 @@ async function generateBusinessFlowDraftInternal(projectId: string, flowType: Fl
     })
   );
 
-  const cleaned = (response.text ?? "{}").replace(/```json|```/g, "").trim();
-  const parsed = FlowResponseSchema.safeParse(JSON.parse(cleaned));
+  const parsed = FlowResponseSchema.safeParse(parseAiJson(response.text));
 
   await supabase.from("ai_interactions").insert({
     project_id: projectId,
@@ -89,7 +89,7 @@ async function generateBusinessFlowDraftInternal(projectId: string, flowType: Fl
     output: parsed.success ? parsed.data : { error: "validation_failed" },
   });
 
-  if (!parsed.success) throw new UserFacingError("AIの出力形式が不正でした。");
+  if (!parsed.success) throw new UserFacingError(AI_OUTPUT_FORMAT_ERROR);
 
   const rows = parsed.data.steps.map((step, index) => ({
     project_id: projectId,

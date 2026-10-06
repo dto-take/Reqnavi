@@ -7,6 +7,7 @@ import { errorMessage } from "@/lib/error-message";
 import { isItemLocked } from "@/lib/item-lock";
 import { getActivePrompt } from "@/lib/ai/prompts";
 import { callGeminiSafely } from "@/lib/ai/gemini-error";
+import { AI_OUTPUT_FORMAT_ERROR, parseAiJson } from "@/lib/ai/parse-ai-json";
 import { fetchOtherChapterConfirmedContext } from "@/lib/ai/other-chapter-context";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -277,10 +278,9 @@ async function suggestKpiCandidatesInner(
     ai.models.generateContent({ model: "gemini-3.6-flash", contents: filledPrompt })
   );
 
-  const cleaned = (response.text ?? "{}").replace(/```json|```/g, "").trim();
   const parsed = z
     .object({ candidates: z.array(z.object({ text: z.string(), why: z.string() })) })
-    .safeParse(JSON.parse(cleaned));
+    .safeParse(parseAiJson(response.text));
 
   await supabase.from("ai_interactions").insert({
     project_id: projectId,
@@ -289,7 +289,7 @@ async function suggestKpiCandidatesInner(
     output: parsed.success ? parsed.data : { error: "validation_failed" },
   });
 
-  if (!parsed.success) throw new UserFacingError("AIの出力形式が不正でした。");
+  if (!parsed.success) throw new UserFacingError(AI_OUTPUT_FORMAT_ERROR);
   return parsed.data.candidates;
 }
 
