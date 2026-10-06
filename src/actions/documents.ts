@@ -118,7 +118,7 @@ async function registerCore(
   let tags: string[] = [];
   let classificationFailed = false;
   try {
-    tags = (await classifyDocument(file, fileName)).tags;
+    tags = (await classifyDocument(file, fileName, { supabase, projectId })).tags;
   } catch (e) {
     classificationFailed = true;
     console.error("[registerUploadedDocument] 分類に失敗したため、未分類で登録します:", e instanceof Error ? e.message : e);
@@ -156,7 +156,7 @@ async function reclassifyDocumentInternal(documentId: string, projectId: string)
     .download(doc.storage_path);
   if (downloadError || !file) throw downloadError ?? new UserFacingError("資料のダウンロードに失敗しました");
 
-  const classification = await classifyDocument(file, doc.file_name);
+  const classification = await classifyDocument(file, doc.file_name, { supabase, projectId });
 
   const { data: affected1, error: updateError } = await supabase
     .from("source_documents")

@@ -48,10 +48,13 @@ export async function extractContent(file: Blob, fileName: string): Promise<Extr
       // 静的importだとTurbopackのSSRバンドルでOfficeParserが未定義になる事象を確認したため、
       // 指示書どおり動的importを使う（Step1の注意事項で想定されていた問題）。
       const { parseOffice } = await import("officeparser");
-      const ast = await parseOffice(buffer);
+      // 本番ビルドのサーバー上では、officeparserのバッファからの形式の自動判定が失敗する（全てのPDF・Officeファイルが
+      // 抽出できず「ファイル名からの推測」になっていた）ため、拡張子から決めた形式を明示する。
+      const ast = await parseOffice(buffer, { fileType: ext.slice(1) as "pdf" | "docx" | "xlsx" | "pptx" });
       const { value: text } = await ast.to("text");
       return { kind: "text", content: text };
-    } catch {
+    } catch (e) {
+      console.error("[extractContent] テキストの抽出に失敗:", fileName, e instanceof Error ? e.message : e);
       return { kind: "unsupported" };
     }
   }
