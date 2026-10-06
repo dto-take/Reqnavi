@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { runAction } from "@/lib/run-action";
+import { SavedField } from "@/components/ui/saved-field";
 import { errorMessage } from "@/lib/error-message";
 import {
   updateRequirementItemContent,
@@ -135,10 +136,14 @@ export function RequirementCard({
   const showBodyHighlightView = hasBodyHighlight && (locked || !bodyEditing);
   const [activeAmbiguousReason, setActiveAmbiguousReason] = useState<string | null>(null);
 
-  function handleContentChange(key: string, value: string) {
+  // 入力欄の保存（SavedFieldのsave）。成功したらtrue、失敗（ok:false・通信断）はfalse（トーストはrunActionが1件出す）
+  function saveContent(key: string, value: string): Promise<boolean> {
     const nextContent = { ...item.content, [key]: value };
-    startTransition(async () => {
-      await runAction(() => updateRequirementItemContent(item.id, projectId, chapterNo, nextContent), show);
+    return new Promise((resolve) => {
+      startTransition(async () => {
+        const r = await runAction(() => updateRequirementItemContent(item.id, projectId, chapterNo, nextContent), show);
+        resolve(!!r);
+      });
     });
   }
 
@@ -315,19 +320,24 @@ export function RequirementCard({
                 インライン編集パターン（Textarea variant="bare"）を保ちつつ、太字・
                 通常よりやや大きい見た目にすることで指示書の見た目の意図を満たす。 */}
             {showTitle && (
-              <Textarea
-                variant="bare"
-                rows={1}
-                ref={(el: HTMLTextAreaElement | null) => {
-                  if (el) autoGrowTextarea(el);
-                }}
-                defaultValue={titleValue ?? ""}
-                onBlur={(e) => handleContentChange("name", e.target.value)}
-                onInput={(e) => autoGrowTextarea(e.currentTarget)}
-                disabled={locked}
-                placeholder="＋ 見出しを入力"
-                className="resize-none overflow-hidden text-sm font-semibold text-primary px-0"
-              />
+              <SavedField id={`${item.id}-name`} value={titleValue ?? ""} save={(v) => saveContent("name", v)}>
+                {(f) => (
+                  <Textarea
+                    variant="bare"
+                    rows={1}
+                    ref={(el: HTMLTextAreaElement | null) => {
+                      if (el) autoGrowTextarea(el);
+                    }}
+                    value={f.value}
+                    onChange={(e) => f.onChange(e.target.value)}
+                    onBlur={(e) => f.commit(e.target.value)}
+                    onInput={(e) => autoGrowTextarea(e.currentTarget)}
+                    disabled={locked}
+                    placeholder="＋ 見出しを入力"
+                    className="resize-none overflow-hidden text-sm font-semibold text-primary px-0"
+                  />
+                )}
+              </SavedField>
             )}
 
             {/* 本文（pickBodyColumnKeyで選ばれた、内容のある列） */}
@@ -359,22 +369,27 @@ export function RequirementCard({
                   )}
                 </div>
               ) : (
-                <Textarea
-                  variant="bare"
-                  rows={1}
-                  ref={(el: HTMLTextAreaElement | null) => {
-                    if (el) autoGrowTextarea(el);
-                  }}
-                  defaultValue={bodyValue}
-                  autoFocus={hasBodyHighlight && bodyEditing}
-                  onBlur={(e) => {
-                    handleContentChange(bodyColumn.column_key, e.target.value);
-                    if (hasBodyHighlight) setBodyEditing(false);
-                  }}
-                  onInput={(e) => autoGrowTextarea(e.currentTarget)}
-                  disabled={locked}
-                  className="resize-none overflow-hidden text-sm leading-relaxed px-0"
-                />
+                <SavedField id={`${item.id}-body`} value={bodyValue} save={(v) => saveContent(bodyColumn.column_key, v)}>
+                  {(f) => (
+                    <Textarea
+                      variant="bare"
+                      rows={1}
+                      ref={(el: HTMLTextAreaElement | null) => {
+                        if (el) autoGrowTextarea(el);
+                      }}
+                      value={f.value}
+                      onChange={(e) => f.onChange(e.target.value)}
+                      autoFocus={hasBodyHighlight && bodyEditing}
+                      onBlur={(e) => {
+                        f.commit(e.target.value);
+                        if (hasBodyHighlight) setBodyEditing(false);
+                      }}
+                      onInput={(e) => autoGrowTextarea(e.currentTarget)}
+                      disabled={locked}
+                      className="resize-none overflow-hidden text-sm leading-relaxed px-0"
+                    />
+                  )}
+                </SavedField>
               )
             )}
             {activeAmbiguousReason && (
@@ -394,21 +409,26 @@ export function RequirementCard({
                   return (
                     <div key={c.column_key} className="flex flex-col gap-1 min-w-0">
                       <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">{c.label}</label>
-                      <Textarea
-                        variant="bare"
-                        rows={1}
-                        ref={(el: HTMLTextAreaElement | null) => {
-                          if (el) autoGrowTextarea(el);
-                        }}
-                        defaultValue={value}
-                        onBlur={(e) => handleContentChange(c.column_key, e.target.value)}
-                        onInput={(e) => autoGrowTextarea(e.currentTarget)}
-                        disabled={locked}
-                        placeholder="＋ 未入力"
-                        className={`resize-none overflow-hidden text-sm rounded-md px-2 py-1.5 ${
-                          value ? "" : "border border-dashed border-border text-faint"
-                        }`}
-                      />
+                      <SavedField id={`${item.id}-${c.column_key}`} value={value} save={(v) => saveContent(c.column_key, v)}>
+                        {(f) => (
+                          <Textarea
+                            variant="bare"
+                            rows={1}
+                            ref={(el: HTMLTextAreaElement | null) => {
+                              if (el) autoGrowTextarea(el);
+                            }}
+                            value={f.value}
+                            onChange={(e) => f.onChange(e.target.value)}
+                            onBlur={(e) => f.commit(e.target.value)}
+                            onInput={(e) => autoGrowTextarea(e.currentTarget)}
+                            disabled={locked}
+                            placeholder="＋ 未入力"
+                            className={`resize-none overflow-hidden text-sm rounded-md px-2 py-1.5 ${
+                              value ? "" : "border border-dashed border-border text-faint"
+                            }`}
+                          />
+                        )}
+                      </SavedField>
                     </div>
                   );
                 })}

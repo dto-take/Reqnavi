@@ -1,6 +1,7 @@
 "use client";
 
 import { runAction } from "@/lib/run-action";
+import { SavedField } from "@/components/ui/saved-field";
 import type { ActionResult } from "@/lib/action-result";
 import { useState, useTransition } from "react";
 import Link from "next/link";
@@ -77,11 +78,15 @@ export function ScreenFlowPanel({
   // 失敗時はトーストのあと再取得して、画面をDBの実際の状態に揃える（確定済みになっていた等）
   // ActionResultを返すアクションを実行する。失敗（{ok:false}・通信エラーとも）はトーストを1件出し、再取得する。
   // 成功時はafterに結果のdataを渡す（採用で作られたidの選択など）。
-  function run<T>(fn: () => Promise<ActionResult<T>>, after?: (data: T) => void) {
-    startTransition(async () => {
-      const r = await runAction(fn, show);
-      if (!r) router.refresh();
-      else after?.(r.data);
+  // 戻り値のPromise<boolean>は、入力欄の保存（SavedField）が、成功・失敗を知るために使う（他の呼び出しは無視してよい）
+  function run<T>(fn: () => Promise<ActionResult<T>>, after?: (data: T) => void): Promise<boolean> {
+    return new Promise((resolve) => {
+      startTransition(async () => {
+        const r = await runAction(fn, show);
+        if (!r) router.refresh();
+        else after?.(r.data);
+        resolve(!!r);
+      });
     });
   }
 
@@ -119,7 +124,7 @@ export function ScreenFlowPanel({
   );
 }
 
-type RunFn = <T>(fn: () => Promise<ActionResult<T>>, after?: (data: T) => void) => void;
+type RunFn = <T>(fn: () => Promise<ActionResult<T>>, after?: (data: T) => void) => Promise<boolean>;
 
 type SuggestionActions = {
   adopt: (s: NodeSuggestion | TransitionSuggestion) => void;
@@ -422,19 +427,24 @@ function NodeMode({
       <div className="flex flex-col gap-1.5">
         <span className={SECTION_LABEL}>画面名</span>
         {editingName && !locked ? (
-          <Input
-            autoFocus
-            defaultValue={node.label}
-            onBlur={(e) => {
-              const v = e.target.value.trim();
-              setEditingName(false);
-              if (v && v !== node.label) run(() => renameScreenNode(node.id, projectId, v));
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") setEditingName(false);
-            }}
-          />
+          <SavedField id={`${node.id}-name`} value={node.label} save={(v) => run(() => renameScreenNode(node.id, projectId, v))}>
+            {(f) => (
+              <Input
+                autoFocus
+                value={f.value}
+                onChange={(e) => f.onChange(e.target.value)}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  setEditingName(false);
+                  if (v) f.commit(v);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") setEditingName(false);
+                }}
+              />
+            )}
+          </SavedField>
         ) : (
           <div
             data-screen-name
@@ -702,20 +712,23 @@ function EdgeMode({
       <div className="flex flex-col gap-1.5">
         <span className={SECTION_LABEL}>遷移のきっかけ（操作名）</span>
         {editingLabel && !locked ? (
-          <Input
-            key={`${edge.id}-${edge.label ?? ""}`}
-            autoFocus
-            defaultValue={edge.label ?? ""}
-            onBlur={(e) => {
-              const v = e.target.value;
-              setEditingLabel(false);
-              if (v.trim() !== (edge.label ?? "")) run(() => updateScreenTransitionLabel(edge.id, projectId, v));
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") setEditingLabel(false);
-            }}
-          />
+          <SavedField id={`${edge.id}-label`} value={edge.label ?? ""} save={(v) => run(() => updateScreenTransitionLabel(edge.id, projectId, v))}>
+            {(f) => (
+              <Input
+                autoFocus
+                value={f.value}
+                onChange={(e) => f.onChange(e.target.value)}
+                onBlur={(e) => {
+                  setEditingLabel(false);
+                  f.commit(e.target.value.trim());
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") setEditingLabel(false);
+                }}
+              />
+            )}
+          </SavedField>
         ) : (
           <div
             data-edge-label-field

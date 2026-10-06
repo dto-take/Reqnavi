@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { runAction } from "@/lib/run-action";
+import type { ActionResult } from "@/lib/action-result";
 import { computeWorkflowLayout } from "@/lib/workflow-layout";
 import { toWorkflowNode, branchSummary, countDescendants, NODE_META, RULE_OPS } from "@/lib/workflow-builder-shared";
 import { updateFlowNode, deleteWorkflowNode, deleteConditionNode, type WorkflowNodeRow, type ConditionRule } from "@/actions/workflow-builder";
@@ -8,7 +11,18 @@ import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
-export function NodeEditPanel({
+// {error: string | null} を返す方式のActionを、runActionが扱うActionResultの形に変える
+// （通信断の例外は、runActionがerrorMessageで日本語にしてトーストを1件出す）
+async function fromErrorResult(p: Promise<{ error: string | null }>): Promise<ActionResult> {
+  const res = await p;
+  return res.error ? { ok: false, error: res.error } : { ok: true, data: undefined };
+}
+
+export function NodeEditPanel(props: Parameters<typeof NodeEditPanelBody>[0]) {
+  return <NodeEditPanelBody key={props.node?.id ?? "none"} {...props} />;
+}
+
+function NodeEditPanelBody({
   node,
   allNodes,
   projectId,
@@ -27,6 +41,11 @@ export function NodeEditPanel({
 }) {
   const [, startTransition] = useTransition();
   const { show } = useToast();
+  const router = useRouter();
+  // 最後に保存できた値（工程ごと）。保存が成功したら更新し、失敗（{error}・通信断）したら、画面上のコピーを
+  // この値へ戻して再取得する（SavedFieldと同じ仕様。ここは親のローカルstateを直接書き換える作りのため別実装）。
+  // 工程ごとに、この部品を作り直す（NodeEditPanelのkey）ので、マウント時点の値が、その工程の保存済みの値になる。
+  const [saved, setSaved] = useState<Partial<WorkflowNodeRow>>(() => (node ? { ...node } : {}));
 
   const stepNumber = useMemo(() => {
     if (!node) return null;
@@ -56,10 +75,19 @@ export function NodeEditPanel({
   const isCondition = node.node_type === "condition";
 
   function persist(patch: Record<string, unknown>) {
-    startTransition(() => {
-      updateFlowNode(node!.id, projectId, patch).then((res) => {
-        if (res.error) show(res.error, "error");
-      });
+    const id = node!.id;
+    startTransition(async () => {
+      // updateFlowNodeは{error}を返す方式。通信断の例外は、runActionと同じくerrorMessageで日本語にする（トーストは1件）
+      const r = await runAction(() => fromErrorResult(updateFlowNode(id, projectId, patch)), show);
+      if (r) {
+        setSaved((prev) => ({ ...prev, ...patch }));
+      } else {
+        // 失敗：画面上のコピーを、最後に保存できた値へ戻し、再取得してDBの実際の状態に揃える
+        const revert: Record<string, unknown> = {};
+        for (const k of Object.keys(patch)) revert[k] = (saved as Record<string, unknown>)[k];
+        onLocalChange(id, revert as Partial<WorkflowNodeRow>);
+        router.refresh();
+      }
     });
   }
 
@@ -102,21 +130,17 @@ export function NodeEditPanel({
         `・Noルート配下の${noCount}件のステップ → まとめて削除されます\n\n` +
         `この操作は取り消せません。削除しますか？`;
       if (!confirm(msg)) return;
-      startTransition(() => {
-        deleteConditionNode(node!.id, projectId).then((res) => {
-          if (res.error) show(res.error, "error");
-          else onDeleted();
-        });
+      startTransition(async () => {
+        const r = await runAction(() => fromErrorResult(deleteConditionNode(node!.id, projectId)), show);
+        if (r) onDeleted();
       });
       return;
     }
 
     if (!confirm("この工程を削除しますか？この操作は取り消せません。")) return;
-    startTransition(() => {
-      deleteWorkflowNode(node!.id, projectId).then((res) => {
-        if (res.error) show(res.error, "error");
-        else onDeleted();
-      });
+    startTransition(async () => {
+      const r = await runAction(() => fromErrorResult(deleteWorkflowNode(node!.id, projectId)), show);
+      if (r) onDeleted();
     });
   }
 

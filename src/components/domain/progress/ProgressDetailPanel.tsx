@@ -1,6 +1,7 @@
 "use client";
 
 import { runAction } from "@/lib/run-action";
+import { SavedField } from "@/components/ui/saved-field";
 import { useTransition } from "react";
 import { updateProgressTaskField, deleteProgressTask, setPredecessor, type ProgressTaskField } from "@/actions/progress-tasks";
 import { childrenOf, rollupRange, wouldCreateCycle, type ProgressTask } from "@/lib/gantt/layout";
@@ -50,15 +51,22 @@ export function ProgressDetailPanel({
     : [];
   const predecessorNode = selectedNode.predecessor_id ? nodes.find((n) => n.id === selectedNode.predecessor_id) ?? null : null;
 
-  function handleField(field: ProgressTaskField, value: string) {
-    startTransition(async () => {
-      await runAction(() => updateProgressTaskField(selectedNode!.id, projectId, field, value), show);
+  // 入力欄の保存（SavedFieldのsave）。成功したらtrue、失敗（ok:false・通信断）はfalse（トーストはrunActionが1件出す）
+  function saveField(field: ProgressTaskField, value: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      startTransition(async () => {
+        const r = await runAction(() => updateProgressTaskField(selectedNode!.id, projectId, field, value), show);
+        resolve(!!r);
+      });
     });
   }
 
-  function handlePredecessorChange(value: string) {
-    startTransition(async () => {
-      await runAction(() => setPredecessor(selectedNode!.id, projectId, value || null), show);
+  function savePredecessor(value: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      startTransition(async () => {
+        const r = await runAction(() => setPredecessor(selectedNode!.id, projectId, value || null), show);
+        resolve(!!r);
+      });
     });
   }
 
@@ -96,12 +104,9 @@ export function ProgressDetailPanel({
       {/* 名称 */}
       <div className="flex flex-col gap-1.5">
         <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">名称</label>
-        <Input
-          key={`${selectedNode.id}-name`}
-          defaultValue={selectedNode.task_name}
-          onBlur={(e) => handleField("task_name", e.target.value)}
-          placeholder="名称を入力"
-        />
+        <SavedField id={`${selectedNode.id}-name`} value={selectedNode.task_name} save={(v) => saveField("task_name", v)}>
+          {(f) => <Input value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={(e) => f.commit(e.target.value)} placeholder="名称を入力" />}
+        </SavedField>
       </div>
 
       {/* 期間 */}
@@ -114,24 +119,15 @@ export function ProgressDetailPanel({
           </p>
         ) : (
           <div className="flex items-center gap-2">
-            <Input
-              // フェーズ3：keyに日付そのものも含める。ガントのバードラッグ（または後続工程の
-              // カスケード）によって、この項目を選択したまま週_start/週_endが外部から変わることが
-              // あるため、ノードIDだけをkeyにすると（defaultValueのuncontrolled inputのため）
-              // 古い値がDOMに残ったままになり、後でこのフィールドがblurした際に古い値で
-              // 上書き保存してしまう不具合があった。値もkeyに含めて変更時に強制的に再マウントする。
-              key={`${selectedNode.id}-start-${selectedNode.week_start}`}
-              type="date"
-              defaultValue={selectedNode.week_start ?? ""}
-              onBlur={(e) => handleField("week_start", e.target.value)}
-            />
+            {/* 規約58：SavedFieldのkeyに、idと日付そのもの（サーバーの値）を含む。ガントのバードラッグや
+                後続工程のカスケードで値が外部から変わったら、強制的に再マウントする */}
+            <SavedField id={`${selectedNode.id}-start`} value={selectedNode.week_start ?? ""} save={(v) => saveField("week_start", v)}>
+              {(f) => <Input type="date" value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={(e) => f.commit(e.target.value)} />}
+            </SavedField>
             <span className="text-faint">→</span>
-            <Input
-              key={`${selectedNode.id}-end-${selectedNode.week_end}`}
-              type="date"
-              defaultValue={selectedNode.week_end ?? ""}
-              onBlur={(e) => handleField("week_end", e.target.value)}
-            />
+            <SavedField id={`${selectedNode.id}-end`} value={selectedNode.week_end ?? ""} save={(v) => saveField("week_end", v)}>
+              {(f) => <Input type="date" value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={(e) => f.commit(e.target.value)} />}
+            </SavedField>
           </div>
         )}
       </div>
@@ -143,35 +139,47 @@ export function ProgressDetailPanel({
             <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">主担当</label>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm flex-none" style={{ background: ownerColor(selectedNode.owner_primary) }} />
-              <Select
-                key={`${selectedNode.id}-owner-primary`}
-                defaultValue={selectedNode.owner_primary ?? ""}
-                onChange={(e) => handleField("owner_primary", e.target.value)}
-                className="flex-1"
-              >
-                <option value="">未設定</option>
-                {memberNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </Select>
+              <SavedField id={`${selectedNode.id}-owner-primary`} value={selectedNode.owner_primary ?? ""} save={(v) => saveField("owner_primary", v)}>
+                {(f) => (
+                  <Select
+                    value={f.value}
+                    onChange={(e) => {
+                      f.onChange(e.target.value);
+                      f.commit(e.target.value);
+                    }}
+                    className="flex-1"
+                  >
+                    <option value="">未設定</option>
+                    {memberNames.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </SavedField>
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">副担当</label>
-            <Select
-              key={`${selectedNode.id}-owner-secondary`}
-              defaultValue={selectedNode.owner_secondary ?? ""}
-              onChange={(e) => handleField("owner_secondary", e.target.value)}
-            >
-              <option value="">未設定</option>
-              {memberNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </Select>
+            <SavedField id={`${selectedNode.id}-owner-secondary`} value={selectedNode.owner_secondary ?? ""} save={(v) => saveField("owner_secondary", v)}>
+              {(f) => (
+                <Select
+                  value={f.value}
+                  onChange={(e) => {
+                    f.onChange(e.target.value);
+                    f.commit(e.target.value);
+                  }}
+                >
+                  <option value="">未設定</option>
+                  {memberNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </SavedField>
           </div>
         </div>
       )}
@@ -180,18 +188,24 @@ export function ProgressDetailPanel({
       {!isPhase && (
         <div className="flex flex-col gap-1.5">
           <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">先行工程</label>
-          <Select
-            key={`${selectedNode.id}-predecessor`}
-            defaultValue={selectedNode.predecessor_id ?? ""}
-            onChange={(e) => handlePredecessorChange(e.target.value)}
-          >
-            <option value="">なし</option>
-            {predecessorCandidates.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.task_name || "（未入力）"}
-              </option>
-            ))}
-          </Select>
+          <SavedField id={`${selectedNode.id}-predecessor`} value={selectedNode.predecessor_id ?? ""} save={savePredecessor}>
+            {(f) => (
+              <Select
+                value={f.value}
+                onChange={(e) => {
+                  f.onChange(e.target.value);
+                  f.commit(e.target.value);
+                }}
+              >
+                <option value="">なし</option>
+                {predecessorCandidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.task_name || "（未入力）"}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </SavedField>
           {predecessorNode && (
             <p className="text-[11px] text-faint">
               「{predecessorNode.task_name || "（未入力）"}」の完了後に開始する想定です。ドラッグ・日付変更で先行工程の期間が延びると、この工程の開始日も自動的に繰り下がります。

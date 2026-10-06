@@ -1,6 +1,7 @@
 "use client";
 
 import { runAction } from "@/lib/run-action";
+import { SavedField } from "@/components/ui/saved-field";
 import { useState, useTransition } from "react";
 import {
   addCheckItem,
@@ -120,9 +121,13 @@ export function AspectDetailPane({
   const availableStandardItems = (masterEntry?.default_items ?? []).filter((t) => !existingTexts.has(t));
   const otherAdoptedAspects = adoptedAspects(nodes).filter((a) => a.id !== selectedAspect.id);
 
-  function savePolicy(policy: string) {
-    startTransition(async () => {
-      await runAction(() => updateAspectPolicy(selectedAspect!.id, projectId, policy), show);
+  // 入力欄の保存（SavedFieldのsave）。成功したらtrue、失敗（ok:false・通信断）はfalse（トーストはrunActionが1件出す）
+  function savePolicy(policy: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      startTransition(async () => {
+        const r = await runAction(() => updateAspectPolicy(selectedAspect!.id, projectId, policy), show);
+        resolve(!!r);
+      });
     });
   }
 
@@ -290,19 +295,24 @@ export function AspectDetailPane({
         <div className="flex flex-col gap-1.5">
           <label className="font-mono text-[10.5px] font-semibold tracking-wider text-faint uppercase">この観点の方針</label>
           {editingPolicy ? (
-            <Textarea
-              autoFocus
-              defaultValue={content.policy}
-              rows={3}
-              onBlur={(e) => {
-                savePolicy(e.target.value);
-                setEditingPolicy(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setEditingPolicy(false);
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) e.currentTarget.blur();
-              }}
-            />
+            <SavedField id={`${selectedAspect.id}-policy`} value={content.policy} save={savePolicy}>
+              {(f) => (
+                <Textarea
+                  autoFocus
+                  value={f.value}
+                  onChange={(e) => f.onChange(e.target.value)}
+                  rows={3}
+                  onBlur={(e) => {
+                    f.commit(e.target.value);
+                    setEditingPolicy(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setEditingPolicy(false);
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) e.currentTarget.blur();
+                  }}
+                />
+              )}
+            </SavedField>
           ) : (
             <div
               onClick={() => !locked && setEditingPolicy(true)}

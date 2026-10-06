@@ -1,6 +1,7 @@
 "use client";
 
 import { runAction } from "@/lib/run-action";
+import { SavedField } from "@/components/ui/saved-field";
 import { useTransition } from "react";
 import {
   updateKpiNodeField,
@@ -97,11 +98,15 @@ export function KpiDetailPane({
   const canPromote = selectedNode.content.level !== "ゴール" && !!parentNode?.parent_id;
   const canDemote = selectedNode.content.level !== "戦術" && siblingIndex > 0;
 
-  function handleFieldBlur(field: "text" | "metric" | "owner" | "due_date", value: string) {
+  // 入力欄の保存（SavedFieldのsave）。成功したらtrue、失敗（ok:false・通信断）はfalse（トーストはrunActionが1件出す）
+  function saveField(field: "text" | "metric" | "owner" | "due_date", value: string): Promise<boolean> {
     const node = selectedNode;
-    if (!node) return;
-    startTransition(async () => {
-      await runAction(() => updateKpiNodeField(node.id, projectId, field, value), show);
+    if (!node) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      startTransition(async () => {
+        const r = await runAction(() => updateKpiNodeField(node.id, projectId, field, value), show);
+        resolve(!!r);
+      });
     });
   }
 
@@ -203,19 +208,23 @@ export function KpiDetailPane({
         <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">
           {selectedNode.content.level}の内容
         </label>
-        <Textarea
-          key={`${selectedNode.id}-text`}
-          defaultValue={selectedNode.content.text}
-          onBlur={(e) => handleFieldBlur("text", e.target.value)}
-          rows={3}
-          placeholder="内容を入力"
-          disabled={locked}
-          // kpi_add_goal.md Step1：keyにselectedNode.idを含むため、ノード切替のたびに
-          // このTextareaは再マウントされる。autoFocusIdが一致する間だけ、マウント時に
-          // ネイティブautoFocusで本文編集にフォーカスを当てる（新規作成直後のみ発火）。
-          autoFocus={selectedNode.id === autoFocusId}
-          className="text-[15px] leading-relaxed resize-none"
-        />
+        <SavedField id={`${selectedNode.id}-text`} value={selectedNode.content.text} save={(v) => saveField("text", v)}>
+          {(f) => (
+            <Textarea
+              value={f.value}
+              onChange={(e) => f.onChange(e.target.value)}
+              onBlur={(e) => f.commit(e.target.value)}
+              rows={3}
+              placeholder="内容を入力"
+              disabled={locked}
+              // kpi_add_goal.md Step1：SavedFieldのkeyにselectedNode.idを含むため、ノード切替のたびに
+              // このTextareaは再マウントされる。autoFocusIdが一致する間だけ、マウント時に
+              // ネイティブautoFocusで本文編集にフォーカスを当てる（新規作成直後のみ発火）。
+              autoFocus={selectedNode.id === autoFocusId}
+              className="text-[15px] leading-relaxed resize-none"
+            />
+          )}
+        </SavedField>
         {!locked && <p className="text-[11px] text-faint">階層が深くても入力幅は一定です。クリックしてそのまま編集できます。</p>}
       </div>
 
@@ -223,33 +232,21 @@ export function KpiDetailPane({
       <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
         <div className="flex flex-col gap-1.5">
           <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">測定指標</label>
-          <Input
-            key={`${selectedNode.id}-metric`}
-            defaultValue={selectedNode.content.metric ?? ""}
-            onBlur={(e) => handleFieldBlur("metric", e.target.value)}
-            placeholder="＋ 未入力"
-            disabled={locked}
-          />
+          <SavedField id={`${selectedNode.id}-metric`} value={selectedNode.content.metric ?? ""} save={(v) => saveField("metric", v)}>
+            {(f) => <Input value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={(e) => f.commit(e.target.value)} placeholder="＋ 未入力" disabled={locked} />}
+          </SavedField>
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">担当</label>
-          <Input
-            key={`${selectedNode.id}-owner`}
-            defaultValue={selectedNode.content.owner ?? ""}
-            onBlur={(e) => handleFieldBlur("owner", e.target.value)}
-            placeholder="＋ 未設定"
-            disabled={locked}
-          />
+          <SavedField id={`${selectedNode.id}-owner`} value={selectedNode.content.owner ?? ""} save={(v) => saveField("owner", v)}>
+            {(f) => <Input value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={(e) => f.commit(e.target.value)} placeholder="＋ 未設定" disabled={locked} />}
+          </SavedField>
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">期限</label>
-          <Input
-            key={`${selectedNode.id}-due`}
-            defaultValue={selectedNode.content.due_date ?? ""}
-            onBlur={(e) => handleFieldBlur("due_date", e.target.value)}
-            placeholder="＋ 未設定"
-            disabled={locked}
-          />
+          <SavedField id={`${selectedNode.id}-due`} value={selectedNode.content.due_date ?? ""} save={(v) => saveField("due_date", v)}>
+            {(f) => <Input value={f.value} onChange={(e) => f.onChange(e.target.value)} onBlur={(e) => f.commit(e.target.value)} placeholder="＋ 未設定" disabled={locked} />}
+          </SavedField>
         </div>
       </div>
 
