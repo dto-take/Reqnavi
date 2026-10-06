@@ -43,7 +43,8 @@ async function checkDuplicateDocumentInner(projectId: string, fileName: string, 
   return isDuplicateDocument(supabase, projectId, fileName, fileSize);
 }
 
-export type RegisterResult = "done" | "skipped" | "classification_failed";
+// done_no_text：登録できたが、テキストを取得できなかった（画面でファイル名つきの注意を出す）
+export type RegisterResult = "done" | "done_no_text" | "skipped" | "classification_failed";
 
 export async function registerUploadedDocument(projectId: string, storagePath: string, fileName: string): Promise<ActionResult<RegisterResult>> {
   return safeAction("registerUploadedDocument", () => registerUploadedDocumentInner(projectId, storagePath, fileName));
@@ -117,8 +118,11 @@ async function registerCore(
   // あとで資料一覧から再分類できる。分類以外の失敗（DB・権限など）は登録しない。
   let tags: string[] = [];
   let classificationFailed = false;
+  let textUnavailable = false;
   try {
-    tags = (await classifyDocument(file, fileName, { supabase, projectId })).tags;
+    const classification = await classifyDocument(file, fileName, { supabase, projectId });
+    tags = classification.tags;
+    textUnavailable = classification.textUnavailable;
   } catch (e) {
     classificationFailed = true;
     console.error("[registerUploadedDocument] 分類に失敗したため、未分類で登録します:", e instanceof Error ? e.message : e);
@@ -135,12 +139,14 @@ async function registerCore(
   if (insertError) throw new UserFacingError(errorMessage(insertError));
 
   revalidatePath(`/projects/${projectId}/documents`);
-  return classificationFailed ? "classification_failed" : "done";
+  if (classificationFailed) return "classification_failed";
+  return textUnavailable ? "done_no_text" : "done";
 }
 
 // 分類プロンプトのカテゴリ一覧を修正した際など、既存資料を再アップロードせずに
 // 分類だけ再実行できるようにする（ストレージ上のファイルをそのまま使う）
-async function reclassifyDocumentInternal(documentId: string, projectId: string) {
+// 戻り値：テキストを取得できなかったときの注意の文言（取得できたときはundefined）
+async function reclassifyDocumentInternal(documentId: string, projectId: string): Promise<string | undefined> {
   const supabase = await createServerActionClient();
 
   const { data: docData, error: docError } = await supabase
@@ -166,6 +172,7 @@ async function reclassifyDocumentInternal(documentId: string, projectId: string)
   if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
 
   revalidatePath(`/projects/${projectId}/documents`);
+  return classification.textUnavailable ? `テキストを取得できませんでした：${doc.file_name}` : undefined;
 }
 
 export async function reclassifyDocument(
@@ -173,10 +180,10 @@ export async function reclassifyDocument(
   projectId: string,
   _prevState: { error: string | null },
   _formData: FormData
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; notice?: string }> {
   try {
-    await reclassifyDocumentInternal(documentId, projectId);
-    return { error: null };
+    const notice = await reclassifyDocumentInternal(documentId, projectId);
+    return { error: null, notice };
   } catch (e) {
     return { error: errorMessage(e) };
   }

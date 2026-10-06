@@ -9,7 +9,8 @@ import { GENERIC_ERROR_JA, knownErrorMessage } from "@/lib/error-message";
 export type ActionResult<T = void> = { ok: true; data: T } | { ok: false; error: string };
 
 // useActionState（規約50）の形。
-export type FormActionState = { error: string | null };
+// noticeは、成功したが利用者に伝えたい注意（成功のトーストに添えて表示する）。
+export type FormActionState = { error: string | null; notice?: string };
 
 // fnがthrowした例外を結果に変換する。
 //  ・UserFacingError・AiCallError（Geminiの利用枠超過・キー無効等。文言は日本語で用意済み）→ その文言

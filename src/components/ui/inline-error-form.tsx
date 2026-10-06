@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useSafeActionState } from "@/lib/use-safe-action-state";
 import { useToast } from "@/components/ui/toast";
 
-type ActionResult = { error: string | null };
+type ActionResult = { error: string | null; notice?: string };
 
 // Next.js 16では、Server Actionからthrowしたエラーはerror.tsxに到達する際に
 // サーバー側のmessageが失われ常に汎用文言に置き換わる（実機で確認済み）。
@@ -34,7 +34,7 @@ export function InlineErrorForm({
       return;
     }
     if (!state.error && successMessage) {
-      show(successMessage);
+      show(state.notice ? `${successMessage}。${state.notice}` : successMessage);
     }
     // 失敗時は、リセットされた入力欄に、送信した値を戻す（入力した内容を消さない）
     if (state.error && formRef.current && submitted.current) {

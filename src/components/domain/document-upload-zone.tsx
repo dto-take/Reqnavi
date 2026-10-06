@@ -7,7 +7,7 @@ import { errorMessage } from "@/lib/error-message";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 
-type QueueItem = { file: File; status: "pending" | "uploading" | "done" | "unclassified" | "error" | "skipped"; error?: string };
+type QueueItem = { file: File; status: "pending" | "uploading" | "done" | "unclassified" | "error" | "skipped"; error?: string; noText?: boolean };
 
 // upload_size_limit.md：1ファイルあたり20MBを上限とする。Storage側のfile_size_limit
 // （20260910041626_set_project_documents_size_limit.sqlマイグレーション）と合わせた
@@ -22,7 +22,7 @@ const DUPLICATE_MESSAGE = "同じ名前・サイズの資料が既に登録さ�
 // ペイロード上限（約4.5MB）が、大きめのPDF/PowerPointファイルで413エラーの原因になっていたため。
 // storagePathの組み立ては規約35（日本語ファイル名をStorageキーに含めない）を踏襲する。
 // 戻り値：登録したら"done"、同じ名前・サイズの資料が既にあれば（Storageへ送らず）"skipped"
-async function uploadOneFile(projectId: string, file: File): Promise<"done" | "skipped" | "unclassified"> {
+async function uploadOneFile(projectId: string, file: File): Promise<"done" | "done_no_text" | "skipped" | "unclassified"> {
   // Server Actionの失敗（{ok:false}）は、サーバーの日本語の文言のままErrorにして、呼び出し元の個別のcatchで扱う
   const dup = await checkDuplicateDocument(projectId, file.name, file.size);
   if (!dup.ok) throw new Error(dup.error);
@@ -76,6 +76,7 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
       let errorCount = 0;
       let skippedCount = 0;
       let unclassifiedCount = 0;
+      const noTextNames: string[] = [];
       for (let i = 0; i < queue.length; i++) {
         if (queue[i].status !== "pending") continue;
         setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: "uploading" } : item)));
@@ -85,10 +86,14 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
         // 呼び出しなのでerror.tsxには届かず、ここで明示的にtry/catchする（規約44）。
         try {
           const result = await uploadOneFile(projectId, queue[i].file);
-          setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: result, error: result === "skipped" ? DUPLICATE_MESSAGE : undefined } : item)));
+          const status = result === "done_no_text" ? "done" : result;
+          setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status, noText: result === "done_no_text", error: result === "skipped" ? DUPLICATE_MESSAGE : undefined } : item)));
           if (result === "skipped") skippedCount++;
           else if (result === "unclassified") unclassifiedCount++;
-          else successCount++;
+          else {
+            successCount++;
+            if (result === "done_no_text") noTextNames.push(queue[i].file.name);
+          }
         } catch (e) {
           const message = errorMessage(e);
           setQueue((q) =>
@@ -99,6 +104,7 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
       }
       const parts = [`${successCount + unclassifiedCount}件アップロード完了`];
       if (unclassifiedCount > 0) parts.push(`うち${unclassifiedCount}件は分類に失敗したため、未分類で登録しました（資料一覧から再分類できます）`);
+      if (noTextNames.length > 0) parts.push(`テキストを取得できませんでした：${noTextNames.join("、")}（内容が素案の生成に使われない可能性があります）`);
       if (skippedCount > 0) parts.push(`スキップ：${skippedCount}件（${DUPLICATE_MESSAGE}）`);
       if (errorCount > 0) parts.push(`失敗${errorCount}件`);
       show(parts.join("、"), errorCount > 0 ? "error" : "success");
@@ -157,7 +163,7 @@ export function DocumentUploadZone({ projectId }: { projectId: string }) {
               >
                 {item.status === "pending" && "待機中"}
                 {item.status === "uploading" && "アップロード中"}
-                {item.status === "done" && "完了"}
+                {item.status === "done" && (item.noText ? "完了（テキスト取得不可）" : "完了")}
                 {item.status === "unclassified" && "完了（未分類）"}
                 {item.status === "error" && "失敗"}
                 {item.status === "skipped" && "スキップ（登録済み）"}

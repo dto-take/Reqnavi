@@ -81,7 +81,10 @@ export async function classifyDocument(file: Blob, fileName: string, record?: Cl
   );
 
   const parsed = ClassificationSchema.safeParse(JSON.parse(response.text ?? "{}"));
-  const result = parsed.success ? parsed.data : { tags: [], summary: "" };
+  // 画像・テキスト以外の形式（PDF・Office等）で、文字を取り出せず、PDF本体も渡せなかった場合
+  const isTextFormat = /.(txt|md)$/i.test(fileName);
+  const textUnavailable = !pdfBase64 && extracted.kind !== "image" && !isTextFormat && textLength === 0;
+  const result = { ...(parsed.success ? parsed.data : { tags: [], summary: "" }), textUnavailable };
 
   // 分類の実行を記録する（記録の失敗で、分類・登録を失敗させない）
   if (record) {
