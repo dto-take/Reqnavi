@@ -2,6 +2,7 @@
 
 import { createServerActionClient } from "@/lib/supabase/server";
 import { UserFacingError } from "@/lib/user-error";
+import { loadAuditProject, recordAudit } from "@/lib/audit";
 import { errorMessage } from "@/lib/error-message";
 import { safeAction, type ActionResult } from "@/lib/action-result";
 import { canRemoveProjectMember } from "@/lib/permissions";
@@ -16,7 +17,7 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   return safeAction("removeProjectMember", () => removeProjectMemberInner(projectId, userId));
 }
 
-type MemberRow = { user_id: string; user_profiles: { user_role: string } | null };
+type MemberRow = { user_id: string; user_profiles: { user_role: string; display_name: string | null } | null };
 
 async function removeProjectMemberInner(projectId: string, userId: string): Promise<{ self: boolean }> {
   const supabase = await createServerActionClient();
@@ -39,7 +40,7 @@ async function removeProjectMemberInner(projectId: string, userId: string): Prom
   // ② 外す相手が、この案件のメンバーであること（存在しない・別の案件のメンバーは「対象が見つかりません」）
   const { data: rows, error: listError } = await supabase
     .from("project_members")
-    .select("user_id, user_profiles(user_role)")
+    .select("user_id, user_profiles(user_role, display_name)")
     .eq("project_id", projectId);
   if (listError) throw new UserFacingError(errorMessage(listError));
   const members = (rows ?? []) as unknown as MemberRow[];
@@ -51,6 +52,8 @@ async function removeProjectMemberInner(projectId: string, userId: string): Prom
     throw new UserFacingError("この案件には、管理者またはPMのメンバーが最低1人必要です");
   }
 
+  const auditProject = await loadAuditProject(supabase, projectId);
+
   // ④ 削除。対象は確認済みなので、0件はRLSで書き込みが拒否された（権限が無い）
   const { data: deleted, error } = await supabase
     .from("project_members")
@@ -60,6 +63,13 @@ async function removeProjectMemberInner(projectId: string, userId: string): Prom
     .select("user_id");
   if (error) throw new UserFacingError(errorMessage(error));
   if (!deleted || deleted.length === 0) throw new UserFacingError("この操作を行う権限がありません");
+
+  await recordAudit({
+    action: "member.remove",
+    project: auditProject,
+    target: { type: "member", id: userId, label: members.find((m) => m.user_id === userId)?.user_profiles?.display_name ?? null },
+    details: { self_removal: userId === me },
+  });
 
   revalidatePath(`/projects/${projectId}/members`);
   revalidatePath("/projects");

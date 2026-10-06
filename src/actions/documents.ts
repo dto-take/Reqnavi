@@ -7,6 +7,7 @@ import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { fetchAllPages } from "@/lib/paged-select";
 import { canDeleteDocument } from "@/lib/permissions";
+import { loadAuditProject, recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 
 // ファイル本体はクライアントから直接Supabase Storageへアップロード済み（規約：
@@ -208,14 +209,14 @@ export async function countUnclassifiedDocuments(projectId: string): Promise<num
   return docs.filter((d) => d.classification_failed || !Array.isArray(d.classified_tags) || d.classified_tags.length === 0).length;
 }
 
-type DocRow = { id: string; project_id: string; file_name: string; storage_path: string };
+type DocRow = { id: string; project_id: string; file_name: string; storage_path: string; file_size: number | null };
 
 // 資料の読み直し（引数は資料のidだけ。案件・ファイルの場所は、サーバーでDBから読む。規約66）。
 // source_documentsのRLSは案件メンバーだけに見せるため、読めない＝存在しない・アクセスできない。
 async function loadDocument(supabase: Awaited<ReturnType<typeof createServerActionClient>>, documentId: string): Promise<DocRow> {
   const { data, error } = await supabase
     .from("source_documents")
-    .select("id, project_id, file_name, storage_path")
+    .select("id, project_id, file_name, storage_path, file_size")
     .eq("id", documentId)
     .maybeSingle();
   if (error) throw new UserFacingError(errorMessage(error));
@@ -250,6 +251,10 @@ async function deleteDocumentInner(documentId: string): Promise<void> {
     throw new UserFacingError("この操作を行う権限がありません");
   }
 
+  // 監査ログ用に、削除する前に控える（出典は外部キーで一緒に消えるため、先に数える）
+  const auditProject = await loadAuditProject(supabase, doc.project_id);
+  const { count: citedItemCount } = await supabase.from("item_sources").select("item_id", { count: "exact", head: true }).eq("source_id", documentId);
+
   const storage = supabase.storage.from("project-documents");
   const slash = doc.storage_path.lastIndexOf("/");
   const dir = doc.storage_path.slice(0, slash);
@@ -271,6 +276,13 @@ async function deleteDocumentInner(documentId: string): Promise<void> {
   const { data: deleted, error: deleteError } = await supabase.from("source_documents").delete().eq("id", documentId).select("id");
   if (deleteError) throw new UserFacingError(errorMessage(deleteError));
   if (!deleted || deleted.length === 0) throw new UserFacingError("対象が見つかりません");
+
+  await recordAudit({
+    action: "document.delete",
+    project: auditProject,
+    target: { type: "document", id: doc.id, label: doc.file_name },
+    details: { file_size: doc.file_size, cited_item_count: citedItemCount ?? null },
+  });
 
   revalidatePath(`/projects/${doc.project_id}/documents`);
   revalidatePath(`/projects/${doc.project_id}/bulk-generate`);

@@ -213,6 +213,25 @@ create table change_requests (
 );
 ```
 
+### 2.4.5 監査ログ
+
+```sql
+create table audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  occurred_at timestamptz not null default now(),
+  tenant_id uuid not null,
+  actor_id uuid, actor_name text, actor_role text,        -- 実行者（外部キーなし。操作時点のスナップショット）
+  action text not null check (action in ('document.delete','member.remove','project.delete','baseline.confirm')),
+  project_id uuid, project_name text, customer_name text, -- 案件への外部キーなし（案件の削除で消えない）
+  target_type text, target_id uuid, target_label text,
+  details jsonb not null default '{}'                     -- メタデータのみ（資料・項目の本文は入れない）
+);
+```
+
+- 追記専用：`authenticated`は`select`のみ、`service_role`は`select`・`insert`のみGRANT（`truncate`等も外す）。UPDATE・DELETE・INSERTのポリシーは無い
+- SELECTポリシー：同じテナント（JWTの`tenant_id`）の`admin`のみ
+- 書き込みは`src/lib/audit.ts`の`recordAudit`（`server-only`）だけ。実行者・案件・対象はサーバーが決め、操作の成功後に記録する。記録の失敗は操作を失敗扱いにせず、内容ごと`console.error`に出す
+
 ### 2.5 AI連携
 
 ```sql

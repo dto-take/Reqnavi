@@ -4,6 +4,7 @@ import { safeFormAction, type FormActionState } from "@/lib/action-result";
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { getReadinessSummary } from "@/actions/readiness";
 import { UserFacingError } from "@/lib/user-error";
+import { loadAuditProject, recordAudit } from "@/lib/audit";
 import { errorMessage } from "@/lib/error-message";
 import { revalidatePath } from "next/cache";
 
@@ -55,7 +56,7 @@ async function createBaselineInner(projectId: string, formData: FormData): Promi
   // 旧activeのsuperseded化・新ベースラインの作成・項目スナップショットの作成を、DB関数（1トランザクション）で行う。
   // 項目の行はアプリに通さない（PostgRESTの1000行上限で黙って切り捨てられるため。規約62）。
   // 関数内でスナップショット件数が元の件数と一致することを確認し、不一致なら全体をロールバックする。
-  const { error } = await supabase.rpc("create_baseline_snapshot", {
+  const { data: baselineId, error } = await supabase.rpc("create_baseline_snapshot", {
     p_project_id: projectId,
     p_version_no: versionNo,
     p_approval_note: approvalNote,
@@ -64,6 +65,17 @@ async function createBaselineInner(projectId: string, formData: FormData): Promi
     p_approved_by: userData.user.id,
   });
   if (error) throw new UserFacingError(errorMessage(error));
+
+  const { count: snapshotCount } = await supabase
+    .from("baseline_item_snapshots")
+    .select("id", { count: "exact", head: true })
+    .eq("baseline_id", baselineId as string);
+  await recordAudit({
+    action: "baseline.confirm",
+    project: await loadAuditProject(supabase, projectId),
+    target: { type: "baseline", id: (baselineId as string | null) ?? null, label: versionNo },
+    details: { version: versionNo, item_count: snapshotCount ?? null },
+  });
 
   revalidatePath(`/projects/${projectId}/baseline`);
 }

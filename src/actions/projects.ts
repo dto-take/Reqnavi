@@ -3,6 +3,7 @@
 import { createServerActionClient, getTenantId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UserFacingError } from "@/lib/user-error";
+import { loadAuditProject, recordAudit } from "@/lib/audit";
 import { errorMessage } from "@/lib/error-message";
 import { canCreateProject } from "@/lib/permissions";
 import { safeFormAction, type FormActionState } from "@/lib/action-result";
@@ -226,6 +227,11 @@ async function deleteProjectInner(projectId: string, formData: FormData): Promis
     .single();
   if (fetchError || !project) throw new UserFacingError("案件が見つかりません");
 
+  // 監査ログ用に、削除する前に控える（案件の削除後には、案件名・顧客名・件数を取れない）
+  const auditProject = await loadAuditProject(supabase, projectId);
+  const { count: documentCount } = await supabase.from("source_documents").select("id", { count: "exact", head: true }).eq("project_id", projectId);
+  const { count: itemCount } = await supabase.from("requirement_items").select("id", { count: "exact", head: true }).eq("project_id", projectId);
+
   const confirmName = formData.get("confirm_name") as string;
   if (confirmName !== project.name) {
     throw new UserFacingError("入力された案件名が一致しません");
@@ -244,6 +250,14 @@ async function deleteProjectInner(projectId: string, formData: FormData): Promis
   const { data: affected1, error: deleteError } = await supabase.from("projects").delete().eq("id", projectId).select("id");
   if (deleteError) throw new UserFacingError(errorMessage(deleteError));
   if (!affected1 || affected1.length === 0) throw new UserFacingError("対象が見つかりません");
+
+  // Storageの削除とDB行の削除に成功したあとに記録する（redirectは例外で処理を打ち切るため、その前に）
+  await recordAudit({
+    action: "project.delete",
+    project: auditProject,
+    target: { type: "project", id: projectId, label: project.name },
+    details: { document_count: documentCount ?? null, item_count: itemCount ?? null },
+  });
 
   revalidatePath("/projects");
   redirect("/projects");

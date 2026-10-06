@@ -22,6 +22,7 @@ export async function AppHeader() {
           <nav className="flex gap-4">
             <Link href="/organizations" className="text-sm text-secondary hover:text-primary">顧客管理</Link>
             <Link href="/admin/users" className="text-sm text-secondary hover:text-primary">ユーザ管理</Link>
+            <Link href="/admin/audit-logs" className="text-sm text-secondary hover:text-primary">監査ログ</Link>
           </nav>
         )}
       </div>
