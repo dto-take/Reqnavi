@@ -620,7 +620,8 @@ export function ScreenFlowCanvas({
 
       <div
         data-screen-flow-zoom
-        className="absolute right-3.5 bottom-3.5 flex gap-1.5 p-1.25 rounded-lg border border-border bg-page"
+        // right-[76px]：右下固定のヘルプボタン（幅48px＋右余白24px）に重ならないよう、その幅だけ左へ寄せる
+        className="absolute right-[76px] bottom-3.5 flex gap-1.5 p-1.25 rounded-lg border border-border bg-page"
         style={{ boxShadow: "0 2px 8px rgba(27,26,23,.1)", zIndex: 5 }}
       >
         <button type="button" aria-label="縮小" onClick={() => changeScale(scale - 0.1)} className="font-mono text-xs px-2.25 py-1.5 rounded-md border border-border bg-page cursor-pointer hover:bg-hover">

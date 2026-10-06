@@ -33,7 +33,8 @@ export default async function ProjectLayout({
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)]">
       <ProjectSidebar projectId={id} projectName={header.name} overall={progress ? progress.overall : null} chapters={chapters} />
-      <main className="flex-1 overflow-x-auto">{children}</main>
+      {/* pb-20：右下固定のヘルプボタン（高さ48px＋余白24px）に、ページ末尾の操作要素が隠れないよう、末尾に余白を確保する */}
+      <main className="flex-1 overflow-x-auto pb-20">{children}</main>
     </div>
   );
 }

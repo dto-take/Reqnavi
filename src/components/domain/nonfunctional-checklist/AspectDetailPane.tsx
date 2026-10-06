@@ -394,7 +394,8 @@ export function AspectDetailPane({
                 data-checkitem-row={item.id}
                 onDragOver={locked ? undefined : (e) => handleItemDragOver(e, item.id)}
                 onDrop={locked ? undefined : (e) => handleItemDrop(e, item.id)}
-                className={`relative flex items-center gap-3 px-3.5 py-3 rounded-[10px] flex-wrap ${isDragging ? "opacity-40" : ""}`}
+                // mr-12：右下固定のヘルプボタンに、行の右端のコントロール（判定のセグメント）が重ならないよう、右に余白を確保する
+                className={`relative flex items-center gap-3 px-3.5 py-3 rounded-[10px] flex-wrap mr-12 ${isDragging ? "opacity-40" : ""}`}
                 style={{
                   borderTop: "1px solid var(--border)",
                   borderRight: "1px solid var(--border)",
@@ -521,7 +522,7 @@ export function AspectDetailPane({
           )}
         </div>
 
-        <div className="mt-auto pt-4 pb-5 border-t border-border flex items-center gap-2 -mx-6 px-6">
+        <div className="mt-auto pt-4 pb-5 border-t border-border flex items-center gap-2 -mx-6 pl-6 pr-20">
           {isConfirmed ? (
             <span
               className="text-[13px] font-medium px-4 py-2.5 rounded-md whitespace-nowrap"
