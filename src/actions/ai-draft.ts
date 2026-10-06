@@ -10,6 +10,8 @@ import { CHAPTER_NAMES } from "@/lib/chapters";
 import { UserFacingError } from "@/lib/user-error";
 import { errorMessage } from "@/lib/error-message";
 import { extractContent } from "@/lib/ai/extract-content";
+import { fetchAllPages } from "@/lib/paged-select";
+import { hasTitleColumn, pickBodyColumnKey } from "@/lib/requirement-body-field";
 import { DOCUMENT_EXCERPT_MAX_LENGTH } from "@/lib/ai/excerpt-limit";
 
 const DraftItemSchema = z.object({
@@ -41,6 +43,41 @@ const DRAFT_RESPONSE_SCHEMA = {
   },
   required: ["items"],
 };
+
+// 素案の再生成で、残す（人が触れた）項目の状態
+const RETAINED_STATUSES = ["se_reviewing", "confirmed", "exception_approved", "rejected"];
+// 項目が多いときの、プロンプトに載せる1件あたりの最大文字数
+const MANY_ITEMS_THRESHOLD = 50;
+const PER_ITEM_MAX_LENGTH = 200;
+
+type RetainedRow = { content: Record<string, unknown>; status: string };
+
+function bodyOf(content: Record<string, unknown>, bodyKey: string | null): string {
+  const v = bodyKey ? content[bodyKey] : null;
+  return typeof v === "string" ? v : "";
+}
+
+// 重複の判定用：全角・半角の違い（NFKC）と、空白・改行の違いを無視する
+function normalizeForCompare(text: string): string {
+  return text.normalize("NFKC").replace(/\s+/g, "");
+}
+
+function buildRetainedItemsPrompt(retained: RetainedRow[], columnKeys: string[], bodyKey: string | null) {
+  const limit = retained.length > MANY_ITEMS_THRESHOLD ? PER_ITEM_MAX_LENGTH : Infinity;
+  const line = (r: RetainedRow) => {
+    const name = hasTitleColumn(columnKeys) && typeof r.content.name === "string" ? r.content.name : "";
+    const text = [name, bodyOf(r.content, bodyKey)].filter((t) => t !== "").join("：") || JSON.stringify(r.content);
+    return `- ${text.length > limit ? text.slice(0, limit) + "…" : text}`;
+  };
+  const rejected = retained.filter((r) => r.status === "rejected");
+  const existing = retained.filter((r) => r.status !== "rejected");
+  return {
+    existing: existing.length > 0 ? existing.map(line).join("\n") : "（なし）",
+    rejected: rejected.length > 0 ? rejected.map(line).join("\n") : "（なし）",
+    existingCount: existing.length,
+    rejectedCount: rejected.length,
+  };
+}
 
 type SourceDocumentRow = {
   id: string;
@@ -204,12 +241,34 @@ async function generateDraftInternal(
     .eq("status", "ai_draft");
   if (deleteDraftError) throw deleteDraftError;
 
+  // 3.7 人が触れた項目（確認中・確定・例外承認・不採用）を、プロンプトへ渡す。AI素案の再生成で、
+  // 確認・不採用にした内容が再び出るのを防ぐ（「既に存在する項目」と「不採用として扱った内容」を区別して渡す）。
+  // 件数は切り捨てず全て渡す（規約56）。多いときだけ、1件あたりの文字数を絞る。
+  const columnKeys = columns.map((c) => c.column_key);
+  const bodyKey = pickBodyColumnKey(columnKeys);
+  const retained = await fetchAllPages<RetainedRow>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("content, status")
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .in("status", RETAINED_STATUSES)
+      .order("id")
+      .range(from, to)
+  );
+  const retainedPrompt = buildRetainedItemsPrompt(retained, columnKeys, bodyKey);
+  const retainedBodies = new Set(
+    retained.map((r) => normalizeForCompare(bodyOf(r.content, bodyKey))).filter((b) => b !== "")
+  );
+
   // 4. プロンプトを組み立ててGeminiを呼び出す
   const { id: promptId, body: promptBody } = await getActivePrompt("extract_requirements");
   const filledPrompt = promptBody
     .replace("{chapter_name}", chapterName)
     .replace("{columns_description}", columnsDescription)
-    .replace("{document_excerpts}", excerpts.join("\n\n") + platformContext);
+    .replace("{document_excerpts}", () => excerpts.join("\n\n") + platformContext)
+    .replace("{existing_items}", () => retainedPrompt.existing)
+    .replace("{rejected_items}", () => retainedPrompt.rejected);
 
   const contents: PartUnion[] = [filledPrompt];
   for (const img of imageParts) {
@@ -240,6 +299,14 @@ async function generateDraftInternal(
   const cleaned = (response.text ?? "{}").replace(/```json|```/g, "").trim();
   const parsed = DraftResponseSchema.safeParse(JSON.parse(cleaned));
 
+  // 4.5 人が触れた項目と同じ本文のAI素案は保存しない（プロンプトで避けるよう指示しても、完全一致は出うるため）
+  const draftItems = parsed.success ? parsed.data.items : [];
+  const keptItems = draftItems.filter((item) => {
+    const body = normalizeForCompare(bodyOf(item.content, bodyKey));
+    return body === "" || !retainedBodies.has(body);
+  });
+  const excludedDuplicateCount = draftItems.length - keptItems.length;
+
   // 5. ai_interactions に記録
   await supabase.from("ai_interactions").insert({
     project_id: projectId,
@@ -248,6 +315,7 @@ async function generateDraftInternal(
       chapter_no: chapterNo,
       document_count: documents.length,
       document_inputs: results.map((r) => r.input),
+      retained_items: { existing: retainedPrompt.existingCount, rejected: retainedPrompt.rejectedCount },
       // pdf_multimodal_input.md Step1：PDF原本添付の実施状況を後から追跡できるよう記録する。
       // サイズ上限（15MB）超過時はテキスト抜粋のみへフォールバックしており、その旨をここに残す。
       pdf_attachments_included: includedPdfAttachments.map((p) => p.fileName),
@@ -256,7 +324,7 @@ async function generateDraftInternal(
         sizeBytes: p.sizeBytes,
       })),
     },
-    output: parsed.success ? parsed.data : { error: "validation_failed" },
+    output: parsed.success ? { ...parsed.data, excluded_duplicate_count: excludedDuplicateCount } : { error: "validation_failed" },
   });
 
   if (!parsed.success) {
@@ -264,7 +332,7 @@ async function generateDraftInternal(
   }
 
   // 6. requirement_items として保存（すべてai_draftステータス）
-  for (const item of parsed.data.items) {
+  for (const item of keptItems) {
     const { data: inserted, error: insertError } = await supabase
       .from("requirement_items")
       .insert({
