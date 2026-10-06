@@ -1,5 +1,5 @@
 import { createServerActionClient } from "@/lib/supabase/server";
-import { fetchAllPages } from "@/lib/paged-select";
+import { fetchExportItems } from "@/lib/export-items";
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   HeadingLevel, WidthType, AlignmentType,
@@ -96,36 +96,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (templateType === "D") {
-      const nodes = await fetchAllPages<KpiNodeRow>((from, to) =>
-        supabase
-          .from("requirement_items")
-          .select("id, parent_id, content")
-          .eq("project_id", projectId)
-          .eq("chapter_no", chapterNo)
-          .order("id")
-          .range(from, to)
-      );
+      const nodes = await fetchExportItems<KpiNodeRow>(supabase, projectId, chapterNo, "id, parent_id, content", "id");
       sections.push(...renderKpiTree(nodes));
       continue;
     }
 
     if (templateType === "E") {
-      const rows = await fetchAllPages<ChecklistRow>((from, to) =>
-        supabase
-          .from("requirement_items")
-          .select("id, parent_id, content, status")
-          .eq("project_id", projectId)
-          .eq("chapter_no", chapterNo)
-          .order("id")
-          .range(from, to)
-      );
+      const rows = await fetchExportItems<ChecklistRow>(supabase, projectId, chapterNo, "id, parent_id, content, status", "id");
       sections.push(...renderChecklist(rows));
       continue;
     }
 
     // A/B/C：表形式
-    // Phase1では確定判定に関わらず（ai_draft等の未確定項目も含めて）全項目を出力する。
-    // Phase3で「確定版のみ出力」等の要件が入る場合は、ここでstatus絞り込みを追加する。
+    // 確定判定に関わらず（ai_draft等の未確定項目も含めて）出力する。ただし不採用（rejected）は除く
+    // （除外条件はfetchExportItemsの1か所）。
     const { data: columnsData } = await supabase
       .from("chapter_column_templates")
       .select("column_key, label, applicable_chapters")
@@ -135,16 +119,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       (c) => c.applicable_chapters === null || c.applicable_chapters.includes(chapterNo)
     );
 
-    const items = await fetchAllPages<ItemRow>((from, to) =>
-      supabase
-        .from("requirement_items")
-        .select("content")
-        .eq("project_id", projectId)
-        .eq("chapter_no", chapterNo)
-        .order("order_index")
-        .order("id")
-        .range(from, to)
-    );
+    const items = await fetchExportItems<ItemRow>(supabase, projectId, chapterNo, "content");
 
     if (items.length === 0) {
       sections.push(p("（この章にはまだ項目がありません）"));
@@ -203,9 +178,10 @@ function renderKpiTree(nodes: KpiNodeRow[]): Paragraph[] {
 }
 
 // nonfunctional_ux_phase1.md：「採用した観点だけが提案書に出力されます」（ハンドオフ footer
-// の注記通り）。未採用（status:'rejected'）の観点は方針・チェック項目ごと出力対象から除く。
+// の注記通り）。未採用（status:'rejected'）の観点は、取得の時点（fetchExportItems）で除かれ、
+// 観点が無いので、その配下のチェック項目も出力されない。
 function renderChecklist(rows: ChecklistRow[]): Paragraph[] {
-  const aspects = rows.filter((r) => r.parent_id === null && r.status !== "rejected");
+  const aspects = rows.filter((r) => r.parent_id === null);
   if (aspects.length === 0) return [p("（この章にはまだ採用された観点がありません）")];
   const result: Paragraph[] = [];
   for (const aspect of aspects) {

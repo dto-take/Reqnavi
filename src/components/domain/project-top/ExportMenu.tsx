@@ -32,7 +32,7 @@ export function ExportMenu({ projectId }: { projectId: string }) {
       )}
     >
       <MenuItem onClick={() => download(`/api/projects/${projectId}/export`, "export.docx")}>Wordで出力</MenuItem>
-      <MenuItem onClick={() => download(`/api/projects/${projectId}/export-pptx`, "export.pptx")}>PowerPointで出力（サマリー）</MenuItem>
+      <MenuItem onClick={() => download(`/api/projects/${projectId}/export-pptx`, "export.pptx")}>PowerPointで出力</MenuItem>
     </Menu>
   );
 }

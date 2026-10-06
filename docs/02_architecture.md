@@ -550,6 +550,8 @@ create policy "progress_tasks_delete" on progress_tasks for delete using (is_pro
 
 - **案件メンバーの削除**：案件のメンバーであるadmin・pmのみ（`canRemoveProjectMember`＝メンバー追加と同じ条件）。`removeProjectMember(projectId, userId)`（project_membersにid列が無いためuser_idで指定）。順序は、①自分が案件のメンバーであることと権限 ②外す相手がこの案件のメンバーであること（存在しない・別の案件のメンバーは「対象が見つかりません」）③**全体の役割がpmまたはadminのメンバーが最低1人残る**ガード（権限・存在の確認のあとに判定）④削除（件数確認）。自分自身を外す操作はガードを満たすかぎり許可し、成功したら案件一覧へ移る。外したメンバーが作成・編集した項目・工数記録は残る。再度追加できる。案件ごとの役割（project_membersの役割の列）は無いため、役割の変更は実装していない（全体の役割は`/admin/users`。案件ごとの役割は`docs/backlog.md`）。RLSは`project_members_delete`（admin・pm かつ案件のメンバー）を追加し、`authenticated`にDELETE権限（GRANT）も付与した（GRANTが無いと、ポリシーがあっても`permission denied`になる）。マイグレーション：`20261007040000_add_project_members_delete_policy.sql`。
 
+- **出力（Word・PowerPoint・Excel）に含める項目**：不採用（`rejected`）の項目は含めない（確定判定の集計、10章の観点の扱いと同じ）。項目の取得は`src/lib/export-items.ts`の`fetchExportItems`（共通のページング。除外条件はここの1か所）を通す。10章は、不採用の観点が取得の時点で除かれるため、その配下のチェック項目も出力されない。業務手順表（CSV）の元の`flow_nodes`には、状態に`rejected`が無い（CHECK制約）ため、対象外。
+
 ## 5. AI呼び出しフロー
 
 ### 5.1 Flow 1（初期構築）／Flow 2（差分最適化）

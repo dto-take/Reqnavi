@@ -1,6 +1,6 @@
 import PptxGenJS from "pptxgenjs";
 import { createServerActionClient } from "@/lib/supabase/server";
-import { fetchAllPages } from "@/lib/paged-select";
+import { fetchExportItems } from "@/lib/export-items";
 import { getProjectOverview } from "@/actions/project-overview";
 import { CHAPTER_NAMES, CHAPTER_TEMPLATE_MAP as FLAT_CHAPTER_TEMPLATE_MAP } from "@/lib/chapters";
 
@@ -158,16 +158,7 @@ async function addTableSlides(pres: PptxGenJS, projectId: string, chapterNo: num
     (c) => c.applicable_chapters === null || c.applicable_chapters.includes(chapterNo)
   );
 
-  const rows = await fetchAllPages<ItemRow>((from, to) =>
-    supabase
-      .from("requirement_items")
-      .select("content")
-      .eq("project_id", projectId)
-      .eq("chapter_no", chapterNo)
-      .order("order_index")
-      .order("id")
-      .range(from, to)
-  );
+  const rows = await fetchExportItems<ItemRow>(supabase, projectId, chapterNo, "content");
   const ROWS_PER_SLIDE = 6;
 
   if (rows.length === 0) {
@@ -200,15 +191,7 @@ async function addTableSlides(pres: PptxGenJS, projectId: string, chapterNo: num
 
 async function addKpiSlide(pres: PptxGenJS, projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
-  const nodes = await fetchAllPages<KpiNodeRow>((from, to) =>
-    supabase
-      .from("requirement_items")
-      .select("id, parent_id, content")
-      .eq("project_id", projectId)
-      .eq("chapter_no", chapterNo)
-      .order("id")
-      .range(from, to)
-  );
+  const nodes = await fetchExportItems<KpiNodeRow>(supabase, projectId, chapterNo, "id, parent_id, content", "id");
 
   const slide = pres.addSlide();
   addChapterTitle(slide, chapterNo);
@@ -233,19 +216,12 @@ async function addKpiSlide(pres: PptxGenJS, projectId: string, chapterNo: number
 }
 
 // nonfunctional_ux_phase1.md：「採用した観点だけが提案書に出力されます」（ハンドオフ footer
-// の注記通り）。未採用（status:'rejected'）の観点は方針・チェック項目ごとスライド化しない。
+// の注記通り）。未採用（status:'rejected'）の観点は、方針・チェック項目ごとスライド化しない。
 async function addChecklistSlides(pres: PptxGenJS, projectId: string, chapterNo: number) {
   const supabase = await createServerActionClient();
-  const rows = await fetchAllPages<ChecklistRow>((from, to) =>
-    supabase
-      .from("requirement_items")
-      .select("id, parent_id, content, status")
-      .eq("project_id", projectId)
-      .eq("chapter_no", chapterNo)
-      .order("id")
-      .range(from, to)
-  );
-  const aspects = rows.filter((r) => r.parent_id === null && r.status !== "rejected");
+  const rows = await fetchExportItems<ChecklistRow>(supabase, projectId, chapterNo, "id, parent_id, content, status", "id");
+  // 未採用の観点は、取得の時点（fetchExportItems）で除かれる
+  const aspects = rows.filter((r) => r.parent_id === null);
 
   if (aspects.length === 0) {
     const slide = pres.addSlide();
