@@ -12,6 +12,7 @@ import { errorMessage } from "@/lib/error-message";
 import { extractContent } from "@/lib/ai/extract-content";
 import { fetchAllPages } from "@/lib/paged-select";
 import { hasTitleColumn, pickBodyColumnKey } from "@/lib/requirement-body-field";
+import { filterDuplicateDrafts } from "@/lib/draft-dedupe";
 import { DOCUMENT_EXCERPT_MAX_LENGTH } from "@/lib/ai/excerpt-limit";
 
 const DraftItemSchema = z.object({
@@ -44,6 +45,35 @@ const DRAFT_RESPONSE_SCHEMA = {
   required: ["items"],
 };
 
+// 項目をidで削除する（URLが長くならないよう分けて削除する）。onlyStatusを指定すると、その状態のものだけ消す
+// （保存した新しい素案の取り消しでは指定せず、置き換え前の素案の削除では、その間に人が触れたものを消さない）。
+// 失敗したときはエラーを返す（取り消しの失敗は、元のエラーを優先して握りつぶす）。
+async function removeItemsByIds(
+  supabase: Awaited<ReturnType<typeof createServerActionClient>>,
+  ids: string[],
+  onlyStatus: string | null
+): Promise<unknown> {
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const { error } = await (onlyStatus
+      ? supabase.from("requirement_items").delete().in("id", chunk).eq("status", onlyStatus).select("id")
+      : supabase.from("requirement_items").delete().in("id", chunk).select("id"));
+    if (error) {
+      console.error("[generateDraft] 項目の削除に失敗:", error.message);
+      return error;
+    }
+    // RLSで拒否された削除は、エラーにならず0件になる（規約47）。削除後に、対象が残っていないことを確かめる。
+    let remaining = supabase.from("requirement_items").select("id", { count: "exact", head: true }).in("id", chunk);
+    if (onlyStatus) remaining = remaining.eq("status", onlyStatus);
+    const { count, error: countError } = await remaining;
+    if (countError || (count ?? 0) > 0) {
+      console.error("[generateDraft] 項目の削除が反映されませんでした:", countError?.message ?? `${count}件が残っています`);
+      return countError ?? new Error("削除が反映されませんでした");
+    }
+  }
+  return null;
+}
+
 // 素案の再生成で、残す（人が触れた）項目の状態
 const RETAINED_STATUSES = ["se_reviewing", "confirmed", "exception_approved", "rejected"];
 // 項目が多いときの、プロンプトに載せる1件あたりの最大文字数
@@ -55,11 +85,6 @@ type RetainedRow = { content: Record<string, unknown>; status: string };
 function bodyOf(content: Record<string, unknown>, bodyKey: string | null): string {
   const v = bodyKey ? content[bodyKey] : null;
   return typeof v === "string" ? v : "";
-}
-
-// 重複の判定用：全角・半角の違い（NFKC）と、空白・改行の違いを無視する
-function normalizeForCompare(text: string): string {
-  return text.normalize("NFKC").replace(/\s+/g, "");
 }
 
 function buildRetainedItemsPrompt(retained: RetainedRow[], columnKeys: string[], bodyKey: string | null) {
@@ -230,16 +255,21 @@ async function generateDraftInternal(
     }
   }
 
-  // 3.6 既存の未レビューAI素案を削除してから再生成する（再生成＝作り直しの意図）。
+  // 3.6 置き換え前のAI素案（ai_draft）のidを控える（再生成＝作り直しの意図）。
+  // 削除は、新しい素案の保存に成功してから行う（Geminiの失敗・出力の不正で、既存の素案を失わないため）。
   // se_reviewing・confirmed・exception_approved・rejectedの項目は対象外（人が触れたものは残す）。
   // item_sourcesのFKはON DELETE CASCADEのため孤立レコードは残らない（案件削除機能のStepで対応済み）。
-  const { error: deleteDraftError } = await supabase
-    .from("requirement_items")
-    .delete()
-    .eq("project_id", projectId)
-    .eq("chapter_no", chapterNo)
-    .eq("status", "ai_draft");
-  if (deleteDraftError) throw deleteDraftError;
+  const oldDrafts = await fetchAllPages<{ id: string }>((from, to) =>
+    supabase
+      .from("requirement_items")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("chapter_no", chapterNo)
+      .eq("status", "ai_draft")
+      .order("id")
+      .range(from, to)
+  );
+  const oldDraftIds = oldDrafts.map((d) => d.id);
 
   // 3.7 人が触れた項目（確認中・確定・例外承認・不採用）を、プロンプトへ渡す。AI素案の再生成で、
   // 確認・不採用にした内容が再び出るのを防ぐ（「既に存在する項目」と「不採用として扱った内容」を区別して渡す）。
@@ -257,9 +287,6 @@ async function generateDraftInternal(
       .range(from, to)
   );
   const retainedPrompt = buildRetainedItemsPrompt(retained, columnKeys, bodyKey);
-  const retainedBodies = new Set(
-    retained.map((r) => normalizeForCompare(bodyOf(r.content, bodyKey))).filter((b) => b !== "")
-  );
 
   // 4. プロンプトを組み立ててGeminiを呼び出す
   const { id: promptId, body: promptBody } = await getActivePrompt("extract_requirements");
@@ -300,12 +327,12 @@ async function generateDraftInternal(
   const parsed = DraftResponseSchema.safeParse(JSON.parse(cleaned));
 
   // 4.5 人が触れた項目と同じ本文のAI素案は保存しない（プロンプトで避けるよう指示しても、完全一致は出うるため）
-  const draftItems = parsed.success ? parsed.data.items : [];
-  const keptItems = draftItems.filter((item) => {
-    const body = normalizeForCompare(bodyOf(item.content, bodyKey));
-    return body === "" || !retainedBodies.has(body);
-  });
-  const excludedDuplicateCount = draftItems.length - keptItems.length;
+  const { kept: keptItems, excludedCount: excludedDuplicateCount } = filterDuplicateDrafts(
+    parsed.success ? parsed.data.items : [],
+    retained.map((r) => r.content),
+    columnKeys,
+    bodyKey
+  );
 
   // 5. ai_interactions に記録
   await supabase.from("ai_interactions").insert({
@@ -331,35 +358,50 @@ async function generateDraftInternal(
     throw new UserFacingError("AIの出力形式が不正でした。プロンプトまたはモデル出力を確認してください。");
   }
 
-  // 6. requirement_items として保存（すべてai_draftステータス）
-  for (const item of keptItems) {
-    const { data: inserted, error: insertError } = await supabase
-      .from("requirement_items")
-      .insert({
-        project_id: projectId,
-        tenant_id: tenantId,
-        chapter_no: chapterNo,
-        template_type: templateType,
-        content: item.content,
-        status: "ai_draft",
-        ambiguous_flags: item.ambiguous
-          ? [{ source: "extraction" as const, reason: item.ambiguous_text ?? undefined }]
-          : [],
-        confidence: item.confidence,
-      })
-      .select("id")
-      .single();
-    if (insertError) throw insertError;
+  // 6. requirement_items として保存（すべてai_draftステータス）。
+  // 途中で失敗したら、挿入済みの新しい素案を消し、元の素案はそのまま残す。
+  const newIds: string[] = [];
+  try {
+    for (const item of keptItems) {
+      const { data: inserted, error: insertError } = await supabase
+        .from("requirement_items")
+        .insert({
+          project_id: projectId,
+          tenant_id: tenantId,
+          chapter_no: chapterNo,
+          template_type: templateType,
+          content: item.content,
+          status: "ai_draft",
+          ambiguous_flags: item.ambiguous
+            ? [{ source: "extraction" as const, reason: item.ambiguous_text ?? undefined }]
+            : [],
+          confidence: item.confidence,
+        })
+        .select("id")
+        .single();
+      if (insertError) throw insertError;
 
-    const insertedItem = inserted as unknown as { id: string };
+      const insertedItem = inserted as unknown as { id: string };
+      newIds.push(insertedItem.id);
 
-    // 出典を全対象資料に対して紐付ける（MVPでは項目単位の精密な紐付けは行わない）
-    const sourceRows = documents.map((d) => ({
-      item_id: insertedItem.id,
-      source_id: d.id,
-      location_note: item.source_ref,
-    }));
-    await supabase.from("item_sources").insert(sourceRows);
+      // 出典を全対象資料に対して紐付ける（MVPでは項目単位の精密な紐付けは行わない）
+      const sourceRows = documents.map((d) => ({
+        item_id: insertedItem.id,
+        source_id: d.id,
+        location_note: item.source_ref,
+      }));
+      const { error: sourceError } = await supabase.from("item_sources").insert(sourceRows);
+      if (sourceError) throw sourceError;
+    }
+  } catch (e) {
+    await removeItemsByIds(supabase, newIds, null);
+    throw e;
+  }
+
+  // 7. 新しい素案の保存に成功したので、置き換え前のAI素案を削除する（statusがai_draftのままのものだけ）
+  const deleteError = await removeItemsByIds(supabase, oldDraftIds, "ai_draft");
+  if (deleteError) {
+    throw new UserFacingError("新しいAI素案は保存しましたが、以前のAI素案の削除に失敗しました。重複している項目を確認してください。");
   }
 
   revalidatePath(`/projects/${projectId}/chapters/${chapterNo}`);
