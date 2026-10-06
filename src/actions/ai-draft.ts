@@ -112,10 +112,20 @@ async function generateDraftInternal(
     | { fileName: string; kind: "included"; base64: string }
     | { fileName: string; kind: "skipped_too_large"; sizeBytes: number };
 
+  // 資料ごとの入力の実態（抽出できた文字数・PDF原本の添付）。抽出が空のまま黙って素案が薄くなる状況を、
+  // ai_interactionsから後で追えるようにする。
+  type DocumentInput = { file_name: string; kind: "text" | "image" | "unsupported" | "unavailable"; text_length: number; pdf_attached: boolean };
+
   const results = await Promise.all(
-    documents.map(async (d): Promise<{ excerpt: ExcerptPart; pdfAttachment: PdfAttachment | null }> => {
+    documents.map(async (d): Promise<{ excerpt: ExcerptPart; pdfAttachment: PdfAttachment | null; input: DocumentInput }> => {
       const { data: file } = await supabase.storage.from("project-documents").download(d.storage_path);
-      if (!file) return { excerpt: { kind: "text", content: `[取得不可: ${d.file_name}]` }, pdfAttachment: null };
+      if (!file) {
+        return {
+          excerpt: { kind: "text", content: `[取得不可: ${d.file_name}]` },
+          pdfAttachment: null,
+          input: { file_name: d.file_name, kind: "unavailable", text_length: 0, pdf_attached: false },
+        };
+      }
 
       const extracted = await extractContent(file, d.file_name);
       const excerpt: ExcerptPart =
@@ -135,7 +145,13 @@ async function generateDraftInternal(
         }
       }
 
-      return { excerpt, pdfAttachment };
+      const input: DocumentInput = {
+        file_name: d.file_name,
+        kind: extracted.kind,
+        text_length: extracted.kind === "text" ? extracted.content.trim().length : 0,
+        pdf_attached: pdfAttachment?.kind === "included",
+      };
+      return { excerpt, pdfAttachment, input };
     })
   );
 
@@ -231,6 +247,7 @@ async function generateDraftInternal(
     input_summary: {
       chapter_no: chapterNo,
       document_count: documents.length,
+      document_inputs: results.map((r) => r.input),
       // pdf_multimodal_input.md Step1：PDF原本添付の実施状況を後から追跡できるよう記録する。
       // サイズ上限（15MB）超過時はテキスト抜粋のみへフォールバックしており、その旨をここに残す。
       pdf_attachments_included: includedPdfAttachments.map((p) => p.fileName),
