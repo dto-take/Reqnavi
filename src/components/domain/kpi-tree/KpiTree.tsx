@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { confirmKpiNode, type KpiNode } from "@/actions/kpi-tree";
 import { KpiTreePane } from "@/components/domain/kpi-tree/KpiTreePane";
 import { KpiDetailPane } from "@/components/domain/kpi-tree/KpiDetailPane";
+import { EMPTY_NODE_CANDIDATES, type NodeCandidates } from "@/components/domain/kpi-tree/KpiCandidatePanel";
 import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
 
@@ -54,6 +55,11 @@ export function KpiTree({
   // 本文編集欄にフォーカスを当てる。単なる選択（ツリー行クリック等）とは区別する必要があるため、
   // 「直近で新規作成され、まだフォーカスを当てていないノードID」を別state として持つ。
   const [autoFocusId, setAutoFocusId] = useState<string | null>(null);
+  // AI候補（ノードごと）。ノードの選択が切り替わっても失われないよう、ツリー全体の状態として持つ
+  const [candidateStore, setCandidateStore] = useState<Record<string, NodeCandidates>>({});
+  function updateCandidates(nodeId: string, updater: (prev: NodeCandidates) => NodeCandidates) {
+    setCandidateStore((store) => ({ ...store, [nodeId]: updater(store[nodeId] ?? EMPTY_NODE_CANDIDATES) }));
+  }
   const [isPending, startTransition] = useTransition();
   const { show } = useToast();
 
@@ -146,6 +152,8 @@ export function KpiTree({
         visibleFlatList={visibleFlatList}
         onConfirm={handleConfirmNode}
         confirmPending={isPending}
+        candidateStore={candidateStore}
+        onCandidatesChange={updateCandidates}
       />
     </div>
   );

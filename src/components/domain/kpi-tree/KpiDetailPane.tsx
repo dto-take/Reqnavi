@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Input, Textarea } from "@/components/ui/input";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
-import { KpiCandidatePanel } from "@/components/domain/kpi-tree/KpiCandidatePanel";
+import { KpiCandidatePanel, EMPTY_NODE_CANDIDATES, type NodeCandidates } from "@/components/domain/kpi-tree/KpiCandidatePanel";
 import { useToast } from "@/components/ui/toast";
 import { isItemLocked } from "@/lib/item-lock";
 
@@ -37,6 +37,8 @@ export function KpiDetailPane({
   visibleFlatList,
   onConfirm,
   confirmPending,
+  candidateStore,
+  onCandidatesChange,
 }: {
   projectId: string;
   tenantId: string;
@@ -55,6 +57,9 @@ export function KpiDetailPane({
   // 確定ロジック自体（Server Action呼び出し＋次ノードへの遷移）をKpiTree.tsx側に引き上げた。
   onConfirm: (nodeId: string) => void;
   confirmPending: boolean;
+  // AI候補（ノードごと。ツリー全体の状態として、KpiTreeが持つ）
+  candidateStore: Record<string, NodeCandidates>;
+  onCandidatesChange: (nodeId: string, updater: (prev: NodeCandidates) => NodeCandidates) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const { show } = useToast();
@@ -259,6 +264,8 @@ export function KpiDetailPane({
           projectId={projectId}
           tenantId={tenantId}
           node={selectedNode}
+          state={candidateStore[selectedNode.id] ?? EMPTY_NODE_CANDIDATES}
+          onStateChange={(updater) => onCandidatesChange(selectedNode.id, updater)}
           onAdopted={(newNodeId) => {
             if (newNodeId) onSelect(newNodeId);
           }}

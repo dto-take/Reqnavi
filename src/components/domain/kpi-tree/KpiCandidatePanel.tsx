@@ -14,23 +14,35 @@ function childLevelLabel(level: KpiLevel): string {
 
 type Candidate = { text: string; why: string };
 
-// kpi_ux_phase3.md：候補はDBに永続化せず、この画面表示中だけ保持する一時的な状態にする
-// （新しいテーブルは作らない、との指示書の方針）。呼び出し元のKpiDetailPane側で
-// key={selectedNode.id}を付けてこのコンポーネントごと再マウントさせることで、
-// 選択ノードが変わるたびに候補状態を自然にリセットする（useEffectでの手動リセット不要）。
+// 候補の状態（ノードごと）。DBには永続化せず、この画面表示中だけ保持する一時的な状態にする
+// （新しいテーブルは作らない、との指示書の方針）。ただし、ノードの選択が切り替わっても失われないよう、
+// このコンポーネントの中ではなく、ツリー全体の状態（KpiTree）に、親ノードのidをキーとして持つ。
+// （候補を1件採用すると、新しいノードが選択されてこのパネルが再マウントされる。以前は状態がここにあり、
+// 残りの候補が消えて、Geminiの呼び出し1回分が失われていた）
+export type NodeCandidates = { candidates: Candidate[]; hasGenerated: boolean };
+export const EMPTY_NODE_CANDIDATES: NodeCandidates = { candidates: [], hasGenerated: false };
+
 export function KpiCandidatePanel({
   projectId,
   tenantId,
   node,
+  state,
+  onStateChange,
   onAdopted,
 }: {
   projectId: string;
   tenantId: string;
   node: KpiNode;
+  state: NodeCandidates;
+  // ノードidを閉じ込んだ更新関数（生成の完了が、別のノードを選んだあとに届いても、元のノードの候補として保存される）
+  onStateChange: (updater: (prev: NodeCandidates) => NodeCandidates) => void;
   onAdopted: (newNodeId: string | null) => void;
 }) {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [hasGenerated, setHasGenerated] = useState(false);
+  const candidates = state.candidates;
+  const hasGenerated = state.hasGenerated;
+  const setCandidates = (next: Candidate[] | ((prev: Candidate[]) => Candidate[])) =>
+    onStateChange((prev) => ({ ...prev, candidates: typeof next === "function" ? next(prev.candidates) : next }));
+  const setHasGenerated = (v: boolean) => onStateChange((prev) => ({ ...prev, hasGenerated: v }));
   const [generating, setGenerating] = useState(false);
   const [isPending, startTransition] = useTransition();
   const { show } = useToast();
